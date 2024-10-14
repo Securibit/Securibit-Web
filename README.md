@@ -1,4 +1,4 @@
-# TOTP Wesite - Documentation
+# Securibit Website - Documentation
 A TOTP 2FA Authencator website.
 ## Usage
 ...
@@ -21,10 +21,9 @@ A TOTP 2FA Authencator website.
 ### Resources
 | Content | Service |
 | ---- | ---- |
-| Post Backend | Firebase |
-| Backend Server | Vercel |
-| Frontend Server | Vercel |
-
+| Code Backend | Firebase |
+| API Backend Server | Netlify |
+| Frontend Server | Netlify |
 
 ## Hot Reloading & Deployment
 ### pnpm (recommendation)
