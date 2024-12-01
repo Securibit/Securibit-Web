@@ -1,5 +1,5 @@
 # Securibit Website - Documentation
-A TOTP 2FA Authencator website.
+A TOTP 2FA Authencator website. 
 ## Usage
 ...
 
