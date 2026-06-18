@@ -9,7 +9,7 @@ import { User } from "firebase/auth";
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import Image from "next/image";
-import { IconButton } from "@material-tailwind/react";
+import { Button } from "@heroui/react";
 import Sidebar from "./Sidebar/Sidebar";
 import { UserData } from '@/types/userData';
 import { Bars3Icon } from '@heroicons/react/24/solid';
@@ -155,19 +155,15 @@ const Navbar = () => {
 
             {/* 更多 */}
             <div className="relative ml- md:hidden">
-              <IconButton
-                variant="text"
+              <Button
+                isIconOnly
+                variant="light"
                 size="lg"
-                onClick={() => setIsDrawerOpen(true)}
-                nonce={undefined}
-                onResize={undefined}
-                onResizeCapture={undefined}
-                placeholder={undefined}
-                onPointerEnterCapture={undefined}
-                onPointerLeaveCapture={undefined}
+                aria-label="開啟選單"
+                onPress={() => setIsDrawerOpen(true)}
               >
                 <Bars3Icon className="h-8 w-8 stroke-2 dark:invert" />
-              </IconButton>
+              </Button>
             </div>
           </div>
         </div>

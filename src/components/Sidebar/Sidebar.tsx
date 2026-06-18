@@ -1,180 +1,105 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import {
-  Typography,
-  List,
-  ListItem,
-  ListItemPrefix,
-  ListItemSuffix,
-  Chip,
   Drawer,
-  Card,
-} from "@material-tailwind/react";
+  DrawerContent,
+  DrawerHeader,
+  DrawerBody,
+  Chip,
+} from "@heroui/react";
 import { SidebarListItemProps, SidebarProps } from "@/types/Sidebar/Sidebar";
-// import BityoIcon from "@/images/icon/bityo.png";
-import { useRouter } from 'next/navigation'; import {
-  CurrencyDollarIcon,
-} from "@heroicons/react/24/solid";
+import { useRouter } from "next/navigation";
+import { CurrencyDollarIcon } from "@heroicons/react/24/solid";
 
 const SidebarListItem = (props: SidebarListItemProps) => {
   const router = useRouter();
 
   return (
-    <ListItem
+    <button
       disabled={props.disabled}
-      nonce={undefined}
-      onResize={undefined}
-      onResizeCapture={undefined}
       onClick={() => {
         props.onClick && props.onClick();
         router.push(props.link);
       }}
-      placeholder={undefined}
-      onPointerEnterCapture={undefined}
-      onPointerLeaveCapture={undefined}
+      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/10"
     >
-      <ListItemPrefix
-        nonce={undefined}
-        onResize={undefined}
-        onResizeCapture={undefined}
-        placeholder={undefined}
-        onPointerEnterCapture={undefined}
-        onPointerLeaveCapture={undefined}
-      >
-        <props.icon className="h-5 w-5" />
-      </ListItemPrefix>
-      {props.text}
-      {
-        props.chip && (
-          <ListItemSuffix
-            nonce={undefined}
-            onResize={undefined}
-            onResizeCapture={undefined}
-            placeholder={undefined}
-            onPointerEnterCapture={undefined}
-            onPointerLeaveCapture={undefined}
-          >
-            <Chip
-              value={props.chip.value}
-              size={props.chip.size}
-              variant="ghost"
-              color={props.chip.color}
-              className="rounded-full"
-            />
-          </ListItemSuffix>
-        )
-      }
-    </ListItem>
-  )
-}
+      <props.icon className="h-5 w-5" />
+      <span className="flex-1">{props.text}</span>
+      {props.chip && (
+        <Chip size={props.chip.size} variant="flat" className="rounded-full">
+          {props.chip.value}
+        </Chip>
+      )}
+    </button>
+  );
+};
 
 const Sidebar = (props: SidebarProps) => {
-  const [open, setOpen] = React.useState(0);
-  const [openAlert, setOpenAlert] = useState(true);
-  const [isDrawerOpen, setIsDrawerOpen] = React.useState(props.isDrawerOpen);
   const router = useRouter();
 
   useEffect(() => {
-    setIsDrawerOpen(props.isDrawerOpen);
+    // 與外部受控狀態同步（HeroUI Drawer 由 isOpen 控制）
   }, [props.isDrawerOpen]);
 
-  const handleOpen = (value: number) => {
-    setOpen(open === value ? 0 : value);
-  };
-
-  const openDrawer = () => setIsDrawerOpen(true);
-  const closeDrawer = () => {
-    setIsDrawerOpen(false)
-    props.setIsDrawerOpen(false);
-  };
+  const closeDrawer = () => props.setIsDrawerOpen(false);
 
   return (
-    <>
-      <Drawer open={isDrawerOpen}
-        onClose={closeDrawer}
-        nonce={undefined}
-        onResize={undefined}
-        onResizeCapture={undefined}
-        placement="right"
-        className="text-white dark:bg-blue-gray-900"
-        transition={{ type: "spring", duration: 0.8 }}
-        overlayProps={{
-          className: "fixed",
-          onClick: closeDrawer
-        }} placeholder={undefined} onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined}      >
-        <Card
-          color="transparent"
-          shadow={false}
-          className="h-full w-full p-4 overflow-y-auto" nonce={undefined} onResize={undefined} onResizeCapture={undefined} placeholder={undefined} onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined}>
+    <Drawer
+      isOpen={props.isDrawerOpen}
+      onOpenChange={(open) => props.setIsDrawerOpen(open)}
+      placement="right"
+      className="text-white dark:bg-blue-gray-900"
+    >
+      <DrawerContent>
+        <DrawerHeader>
           <button
-            className="mb-2 flex items-center gap-4 p-4"
+            className="flex items-center gap-4"
             onClick={() => {
-              router.push('/');
+              router.push("/");
               closeDrawer();
             }}
           >
-            {/* <Image
-              src={BityoIcon}
-              alt="Bityo"
-              className="h-8 w-8"
-            /> */}
-            <Typography variant="h5" className="text-black dark:text-white" nonce={undefined} onResize={undefined} onResizeCapture={undefined} placeholder={undefined} onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined}>
+            <span className="text-xl font-semibold text-black dark:text-white">
               Bityo
-            </Typography>
+            </span>
           </button>
-          <List nonce={undefined} onResize={undefined} onResizeCapture={undefined} className="dark:text-blue-gray-100" placeholder={undefined} onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined}>
-            {/* <SidebarListItem
-              key={index}
-              icon={item.icon}
-              text={item.text}
-              link={item.link}
-              disabled={item.disabled}
-              onClick={() => {
-                item.onClick && item.onClick();
-                closeDrawer();
-              }}
-              chip={item.chip}
-            /> */}
+        </DrawerHeader>
+        <DrawerBody className="dark:text-blue-gray-100">
+          <SidebarListItem
+            icon={CurrencyDollarIcon}
+            text={"驗證碼"}
+            link={"/code"}
+            disabled={false}
+            onClick={() => {
+              router.push("/code");
+              closeDrawer();
+            }}
+          />
 
-            <SidebarListItem
-              icon={CurrencyDollarIcon}
-              key={1}
-              text={'驗證碼'}
-              link={'/code'}
-              disabled={false}
-              onClick={() => {
-                router.push('/code');
-                closeDrawer();
-              }}
-            />
+          <SidebarListItem
+            icon={CurrencyDollarIcon}
+            text={"新增驗證碼"}
+            link={"/addCode"}
+            disabled={false}
+            onClick={() => {
+              router.push("/addCode");
+              closeDrawer();
+            }}
+          />
 
-            <SidebarListItem
-              icon={CurrencyDollarIcon}
-              key={1}
-              text={'新增驗證碼'}
-              link={'/addCode'}
-              disabled={false}
-              onClick={() => {
-                router.push('/addCode');
-                closeDrawer();
-              }}
-            />
-
-            <SidebarListItem
-              icon={CurrencyDollarIcon}
-              key={1}
-              text={'我的頁面'}
-              link={'/me/MyPage'}
-              disabled={false}
-              onClick={() => {
-                router.push('/me/MyPage');
-                closeDrawer();
-              }}
-            />
-          </List>
-        </Card>
-      </Drawer>
-    </>
+          <SidebarListItem
+            icon={CurrencyDollarIcon}
+            text={"我的頁面"}
+            link={"/me/MyPage"}
+            disabled={false}
+            onClick={() => {
+              router.push("/me/MyPage");
+              closeDrawer();
+            }}
+          />
+        </DrawerBody>
+      </DrawerContent>
+    </Drawer>
   );
-}
+};
 
 export default Sidebar;

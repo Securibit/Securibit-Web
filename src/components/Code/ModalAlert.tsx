@@ -1,77 +1,61 @@
-import React from "react";
 import {
   Button,
-  Dialog,
-  DialogHeader,
-  DialogBody,
-  DialogFooter,
-} from "@material-tailwind/react";
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+} from "@heroui/react";
 import { ModalProps } from "@/types/Code/ModalAlert";
 
 const DialogDefault = (props: ModalProps) => {
-  const [open, setOpen] = React.useState(false);
-
-  const handleOpen = () => setOpen(!open);
+  const { isOpen, onOpen, onOpenChange } = useDisclosure();
 
   return (
     <>
-      <button onClick={handleOpen}>
+      <button onClick={onOpen}>
         {props.children}
       </button>
-      <Dialog
-        open={open}
-        handler={handleOpen}
+      <Modal
+        isOpen={isOpen}
+        onOpenChange={onOpenChange}
         className="dark:bg-gray-blue-800"
-        placeholder={undefined}
-        onPointerEnterCapture={undefined}
-        onPointerLeaveCapture={undefined}
       >
-        <DialogHeader
-          className="text-black dark:text-white"
-          placeholder={undefined}
-          onPointerEnterCapture={undefined}
-          onPointerLeaveCapture={undefined}
-        >
-          刪除警告！
-        </DialogHeader>
-        <DialogBody
-          className="text-black dark:text-white font-normal"
-          divider
-          placeholder={undefined}
-          onPointerEnterCapture={undefined}
-          onPointerLeaveCapture={undefined}
-        >
-          請問您要刪除嗎？一經刪除就不可恢復，並且會遺失金鑰。
-        </DialogBody>
-        <DialogFooter
-          placeholder={undefined}
-          onPointerEnterCapture={undefined}
-          onPointerLeaveCapture={undefined}>
-          <Button
-            variant="text"
-            color="red"
-            onClick={handleOpen}
-            className="mr-1 border-1 border-red-600"
-            placeholder={undefined}
-            onPointerEnterCapture={undefined}
-            onPointerLeaveCapture={undefined}
-          >
-            <span>取消</span>
-          </Button>
-          <Button
-            variant="gradient"
-            color="green"
-            onClick={props.deleteTOTP}
-            placeholder={undefined}
-            onPointerEnterCapture={undefined}
-            onPointerLeaveCapture={undefined}
-          >
-            <span>刪除！</span>
-          </Button>
-        </DialogFooter>
-      </Dialog>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="text-black dark:text-white">
+                刪除警告！
+              </ModalHeader>
+              <ModalBody className="text-black dark:text-white font-normal">
+                請問您要刪除嗎？一經刪除就不可恢復，並且會遺失金鑰。
+              </ModalBody>
+              <ModalFooter>
+                <Button
+                  variant="bordered"
+                  color="danger"
+                  onPress={onClose}
+                  className="mr-1"
+                >
+                  取消
+                </Button>
+                <Button
+                  color="success"
+                  onPress={() => {
+                    props.deleteTOTP();
+                    onClose();
+                  }}
+                >
+                  刪除！
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </>
   );
-}
+};
 
 export default DialogDefault;

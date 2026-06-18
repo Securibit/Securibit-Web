@@ -1,58 +1,39 @@
 import { AlertCardProps } from "@/types/Alert/AlertCard";
-import {
-  Typography,
-  Alert,
-} from "@material-tailwind/react";
 import { CubeTransparentIcon } from "@heroicons/react/24/outline";
 
 const AlertCard = (props: AlertCardProps) => {
+  if (!props.openAlert) return null;
 
   return (
-    <Alert
-      open={props.openAlert}
-      className="mt-auto"
-      onClose={() => props.onClose()}
-    >
+    <div className="mt-auto rounded-lg bg-gray-blue-900 p-4 text-white">
+      <button
+        onClick={() => props.onClose()}
+        className="float-right text-white/70 hover:text-white"
+        aria-label="關閉"
+      >
+        ✕
+      </button>
       <CubeTransparentIcon className="mb-4 h-12 w-12" />
-      <Typography variant="h6" className="mb-1" nonce={undefined} onResize={undefined} onResizeCapture={undefined} placeholder={undefined} onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined}>
-        {props.title}
-      </Typography>
-      <Typography variant="small" className="font-normal opacity-80" nonce={undefined} onResize={undefined} onResizeCapture={undefined} placeholder={undefined} onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined}>
-        {props.description}
-      </Typography>
+      <h6 className="mb-1 text-base font-semibold">{props.title}</h6>
+      <p className="text-sm font-normal opacity-80">{props.description}</p>
       <div className="mt-4 flex gap-3">
-        <Typography
-          as="a"
+        <a
           href="#"
-          variant="small"
-          className="font-medium opacity-80"
+          className="text-sm font-medium opacity-80"
           onClick={() => props.leftBtn.onClick()}
-          nonce={undefined}
-          onResize={undefined}
-          onResizeCapture={undefined}
-          placeholder={undefined}
-          onPointerEnterCapture={undefined}
-          onPointerLeaveCapture={undefined}
         >
           {props.leftBtn.text}
-        </Typography>
-        <Typography
-          onClick={() => props.rightBtn.onClick()}
-          as="a"
+        </a>
+        <a
           href="#"
-          variant="small"
-          className="font-medium"
-          nonce={undefined} onResize={undefined}
-          onResizeCapture={undefined}
-          placeholder={undefined}
-          onPointerEnterCapture={undefined}
-          onPointerLeaveCapture={undefined}
+          className="text-sm font-medium"
+          onClick={() => props.rightBtn.onClick()}
         >
           {props.rightBtn.text}
-        </Typography>
+        </a>
       </div>
-    </Alert>
+    </div>
   );
-}
+};
 
 export default AlertCard;

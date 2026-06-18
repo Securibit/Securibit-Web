@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { TOTP } from "totp-generator";
 import { useInterval } from 'react-use';
-import { CircularProgress, Progress } from "@nextui-org/react";
+import { CircularProgress, Progress } from "@heroui/react";
 import { toast } from "react-hot-toast";
 import ModalAlert from "./Code/ModalAlert";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -18,11 +18,25 @@ interface CodeCardProps {
 const CodeCard = (props: CodeCardProps) => {
 
   const period = 30;
-  const totp = isBase32(props.code) ? TOTP.generate(props.code, { period: 30 }) : null;
+  const [otp, setOtp] = useState<string | null>(null);
 
   const calculateTimeLeft = () => {
     const currentTime = Math.floor(new Date().getTime() / 1000);
     return period - (currentTime % period);
+  };
+
+  // totp-generator v2 的 TOTP.generate 改為 async，需在 effect 中產生驗證碼
+  const generateOtp = async () => {
+    if (!isBase32(props.code)) {
+      setOtp(null);
+      return;
+    }
+    try {
+      const result = await TOTP.generate(props.code, { period });
+      setOtp(result.otp);
+    } catch {
+      setOtp(null);
+    }
   };
 
   const copyToClipboard = (text: string) => {
@@ -36,7 +50,9 @@ const CodeCard = (props: CodeCardProps) => {
 
   useEffect(() => {
     setTimeLeft(calculateTimeLeft());
-  }, []);
+    generateOtp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.code]);
 
   // 更新剩餘時間
   useInterval(() => {
@@ -44,15 +60,12 @@ const CodeCard = (props: CodeCardProps) => {
 
     if (newTimeLeft <= 0) {
       setTimeLeft(30);
+      // 進入新的時間週期時重新產生驗證碼
+      generateOtp();
     } else {
       setTimeLeft(newTimeLeft);
     }
   }, 1000);
-
-  // 如果 otp 或 timeLeft 為 null, 可以回傳加載 null 或 Loading...
-  if (totp?.otp === null || timeLeft === null) {
-    return <div>Loading...</div>;
-  }
 
   return (
     <>
@@ -86,11 +99,11 @@ const CodeCard = (props: CodeCardProps) => {
 
           </div>
           {
-            totp?.otp ? (
+            otp ? (
               <button
-                onClick={() => { totp?.otp && copyToClipboard(totp?.otp) }}
+                onClick={() => { otp && copyToClipboard(otp) }}
                 className="text-xl font-semibold text-gray-blue-900 dark:text-white">
-                {totp?.otp}
+                {otp}
               </button>
             ) : (
               <p

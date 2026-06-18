@@ -5,7 +5,7 @@ import type { AppProps } from 'next/app'
 import '../config/firebase';
 import { Toaster } from 'react-hot-toast';
 import NextNProgress from "nextjs-progressbar";
-import { NextUIProvider } from "@nextui-org/react";
+import { HeroUIProvider } from "@heroui/react";
 
 import { config } from '@fortawesome/fontawesome-svg-core'
 
@@ -43,7 +43,7 @@ const App = ({ Component, pageProps }: AppProps) => {
   }, [router]);
 
   return (
-    <NextUIProvider>
+    <HeroUIProvider>
       <ThemeProvider attribute="class" defaultTheme="dark">
         <div className={`transition-opacity duration-500 ${isTransitioning ? 'opacity-50' : 'opacity-100'}`}>
           <Layout>
@@ -53,7 +53,7 @@ const App = ({ Component, pageProps }: AppProps) => {
           </Layout>
         </div>
       </ThemeProvider>
-    </NextUIProvider>
+    </HeroUIProvider>
   )
 }
 

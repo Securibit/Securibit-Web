@@ -1,18 +1,12 @@
 import type { Config } from 'tailwindcss'
-import {nextui} from "@nextui-org/react";
-import withMT from '@material-tailwind/react/utils/withMT'
-const defaultTheme = require('tailwindcss/defaultTheme')
+import defaultTheme from 'tailwindcss/defaultTheme'
 
-const config = withMT({
+const config: Config = {
   darkMode: 'class',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
-    "./node_modules/@nextui-org/theme/dist/**/*.{js,ts,jsx,tsx}",
-    "./node_modules/@material-tailwind/react/components/**/*.{js,ts,jsx,tsx}",
-    "./node_modules/@material-tailwind/react/theme/components/**/*.{js,ts,jsx,tsx}",
-    "./node_modules/@nextui-org/theme/dist/**/*.{js,ts,jsx,tsx}"
   ],
   theme: {
     container: {
@@ -159,10 +153,6 @@ const config = withMT({
       },
     },
   },
-  plugins: [
-    nextui(),
-    require("daisyui"),
-  ],
-});
+};
 
 export default config
