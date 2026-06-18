@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import { TOTP } from "totp-generator";
 import { useInterval } from 'react-use';
@@ -20,6 +22,9 @@ const CodeCard = (props: CodeCardProps) => {
   const period = 30;
   const [otp, setOtp] = useState<string | null>(null);
 
+  // 正規化金鑰：去除空格並轉大寫（許多 secret 是小寫或含空格，否則會被判定為錯誤）
+  const normalizedCode = props.code.replace(/\s/g, '').toUpperCase();
+
   const calculateTimeLeft = () => {
     const currentTime = Math.floor(new Date().getTime() / 1000);
     return period - (currentTime % period);
@@ -27,12 +32,12 @@ const CodeCard = (props: CodeCardProps) => {
 
   // totp-generator v2 的 TOTP.generate 改為 async，需在 effect 中產生驗證碼
   const generateOtp = async () => {
-    if (!isBase32(props.code)) {
+    if (!isBase32(normalizedCode)) {
       setOtp(null);
       return;
     }
     try {
-      const result = await TOTP.generate(props.code, { period });
+      const result = await TOTP.generate(normalizedCode, { period });
       setOtp(result.otp);
     } catch {
       setOtp(null);
@@ -71,9 +76,10 @@ const CodeCard = (props: CodeCardProps) => {
     <>
       <li className="py-3 sm:py-4">
         <Progress
+          aria-label="剩餘時間"
           maxValue={30}
           value={timeLeft}
-          color="primary"
+          color={timeLeft <= 10 ? "danger" : "primary"}
           className="mb-2 h-1"
         />
         <div className="flex items-center space-x-4">
@@ -117,7 +123,7 @@ const CodeCard = (props: CodeCardProps) => {
             size="lg"
             maxValue={30}
             value={timeLeft}
-            color="primary"
+            color={timeLeft <= 10 ? "danger" : "primary"}
             formatOptions={{
               style: 'unit',
               unit: 'second',

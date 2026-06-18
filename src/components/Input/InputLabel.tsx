@@ -1,3 +1,5 @@
+"use client";
+
 import { InputLabelProps } from "@/types/Input/InputLabel";
 
 const InputLabel = (props: InputLabelProps) => {

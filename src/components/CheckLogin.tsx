@@ -11,5 +11,8 @@ export interface UserData {
     creationTime: string;
     lastSignInTime: string;
   };
+  lastLoginAt?: string;
+  lastLoginIp?: string;
+  lastLoginDevice?: string;
   totp: any[];
 }

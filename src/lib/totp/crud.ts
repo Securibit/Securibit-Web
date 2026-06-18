@@ -1,115 +1,97 @@
-import { getDocs, collection, query, where, updateDoc, deleteDoc, arrayUnion } from 'firebase/firestore';
-import { db, auth } from '@/config/firebase';
-import { UserData } from '@/types/userData';
-import { onAuthStateChanged, User, Unsubscribe } from 'firebase/auth';
+import { supabase } from '@/config/supabase';
+import { UserData, totpItems } from '@/types/userData';
 
 // Check user data
 export const loadUserData = async (uid: string) => {
-  try {
-    const userRef = collection(db, 'user');
-    const q = query(userRef, where('uid', '==', uid));
-    const querySnapshot = await getDocs(q);
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', uid)
+    .maybeSingle();
 
-    if (!querySnapshot.empty) {
-      const data = querySnapshot.docs[0].data();
-
-      // 顯式斷言為 userData 類型
-      return { success: true, data: data as UserData };
-    } else {
-      return { success: false, message: '找不到使用者資料' };
-    }
-  } catch (error: any) {
+  if (error) {
     return { success: false, message: error.message };
   }
+  if (!data) {
+    return { success: false, message: '找不到使用者資料' };
+  }
+  return { success: true, data: { uid: data.id, totp: data.totp ?? [] } as UserData };
 };
 
 // add TOTP item
-export const addTotp = async (uid: string, totp: { name: string; secret: string; category: string }): Promise<{ success: boolean; message?: string }> => {
-  try {
-    // 使用 where 查找 user 文檔
-    const userQuery = query(collection(db, 'user'), where('uid', '==', uid));
-    const userQuerySnapshot = await getDocs(userQuery);
+export const addTotp = async (
+  uid: string,
+  totp: { name: string; secret: string; category: string }
+): Promise<{ success: boolean; message?: string }> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('totp')
+    .eq('id', uid)
+    .maybeSingle();
 
-    if (!userQuerySnapshot.empty) {
-      // 找到匹配的 Doc
-      const docRef = userQuerySnapshot.docs[0].ref;
-
-      // 更新 Doc 來添加新的 TOTP
-      await updateDoc(docRef, {
-        totp: arrayUnion(totp),
-      });
-
-      return { success: true };
-    } else {
-      return { success: false, message: '未找到匹配 UID 的文檔' };
-    }
-  } catch (error: any) {
+  if (error) {
     return { success: false, message: error.message };
   }
-};
-
-// Delete user code data
-export const deleteUserCode = async (uid: string) => {
-  try {
-    const userQuery = query(collection(db, 'user'), where('uid', '==', uid));
-    const userQuerySnapshot = await getDocs(userQuery);
-
-    if (!userQuerySnapshot.empty) {
-      const userDoc = userQuerySnapshot.docs[0];
-      const userDocRef = userDoc.ref;
-      await deleteDoc(userDocRef);
-      return { success: true };
-    } else {
-      return { success: false, message: '找不到驗證碼資料' };
-    }
-  } catch (error: any) {
-    return { success: false, message: error.message };
+  if (!data) {
+    return { success: false, message: '未找到匹配 UID 的資料' };
   }
+
+  const current = (data.totp ?? []) as totpItems[];
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ totp: [...current, totp] })
+    .eq('id', uid);
+
+  if (updateError) {
+    return { success: false, message: updateError.message };
+  }
+  return { success: true };
 };
 
 // Delete TOTP item
 export const deleteTotpItem = async (uid: string, totpCode: string) => {
-  try {
-    const userRef = collection(db, 'user');
-    const q = query(userRef, where('uid', '==', uid));
-    const querySnapshot = await getDocs(q);
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('totp')
+    .eq('id', uid)
+    .maybeSingle();
 
-    if (!querySnapshot.empty) {
-      const docRef = querySnapshot.docs[0].ref;
-      const userData = querySnapshot.docs[0].data();
-      const newTotpArray = (userData.totp || []).filter((item: { secret: string; }) => item.secret !== totpCode);
-
-      await updateDoc(docRef, { totp: newTotpArray });
-      return { success: true };
-    } else {
-      return { success: false, message: '找不到 TOTP 項目' };
-    }
-  } catch (error: any) {
+  if (error) {
     return { success: false, message: error.message };
   }
+  if (!data) {
+    return { success: false, message: '找不到 TOTP 項目' };
+  }
+
+  const newTotpArray = ((data.totp ?? []) as totpItems[]).filter(
+    (item) => item.secret !== totpCode
+  );
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ totp: newTotpArray })
+    .eq('id', uid);
+
+  if (updateError) {
+    return { success: false, message: updateError.message };
+  }
+  return { success: true };
 };
 
 // Clear TOTP items
 export const clearTotpItems = async (uid: string) => {
-  try {
-    const userRef = collection(db, 'user');
-    const q = query(userRef, where('uid', '==', uid));
-    const querySnapshot = await getDocs(q);
+  const { error } = await supabase
+    .from('profiles')
+    .update({ totp: [] })
+    .eq('id', uid);
 
-    if (!querySnapshot.empty) {
-      const userDoc = querySnapshot.docs[0];
-      await updateDoc(userDoc.ref, { totp: [] });
-      return { success: true };
-    } else {
-      return { success: false, message: '找不到驗證碼' };
-    }
-  } catch (error: any) {
+  if (error) {
     return { success: false, message: error.message };
   }
+  return { success: true };
 };
 
 // check if the input is a base32 string
 export const isBase32 = (input: string) => {
-  const regex = /^[A-Z2-7]+=*$/
-  return regex.test(input)
-}
+  const regex = /^[A-Z2-7]+=*$/;
+  return regex.test(input);
+};

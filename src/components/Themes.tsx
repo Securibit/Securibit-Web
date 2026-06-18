@@ -1,3 +1,5 @@
+"use client";
+
 import { faMoon, faSun } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useState } from "react";
@@ -12,7 +14,7 @@ const Themes = () => {
 
   return (
     mounted && (
-      <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} type="button" className="flex items-center font-normal w-full sm:w-fit">
+      <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} type="button" className="flex items-center font-normal w-full sm:w-fit hover:text-tpp transition-colors">
         {
           theme === 'dark' ? (
             <>

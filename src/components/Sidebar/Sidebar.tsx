@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect } from "react";
 import {
   Drawer,
@@ -7,7 +9,7 @@ import {
   Chip,
 } from "@heroui/react";
 import { SidebarListItemProps, SidebarProps } from "@/types/Sidebar/Sidebar";
-import { useRouter } from "next/navigation";
+import { useRouter } from "next-nprogress-bar";
 import { CurrencyDollarIcon } from "@heroicons/react/24/solid";
 
 const SidebarListItem = (props: SidebarListItemProps) => {

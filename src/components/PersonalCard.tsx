@@ -1,7 +1,7 @@
+"use client";
 /* eslint-disable @next/next/no-img-element */
-import { auth } from "@/config/firebase";
-import { signOut } from "firebase/auth";
-import {useRouter} from "next/router";
+import { supabase } from "@/config/supabase";
+import {useRouter} from "next-nprogress-bar";
 import toast from "react-hot-toast";
 
 interface Props {
@@ -16,21 +16,32 @@ interface Props {
     creationTime: string;
     lastSignInTime: string;
   };
+  lastLoginAt?: string;
+  lastLoginIp?: string;
+  lastLoginDevice?: string;
 }
+
+// 將 ISO 時間轉成在地可讀格式
+const fmt = (iso?: string) => {
+  if (!iso) return '無';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? iso : d.toLocaleString('zh-TW');
+};
 
 const PersonalCard = (props: Props) => {
   const router = useRouter();
 
-  const logout_btn = () => {
-    signOut(auth).then(() => {
+  const logout_btn = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast.error(`登出失敗！\n錯誤訊息：\n${error.message}`, {
+        position: "top-right"
+      });
+    } else {
       toast.success('登出成功！', {
         position: "top-right"
       });
-    }).catch((error) => {
-      toast.success(`登出失敗！\n錯誤訊息：\n${error}`, {
-        position: "top-right"
-      });
-    });
+    }
     router.push('/');
   }
 
@@ -67,7 +78,15 @@ const PersonalCard = (props: Props) => {
               </tr>
               <tr>
                 <td className="px-2 py-2 text-gray-blue-500 font-semibold">最後登入時間</td>
-                <td className="px-2 py-2">{ props.metadata.lastSignInTime }</td>
+                <td className="px-2 py-2">{ fmt(props.lastLoginAt) }</td>
+              </tr>
+              <tr>
+                <td className="px-2 py-2 text-gray-blue-500 font-semibold">最後登入 IP</td>
+                <td className="px-2 py-2">{ props.lastLoginIp || '無' }</td>
+              </tr>
+              <tr>
+                <td className="px-2 py-2 text-gray-blue-500 font-semibold">最後登入裝置</td>
+                <td className="px-2 py-2">{ props.lastLoginDevice || '無' }</td>
               </tr>
               <tr>
                 <td className="px-2 py-2 text-gray-blue-500 font-semibold">UID</td>

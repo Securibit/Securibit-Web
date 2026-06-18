@@ -1,3 +1,5 @@
+"use client";
+
 import { AlertCardProps } from "@/types/Alert/AlertCard";
 import { CubeTransparentIcon } from "@heroicons/react/24/outline";
 

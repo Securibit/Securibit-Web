@@ -1,3 +1,5 @@
+"use client";
+
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination, Autoplay } from 'swiper/modules'; // 引入 Autoplay 和 Pagination 模組
 import 'swiper/css'; // 引入 Swiper 樣式

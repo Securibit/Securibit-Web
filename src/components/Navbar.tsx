@@ -1,3 +1,4 @@
+"use client";
 /* eslint-disable @next/next/no-img-element */
 /* eslint-disable @next/next/no-html-link-for-pages */
 
@@ -5,8 +6,8 @@ import { faKey, faPlus, faRightFromBracket } from "@fortawesome/free-solid-svg-i
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Themes from "./Themes";
 import { useEffect, useState } from "react";
-import { User } from "firebase/auth";
-import { useRouter } from 'next/navigation';
+import { AppUser } from "@/types/authUser";
+import { useRouter } from 'next-nprogress-bar';
 import { toast } from 'react-hot-toast';
 import Image from "next/image";
 import { Button } from "@heroui/react";
@@ -20,15 +21,13 @@ const Navbar = () => {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [userData, setUserData] = useState<UserData | undefined>();
-  const [user, setUser] = useState<User | undefined>();
+  const [user, setUser] = useState<AppUser | undefined>();
 
-  // 登入
+  // 登入（成功提示會在轉向回來後由 _app 顯示，這裡只處理「立即失敗」如 provider 未啟用）
   const handleLogin = async () => {
     const result = await handleGoogleLogin();
 
-    if (result.success) {
-      toast.success('登入成功！', { position: 'top-right' });
-    } else {
+    if (!result.success) {
       toast.error(`登入失敗！\n失敗原因：${result.message}`, { position: 'top-right' });
     }
   };
@@ -71,7 +70,7 @@ const Navbar = () => {
           </div>
           {/* Logo */}
           <button
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 hover:text-tpp transition-colors"
             onClick={() => router.push('/')}
           >
             <Image
@@ -90,7 +89,7 @@ const Navbar = () => {
             {
               user && <button
                 onClick={() => { router.push('/code') }}
-                className="hidden md:flex gap-2 items-center"
+                className="hidden md:flex gap-2 items-center hover:text-tpp transition-colors"
               >
                 <FontAwesomeIcon icon={faKey} className="w-4" />
                 <p>驗證碼</p>
@@ -101,7 +100,7 @@ const Navbar = () => {
             {
               user && <button
                 onClick={() => { router.push('/addCode') }}
-                className="hidden md:flex gap-2 items-center"
+                className="hidden md:flex gap-2 items-center hover:text-tpp transition-colors"
               >
                 <FontAwesomeIcon icon={faPlus} className="w-4" />
                 <p>新增驗證碼</p>
@@ -112,7 +111,7 @@ const Navbar = () => {
             {
               user && <button
                 onClick={handleLogout}
-                className="hidden md:flex gap-2 items-center"
+                className="hidden md:flex gap-2 items-center hover:text-tpp transition-colors"
               >
                 <FontAwesomeIcon icon={faRightFromBracket} className="w-4" />
                 <p>登出</p>
@@ -123,7 +122,7 @@ const Navbar = () => {
             {
               user && <button
                 onClick={() => { router.push('/me/MyPage') }}
-                className="hidden md:flex gap-2 items-center"
+                className="hidden md:flex gap-2 items-center hover:text-tpp transition-colors"
               >
 
                 <div className="relative">
@@ -141,7 +140,7 @@ const Navbar = () => {
             {
               !user && <button
                 onClick={handleLogin}
-                className="hidden md:flex gap-2 items-center"
+                className="hidden md:flex gap-2 items-center hover:text-tpp transition-colors"
               >
                 <FontAwesomeIcon icon={faRightFromBracket} className="w-4" />
                 <p>登入</p>

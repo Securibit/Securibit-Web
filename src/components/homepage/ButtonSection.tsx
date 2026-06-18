@@ -1,6 +1,8 @@
+"use client";
+
 import { faFacebook, faYoutube } from "@fortawesome/free-brands-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useRouter } from "next/router";
+import { useRouter } from "next-nprogress-bar";
 
 const ButtonSection = () => {
   const router = useRouter();
