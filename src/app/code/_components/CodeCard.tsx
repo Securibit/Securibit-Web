@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useInterval } from 'react-use';
-import { CircularProgress, Progress } from "@heroui/react";
+import { CircularProgress, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Progress } from "@heroui/react";
 import { toast } from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faArrowDown, faArrowUp, faEllipsis, faPen, faThumbtack, faTrash } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import { generateOtp } from "@/lib/totp/otp";
 import { TOTP_DEFAULTS } from "@/types/Totp/Totp";
@@ -74,27 +74,73 @@ const CodeCard = (props: CodeCardProps) => {
         className="mb-2 h-1"
       />
       <div className="flex items-center gap-3 sm:gap-4">
-        {/* 操作按鈕 */}
-        <div className="flex flex-shrink-0 gap-2">
-          <button
-            onClick={props.onEdit}
-            aria-label="編輯驗證碼"
-            className="rounded-full border-2 border-tpp w-10 h-10 flex items-center justify-center hover:bg-tpp/10 transition-colors"
-          >
-            <FontAwesomeIcon icon={faPen} className="w-4 h-4 text-tpp" />
-          </button>
-          <button
-            onClick={() => setConfirmOpen(true)}
-            aria-label="刪除驗證碼"
-            className="rounded-full border-2 border-red-500 w-10 h-10 flex items-center justify-center hover:bg-red-500/10 transition-colors"
-          >
-            <FontAwesomeIcon icon={faTrash} className="w-4 h-4 text-red-500" />
-          </button>
-        </div>
+        {/* 操作按鈕；排序模式改成上下移動 */}
+        {props.sort ? (
+          <div className="flex flex-shrink-0 gap-2">
+            <button
+              onClick={props.sort.onUp}
+              disabled={!props.sort.canUp}
+              aria-label="往上移"
+              className="rounded-full border-2 border-tpp w-10 h-10 flex items-center justify-center hover:bg-tpp/10 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <FontAwesomeIcon icon={faArrowUp} className="w-4 h-4 text-tpp" />
+            </button>
+            <button
+              onClick={props.sort.onDown}
+              disabled={!props.sort.canDown}
+              aria-label="往下移"
+              className="rounded-full border-2 border-tpp w-10 h-10 flex items-center justify-center hover:bg-tpp/10 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <FontAwesomeIcon icon={faArrowDown} className="w-4 h-4 text-tpp" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-shrink-0 gap-2">
+            <button
+              onClick={props.onEdit}
+              aria-label="編輯驗證碼"
+              className="rounded-full border-2 border-tpp w-10 h-10 flex items-center justify-center hover:bg-tpp/10 transition-colors"
+            >
+              <FontAwesomeIcon icon={faPen} className="w-4 h-4 text-tpp" />
+            </button>
+            <Dropdown className="dark:bg-gray-blue-800">
+              <DropdownTrigger>
+                <button
+                  aria-label="更多操作"
+                  className="rounded-full border-2 border-gray-blue-300 w-10 h-10 flex items-center justify-center hover:bg-gray-blue-500/10 transition-colors dark:border-gray-blue-600"
+                >
+                  <FontAwesomeIcon icon={faEllipsis} className="w-4 h-4 text-gray-blue-500 dark:text-gray-blue-300" />
+                </button>
+              </DropdownTrigger>
+              <DropdownMenu
+                aria-label="驗證碼操作"
+                onAction={(key) => {
+                  if (key === "pin") props.onTogglePin();
+                  if (key === "delete") setConfirmOpen(true);
+                }}
+              >
+                <DropdownItem key="pin" startContent={<FontAwesomeIcon icon={faThumbtack} className="w-3.5" />}>
+                  {item.pinned ? "取消釘選" : "釘選到最上面"}
+                </DropdownItem>
+                <DropdownItem
+                  key="delete"
+                  className="text-danger"
+                  color="danger"
+                  startContent={<FontAwesomeIcon icon={faTrash} className="w-3.5" />}
+                >
+                  刪除
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          </div>
+        )}
 
         {/* TOTP 名稱 */}
         <div className="flex-1 min-w-0">
           <p className="text-base sm:text-lg font-medium text-gray-blue-900 truncate dark:text-white">
+            {item.pinned && (
+              <FontAwesomeIcon icon={faThumbtack} className="mr-1.5 w-3 text-tpp" aria-label="已釘選" />
+            )}
             {item.name}
           </p>
           {item.category && (

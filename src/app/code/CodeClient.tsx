@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useRouter } from 'nextjs-toploader/app';
 import { Button, Chip, Input, Switch } from '@heroui/react';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass, faPlus, faTrashCan, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
+import { faArrowsUpDown, faCheck, faMagnifyingGlass, faPlus, faTrashCan, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import CodeCard from './_components/CodeCard';
 import TotpEditModal from './_components/TotpEditModal';
 import ConfirmModal from '@/components/ui/Modal/ConfirmModal';
@@ -13,7 +13,7 @@ import Spinner from '@/components/ui/Loading/Spinner';
 import PageContent from '@/components/layout/PageContent';
 import PageHeader from '@/components/layout/PageHeader';
 import useAuth from '@/components/auth/useAuth';
-import { TotpResult, clearTotp, deleteTotp, loadTotp, updateTotp } from '@/lib/totp/crud';
+import { TotpResult, clearTotp, deleteTotp, loadTotp, reorderTotp, updateTotp } from '@/lib/totp/crud';
 import { TotpInput, TotpItem } from '@/types/Totp/Totp';
 import { showError } from "@/lib/errorDialog";
 
@@ -57,14 +57,26 @@ const CodeClient = () => {
   // 篩選中的類別被刪光或改名時，自動回到全部
   const activeCategory = category && categories.includes(category) ? category : undefined;
 
+  // 排序模式：顯示全部項目與上下移動按鈕（篩選中的列表無法正確換位置，所以先停用搜尋）
+  const [sorting, setSorting] = useState(false);
+  // 連按排序時只採用最後一次請求的結果，避免較早的回應蓋掉較新的順序
+  const reorderSeq = useRef(0);
+
+  // 釘選的排最上面，其餘維持儲存的順序
+  const ordered = useMemo(
+    () => [...(items ?? []).filter((item) => item.pinned), ...(items ?? []).filter((item) => !item.pinned)],
+    [items]
+  );
+
   // 名稱或類別包含關鍵字（不分大小寫），再依類別篩選
   const filtered = useMemo(() => {
+    if (sorting) return ordered;
     const q = keyword.trim().toLowerCase();
-    return (items ?? []).filter((item) =>
+    return ordered.filter((item) =>
       (!activeCategory || item.category === activeCategory) &&
       (!q || item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q))
     );
-  }, [items, keyword, activeCategory]);
+  }, [ordered, sorting, keyword, activeCategory]);
 
   // 登入狀態由 AuthGate 確認過，這裡只負責載入驗證碼
   useEffect(() => {
@@ -100,6 +112,41 @@ const CodeClient = () => {
     applyResult(await deleteTotp(user.uid, id), '已成功刪除驗證碼！', '刪除驗證碼失敗');
   };
 
+  const handleTogglePin = async (item: TotpItem) => {
+    if (!user) return;
+    applyResult(
+      await updateTotp(user.uid, item.id, { pinned: !item.pinned }),
+      item.pinned ? '已取消釘選' : '已釘選到最上面',
+      item.pinned ? '取消釘選失敗' : '釘選失敗'
+    );
+  };
+
+  // 和相鄰項目交換位置（只在同一組裡移動：釘選的和未釘選的不互換）
+  const handleMove = async (index: number, offset: -1 | 1) => {
+    if (!user || !items) return;
+    const target = index + offset;
+    const next = [...ordered];
+    [next[index], next[target]] = [next[target], next[index]];
+
+    // 先換畫面，失敗再換回來
+    const previous = items;
+    setItems(next);
+    const seq = ++reorderSeq.current;
+    const result = await reorderTotp(user.uid, next.map((item) => item.id));
+    if (seq !== reorderSeq.current) return;
+    if (result.success) {
+      setItems(result.data);
+    } else {
+      setItems(previous);
+      showError('排序失敗', result.message);
+    }
+  };
+
+  const canSwap = (index: number, offset: -1 | 1) => {
+    const neighbor = ordered[index + offset];
+    return !!neighbor && !!neighbor.pinned === !!ordered[index].pinned;
+  };
+
   const handleClear = async () => {
     if (!user) return;
     applyResult(await clearTotp(user.uid), '已成功清空驗證碼！', '清空驗證碼失敗');
@@ -112,7 +159,17 @@ const CodeClient = () => {
         subtitle="點擊驗證碼即可複製"
         right={
           <>
-            {items && items.length > 0 && (
+            {items && (sorting || items.length > 1) && (
+              <Button
+                variant={sorting ? 'solid' : 'bordered'}
+                color="primary"
+                startContent={<FontAwesomeIcon icon={sorting ? faCheck : faArrowsUpDown} className="w-3.5" />}
+                onPress={() => setSorting(!sorting)}
+              >
+                {sorting ? '完成排序' : '排序'}
+              </Button>
+            )}
+            {items && items.length > 0 && !sorting && (
               <Button
                 variant="bordered"
                 color="danger"
@@ -145,44 +202,50 @@ const CodeClient = () => {
         </div>
       ) : (
         <>
-          <div className="mb-4 flex flex-col gap-3">
-            <Input
-              aria-label="搜尋驗證碼"
-              placeholder="搜尋名稱或類別"
-              value={keyword}
-              onValueChange={setKeyword}
-              isClearable
-              onClear={() => setKeyword('')}
-              startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="w-3.5 text-gray-blue-400" />}
-              className="sm:max-w-sm"
-            />
-            <Switch size="sm" isSelected={hideCodes} onValueChange={toggleHideCodes}>
-              隱藏驗證碼（點一下才顯示）
-            </Switch>
-            {categories.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                <Chip
-                  as="button"
-                  variant={activeCategory ? 'bordered' : 'solid'}
-                  color="primary"
-                  onClick={() => setCategory(undefined)}
-                >
-                  全部 {items.length}
-                </Chip>
-                {categories.map((name) => (
+          {sorting ? (
+            <p className="mb-4 text-sm text-gray-blue-500 dark:text-gray-blue-400">
+              用箭頭調整順序，釘選的項目固定排在最上面。調整完按「完成排序」。
+            </p>
+          ) : (
+            <div className="mb-4 flex flex-col gap-3">
+              <Input
+                aria-label="搜尋驗證碼"
+                placeholder="搜尋名稱或類別"
+                value={keyword}
+                onValueChange={setKeyword}
+                isClearable
+                onClear={() => setKeyword('')}
+                startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="w-3.5 text-gray-blue-400" />}
+                className="sm:max-w-sm"
+              />
+              <Switch size="sm" isSelected={hideCodes} onValueChange={toggleHideCodes}>
+                隱藏驗證碼（點一下才顯示）
+              </Switch>
+              {categories.length > 0 && (
+                <div className="flex flex-wrap gap-2">
                   <Chip
-                    key={name}
                     as="button"
-                    variant={activeCategory === name ? 'solid' : 'bordered'}
+                    variant={activeCategory ? 'bordered' : 'solid'}
                     color="primary"
-                    onClick={() => setCategory(activeCategory === name ? undefined : name)}
+                    onClick={() => setCategory(undefined)}
                   >
-                    {name} {items.filter((item) => item.category === name).length}
+                    全部 {items.length}
                   </Chip>
-                ))}
-              </div>
-            )}
-          </div>
+                  {categories.map((name) => (
+                    <Chip
+                      key={name}
+                      as="button"
+                      variant={activeCategory === name ? 'solid' : 'bordered'}
+                      color="primary"
+                      onClick={() => setCategory(activeCategory === name ? undefined : name)}
+                    >
+                      {name} {items.filter((item) => item.category === name).length}
+                    </Chip>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {filtered.length === 0 ? (
             <p className="py-10 text-center text-gray-blue-500 dark:text-gray-blue-400">
@@ -191,13 +254,24 @@ const CodeClient = () => {
           ) : (
             <div className="w-full p-4 bg-white border border-gray-blue-200 rounded-lg shadow sm:px-8 dark:bg-gray-blue-800 dark:border-gray-blue-700">
               <ul role="list" className="divide-y divide-gray-blue-200 dark:divide-gray-blue-700">
-                {filtered.map((item) => (
+                {filtered.map((item, index) => (
                   <CodeCard
                     key={item.id}
                     item={item}
                     onEdit={() => setEditing(item)}
                     onDelete={() => handleDelete(item.id)}
+                    onTogglePin={() => handleTogglePin(item)}
                     hidden={hideCodes}
+                    sort={
+                      sorting
+                        ? {
+                            canUp: canSwap(index, -1),
+                            canDown: canSwap(index, 1),
+                            onUp: () => handleMove(index, -1),
+                            onDown: () => handleMove(index, 1),
+                          }
+                        : undefined
+                    }
                   />
                 ))}
               </ul>

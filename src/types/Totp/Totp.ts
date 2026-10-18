@@ -10,6 +10,8 @@ export interface TotpItem {
   digits?: number;
   period?: number;
   algorithm?: TotpAlgorithm;
+  // 釘選的項目排在列表最上面
+  pinned?: boolean;
 }
 
 // 新增 / 編輯表單送出的內容（id 由資料層產生）
