@@ -21,8 +21,14 @@ Supabase 會配一個全新的 uuid，所以無法用 uid 對應舊資料。
 ## 1. 建立 Supabase 專案與資料表
 
 1. 在 https://supabase.com 建立專案
-2. 進 SQL Editor，貼上並執行 `supabase/migrations/0001_init.sql`
-   （建立 `profiles`、`legacy_import`、RLS 政策與 `handle_new_user` 觸發器）
+2. 進 SQL Editor，依序貼上並執行 `supabase/migrations/` 裡的每個檔案（0001 → 0007，都可重複執行）：
+   - `0001_init.sql`：`profiles`、`legacy_import`、RLS 政策與 `handle_new_user` 觸發器
+   - `0002_migration_notice.sql`：舊使用者第一次登入的遷移提示
+   - `0003_ensure_profile.sql`：登入時自動建立 profile、接回舊資料
+   - `0004_login_info.sql`：最後登入時間 / IP / 裝置
+   - `0005_totp_item_ids.sql`：每筆 TOTP 補上 id
+   - `0006_totp_rpc.sql`：新增 / 修改 / 刪除 / 排序改在資料庫裡完成，兩個裝置同時操作不會互蓋
+   - `0007_vault.sql`：使用者自行啟用的金鑰加密
 
 ## 2. 設定 Google 登入
 
