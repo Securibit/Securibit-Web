@@ -5,6 +5,7 @@ import { useRouter } from "nextjs-toploader/app";
 import toast from "react-hot-toast";
 import { supabase } from "@/config/supabase";
 import {
+  AUTH_CHANNEL,
   ensureProfile,
   getUserData,
   handleGoogleLogin,
@@ -16,6 +17,7 @@ import { AppUser, toAppUser } from "@/types/authUser";
 import { Profile } from "@/types/Profile/Profile";
 import { AuthContextValue } from "@/types/Auth/Auth";
 import { AuthProviderProps } from "@/types/Auth/AuthProvider";
+import { AuthPopupMessage } from "@/types/Auth/AuthPopup";
 import { showError } from "@/lib/errorDialog";
 
 // 掛在 Layout 最外層，全站只訂閱一次 Supabase 登入狀態，換頁不會重新抓
@@ -28,6 +30,8 @@ const AuthProvider = (props: AuthProviderProps) => {
   const [profile, setProfile] = useState<Profile>();
   // 已載入過 profile 的 uid；切回分頁時 Supabase 會再發一次 SIGNED_IN，不必重抓
   const loadedUid = useRef<string | null>(null);
+  // 這個分頁是否開了登入彈窗；同時開好幾個分頁時，只由發起的那個顯示提示、記錄登入
+  const popupPending = useRef(false);
 
   const loadProfile = useCallback(async (uid: string) => {
     // 先確保 profile 存在（沒有就依 email 接回舊資料），再讀取
@@ -78,14 +82,48 @@ const AuthProvider = (props: AuthProviderProps) => {
     return () => subscription.unsubscribe();
   }, [loadProfile]);
 
+  // 接收彈出視窗登入的結果（/auth/callback 送來）
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+
+    const channel = new BroadcastChannel(AUTH_CHANNEL);
+    channel.onmessage = async (event: MessageEvent<AuthPopupMessage>) => {
+      const message = event.data;
+      const initiated = popupPending.current;
+      popupPending.current = false;
+
+      if (message.type === 'signed-in') {
+        // 把彈窗拿到的 session 套到這個分頁，會觸發 onAuthStateChange 載入 profile
+        const { error } = await supabase.auth.setSession({
+          access_token: message.accessToken,
+          refresh_token: message.refreshToken,
+        });
+        if (error) {
+          if (initiated) showError('登入失敗', error.message);
+          return;
+        }
+        if (initiated) {
+          toast.success('登入成功！', { position: 'top-right' });
+          recordLogin();
+        }
+      } else if (message.type === 'error' && initiated) {
+        showError('登入失敗', message.message);
+      }
+    };
+
+    return () => channel.close();
+  }, []);
+
   const refresh = useCallback(async () => {
     return user ? loadProfile(user.uid) : undefined;
   }, [user, loadProfile]);
 
   // 登入（成功提示會在轉向回來後顯示，這裡只處理「立即失敗」如 provider 未啟用）
   const login = useCallback(async () => {
+    popupPending.current = true;
     const result = await handleGoogleLogin();
     if (!result.success) {
+      popupPending.current = false;
       showError('登入失敗', result.message);
     }
   }, []);

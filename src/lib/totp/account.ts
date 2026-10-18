@@ -42,26 +42,68 @@ export const ensureProfile = async () => {
   if (error) console.error('ensure_profile 失敗:', error.message);
 };
 
-// login（Google OAuth 轉向流程）
-export const handleGoogleLogin = async () => {
+// 彈出視窗登入用的頻道名稱與 callback 路徑
+export const AUTH_CHANNEL = 'securibit-auth';
+export const AUTH_CALLBACK_PATH = '/auth/callback';
+
+// 在螢幕中間開一個登入視窗
+const openLoginPopup = () => {
+  const width = 500;
+  const height = 650;
+  const left = window.screenX + (window.outerWidth - width) / 2;
+  const top = window.screenY + (window.outerHeight - height) / 2;
+  return window.open(
+    '',
+    'google-login',
+    `popup=yes,width=${width},height=${height},left=${left},top=${top}`
+  );
+};
+
+// 整頁轉向登入（彈出視窗被瀏覽器擋下時的備案）
+const redirectLogin = async () => {
   // 設旗標：轉向回來、session 真的建立後，才由 AuthProvider 顯示「登入成功」
-  if (typeof window !== 'undefined') {
-    sessionStorage.setItem('pendingLogin', '1');
-  }
+  sessionStorage.setItem('pendingLogin', '1');
 
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: {
-      redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
-    },
+    options: { redirectTo: window.location.origin },
   });
 
   if (error) {
-    if (typeof window !== 'undefined') sessionStorage.removeItem('pendingLogin');
+    sessionStorage.removeItem('pendingLogin');
     console.error('Google 登入錯誤:', error);
     return { success: false, message: error.message };
   }
-  // 成功後瀏覽器會轉向至 Google，回來時自動建立 session（不在此處顯示成功提示）
+  return { success: true };
+};
+
+/**
+ * Google 登入：開彈出視窗，登入完成後由 /auth/callback 透過 BroadcastChannel 通知原頁面
+ * （Google 登入頁有 COOP，彈窗導過去後 window.opener 會斷掉，不能用 postMessage）。
+ * 必須在點擊事件裡「同步」開窗，否則會被當成廣告擋掉，所以先開空白視窗、拿到網址再導過去。
+ */
+export const handleGoogleLogin = async (): Promise<{ success: boolean; message?: string }> => {
+  const popup = typeof BroadcastChannel !== 'undefined' ? openLoginPopup() : null;
+  if (!popup) return redirectLogin();
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}${AUTH_CALLBACK_PATH}`,
+      skipBrowserRedirect: true,
+      // 每次都讓使用者選帳號，方便切換 Google 帳號
+      queryParams: { prompt: 'select_account' },
+    },
+  });
+
+  if (error || !data.url) {
+    popup.close();
+    console.error('Google 登入錯誤:', error);
+    return { success: false, message: error?.message ?? '無法取得 Google 登入網址' };
+  }
+
+  popup.location.href = data.url;
+  popup.focus();
   return { success: true };
 };
 
