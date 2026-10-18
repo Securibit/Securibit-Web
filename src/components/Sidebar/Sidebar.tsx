@@ -11,9 +11,12 @@ import {
   InformationCircleIcon,
   KeyIcon,
   PlusCircleIcon,
+  ShieldCheckIcon,
   UserCircleIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
+import { SITE } from "@/lib/permissions/bits";
 import { SidebarListItemProps, SidebarProps } from "@/types/Sidebar/Sidebar";
 import useAuth from "../auth/useAuth";
 import Themes from "../Themes";
@@ -41,9 +44,13 @@ const SidebarListItem = (props: SidebarListItemProps) => {
 // 手機版側欄：依登入狀態顯示可用項目
 const Sidebar = (props: SidebarProps) => {
   const pathname = usePathname();
-  const { user, profile, login, logout } = useAuth();
+  const { user, profile, can, login, logout } = useAuth();
 
   const closeDrawer = () => props.setIsDrawerOpen(false);
+
+  // 前綴比對：/groups/xxx 也算在「群組」；首頁只在完全相等時亮
+  const isActive = (link: string) =>
+    link === "/" ? pathname === "/" : pathname === link || pathname.startsWith(`${link}/`);
 
   const links = [
     { icon: HomeIcon, text: "首頁", link: "/" },
@@ -51,6 +58,8 @@ const Sidebar = (props: SidebarProps) => {
       ? [
           { icon: KeyIcon, text: "驗證碼", link: "/code" },
           { icon: PlusCircleIcon, text: "新增驗證碼", link: "/addCode" },
+          { icon: UserGroupIcon, text: "群組", link: "/groups" },
+          ...(can(SITE.VIEW_ADMIN) ? [{ icon: ShieldCheckIcon, text: "後台", link: "/admin" }] : []),
           { icon: UserCircleIcon, text: "個人頁面", link: "/me/MyPage" },
         ]
       : []),
@@ -80,7 +89,7 @@ const Sidebar = (props: SidebarProps) => {
             <SidebarListItem
               key={item.link}
               {...item}
-              active={pathname === item.link}
+              active={isActive(item.link)}
               onClick={closeDrawer}
             />
           ))}

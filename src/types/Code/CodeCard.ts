@@ -5,6 +5,8 @@ export interface CodeCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onTogglePin: () => void;
+  // 分享到群組（複製一份）；沒傳就不顯示這個選項
+  onShare?: () => void;
   // 隱藏驗證碼，點一下才顯示
   hidden?: boolean;
   // 排序模式：顯示上下移動按鈕，取代其他操作

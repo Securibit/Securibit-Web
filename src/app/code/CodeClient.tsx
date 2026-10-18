@@ -9,6 +9,7 @@ import { faArrowsUpDown, faCheck, faFileExport, faMagnifyingGlass, faPlus, faTra
 import CodeCard from './_components/CodeCard';
 import TotpEditModal from './_components/TotpEditModal';
 import ExportModal from './_components/ExportModal';
+import ShareToGroupModal from './_components/ShareToGroupModal';
 import ConfirmModal from '@/components/ui/Modal/ConfirmModal';
 import Spinner from '@/components/ui/Loading/Spinner';
 import PageContent from '@/components/layout/PageContent';
@@ -37,6 +38,8 @@ const CodeClient = () => {
   const [items, setItems] = useState<TotpItem[]>();
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [editing, setEditing] = useState<TotpItem>();
+  // 要分享到群組的項目
+  const [shareTarget, setShareTarget] = useState<TotpItem>();
   const [keyword, setKeyword] = useState('');
   // 目前篩選的類別，undefined 代表全部
   const [category, setCategory] = useState<string>();
@@ -275,6 +278,7 @@ const CodeClient = () => {
                     onEdit={() => setEditing(item)}
                     onDelete={() => handleDelete(item.id)}
                     onTogglePin={() => handleTogglePin(item)}
+                    onShare={() => setShareTarget(item)}
                     hidden={hideCodes}
                     sort={
                       sorting
@@ -303,6 +307,8 @@ const CodeClient = () => {
           onSave={(input) => handleUpdate(editing.id, input)}
         />
       )}
+
+      {shareTarget && <ShareToGroupModal key={shareTarget.id} item={shareTarget} onClose={() => setShareTarget(undefined)} />}
 
       {/* 解不開的金鑰（顯示「金鑰錯誤」的項目）不匯出 */}
       {exportOpen && (

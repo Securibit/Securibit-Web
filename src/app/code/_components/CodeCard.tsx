@@ -5,9 +5,10 @@ import { useInterval } from 'react-use';
 import { CircularProgress, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Progress } from "@heroui/react";
 import { toast } from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowDown, faArrowUp, faEllipsis, faPen, faQrcode, faThumbtack, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faArrowDown, faArrowUp, faEllipsis, faPen, faQrcode, faShareFromSquare, faThumbtack, faTrash } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import { generateOtp } from "@/lib/totp/otp";
+import { isValidSecret } from "@/lib/totp/crud";
 import { TOTP_DEFAULTS } from "@/types/Totp/Totp";
 import { CodeCardProps } from "@/types/Code/CodeCard";
 import ExportItemModal from "./ExportItemModal";
@@ -59,6 +60,9 @@ const CodeCard = (props: CodeCardProps) => {
       showError("無法複製", "瀏覽器不允許存取剪貼簿，請手動複製驗證碼。");
     }
   };
+
+  // 金鑰錯誤（含解不開的密文）時不能匯出、也不能分享
+  const secretInvalid = otp?.value === null || !isValidSecret(item.secret);
 
   const danger = timeLeft <= Math.min(10, period / 3);
 
@@ -117,10 +121,11 @@ const CodeCard = (props: CodeCardProps) => {
               <DropdownMenu
                 aria-label="驗證碼操作"
                 // 金鑰錯誤時匯出的 QR Code 也不能用
-                disabledKeys={otp?.value === null ? ["export"] : []}
+                disabledKeys={secretInvalid ? ["export", "share"] : []}
                 onAction={(key) => {
                   if (key === "pin") props.onTogglePin();
                   if (key === "export") setExportOpen(true);
+                  if (key === "share") props.onShare?.();
                   if (key === "delete") setConfirmOpen(true);
                 }}
               >
@@ -130,6 +135,11 @@ const CodeCard = (props: CodeCardProps) => {
                 <DropdownItem key="export" startContent={<FontAwesomeIcon icon={faQrcode} className="w-3.5" />}>
                   匯出 QR Code
                 </DropdownItem>
+                {props.onShare ? (
+                  <DropdownItem key="share" startContent={<FontAwesomeIcon icon={faShareFromSquare} className="w-3.5" />}>
+                    分享到群組
+                  </DropdownItem>
+                ) : null}
                 <DropdownItem
                   key="delete"
                   className="text-danger"

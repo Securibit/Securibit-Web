@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { faKey, faPlus, faRightFromBracket } from "@fortawesome/free-solid-svg-icons";
+import { faKey, faPlus, faRightFromBracket, faShieldHalved, faUserGroup } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Themes from "./Themes";
 import { useState } from "react";
@@ -11,11 +11,12 @@ import { Button } from "@heroui/react";
 import Sidebar from "./Sidebar/Sidebar";
 import { Bars3Icon } from '@heroicons/react/24/solid';
 import useAuth from "./auth/useAuth";
+import { SITE } from "@/lib/permissions/bits";
 
 // 整個 Navbar
 const Navbar = () => {
   const router = useRouter();
-  const { user, profile, login: handleLogin, logout: handleLogout } = useAuth();
+  const { user, profile, can, login: handleLogin, logout: handleLogout } = useAuth();
   // 優先顯示使用者在個人頁面改過的名稱與大頭照
   const displayName = profile?.name || user?.displayName;
   const photoURL = profile?.photoURL || user?.photoURL;
@@ -65,6 +66,28 @@ const Navbar = () => {
               >
                 <FontAwesomeIcon icon={faPlus} className="w-4" />
                 <p>新增驗證碼</p>
+              </button>
+            }
+
+            {/* 群組 */}
+            {
+              user && <button
+                onClick={() => { router.push('/groups') }}
+                className="hidden md:flex gap-2 items-center hover:text-tpp transition-colors"
+              >
+                <FontAwesomeIcon icon={faUserGroup} className="w-4" />
+                <p>群組</p>
+              </button>
+            }
+
+            {/* 後台（需要「進入後台」權限） */}
+            {
+              user && can(SITE.VIEW_ADMIN) && <button
+                onClick={() => { router.push('/admin') }}
+                className="hidden md:flex gap-2 items-center hover:text-tpp transition-colors"
+              >
+                <FontAwesomeIcon icon={faShieldHalved} className="w-4" />
+                <p>後台</p>
               </button>
             }
 

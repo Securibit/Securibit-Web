@@ -86,6 +86,7 @@ const VaultSettings = () => {
       <p className="mt-1 mb-4 text-sm text-gray-blue-500 dark:text-gray-blue-400">
         啟用後，驗證碼的金鑰會先在你的瀏覽器用密碼加密才存到伺服器，資料庫裡只剩密文，連網站管理者也看不到。
         名稱與類別不會加密。每次在新的裝置或登出後都要輸入密碼。
+        啟用後，網站管理員也無法查看你的金鑰；分享到群組的驗證碼不會加密。
       </p>
 
       {vault.status === "loading" && <Spinner label="確認加密狀態…" />}

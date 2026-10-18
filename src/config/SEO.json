@@ -79,5 +79,41 @@
         "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
         "author": "TershiXia",
         "copyright": "TershiXia"
+    },
+    "Groups": {
+        "title": "群組",
+        "description": "和其他人共用 2FA 驗證碼的群組"
+    },
+    "Group": {
+        "title": "群組",
+        "description": "群組的驗證碼、成員與身分組"
+    },
+    "Invite": {
+        "title": "加入群組",
+        "description": "透過邀請連結加入群組"
+    },
+    "Admin": {
+        "title": "後台",
+        "description": "管理使用者、身分組與群組"
+    },
+    "AdminUsers": {
+        "title": "使用者管理",
+        "description": "後台：使用者列表"
+    },
+    "AdminUser": {
+        "title": "使用者詳情",
+        "description": "後台：使用者資料、身分組與 2FA"
+    },
+    "AdminRoles": {
+        "title": "身分組管理",
+        "description": "後台：全站身分組與權限"
+    },
+    "AdminGroups": {
+        "title": "群組管理",
+        "description": "後台：所有群組"
+    },
+    "AdminAudit": {
+        "title": "操作紀錄",
+        "description": "後台：全站操作紀錄"
     }
 }
