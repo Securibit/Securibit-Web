@@ -4,6 +4,8 @@ import { VaultInfo } from "@/types/Vault/Vault";
 export interface Profile {
   uid: string;
   name: string;
+  // 使用者自己取的 @ID（不含 @，沒有時為空字串）
+  username: string;
   email: string;
   photoURL: string;
   bgPhotoURL: string;

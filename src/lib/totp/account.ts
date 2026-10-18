@@ -1,11 +1,13 @@
 import { Profile } from '@/types/Profile/Profile';
 import { supabase } from '@/config/supabase';
 import { AppUser } from '@/types/authUser';
+import { rpc } from '@/lib/rpc';
 
 // 將 profiles 資料列（snake_case）轉成 App 內部使用的 Profile
 export const rowToProfile = (row: any): Profile => ({
   uid: row.id,
   name: row.name ?? '',
+  username: row.username ?? '',
   email: row.email ?? '',
   photoURL: row.photo_url ?? '',
   bgPhotoURL: row.bg_photo_url ?? '',
@@ -36,6 +38,17 @@ export const recordLogin = async () => {
     // 記錄失敗不影響登入流程
   }
 };
+
+// 設定自己的 @ID（空字串代表清除），回傳實際存進去的值（小寫）
+export const setUsername = (username: string) =>
+  rpc<string | null>('set_username', { new_username: username.trim().replace(/^@/, '') });
+
+// @ID 可不可以用（格式正確、不是保留字、沒人用）
+export const isUsernameAvailable = (username: string) =>
+  rpc<boolean>('username_available', { name: username.trim().replace(/^@/, '').toLowerCase() });
+
+// @ID 格式：3～32 字，小寫英數、底線、點
+export const USERNAME_PATTERN = /^[a-z0-9_.]{3,32}$/;
 
 // 確保使用者有 profile（沒有就依 email 自我修復、接回舊資料）。冪等、可重複呼叫。
 export const ensureProfile = async () => {

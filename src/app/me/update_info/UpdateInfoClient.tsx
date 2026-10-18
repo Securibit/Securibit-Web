@@ -12,6 +12,7 @@ import PageHeader from "@/components/layout/PageHeader";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import { deleteAccount, submitChange, syncGoogleUserData } from "@/lib/totp/account";
 import { Profile } from "@/types/Profile/Profile";
+import UsernameSettings from "./_components/UsernameSettings";
 import VaultSettings from "./_components/VaultSettings";
 import { showError } from "@/lib/errorDialog";
 
@@ -170,6 +171,8 @@ const UpdateInfoClient = () => {
           </Button>
         </div>
       </form>
+
+      <UsernameSettings />
 
       <VaultSettings />
 
