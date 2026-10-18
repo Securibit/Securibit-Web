@@ -5,11 +5,12 @@ import { useInterval } from 'react-use';
 import { CircularProgress, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Progress } from "@heroui/react";
 import { toast } from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowDown, faArrowUp, faEllipsis, faPen, faThumbtack, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faArrowDown, faArrowUp, faEllipsis, faPen, faQrcode, faThumbtack, faTrash } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import { generateOtp } from "@/lib/totp/otp";
 import { TOTP_DEFAULTS } from "@/types/Totp/Totp";
 import { CodeCardProps } from "@/types/Code/CodeCard";
+import ExportItemModal from "./ExportItemModal";
 import { showError } from "@/lib/errorDialog";
 
 // 每 4 位插一個空白方便閱讀（6 位數 → 123 456，8 位數 → 1234 5678）
@@ -48,6 +49,7 @@ const CodeCard = (props: CodeCardProps) => {
   }, [otpKey]);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -116,11 +118,15 @@ const CodeCard = (props: CodeCardProps) => {
                 aria-label="驗證碼操作"
                 onAction={(key) => {
                   if (key === "pin") props.onTogglePin();
+                  if (key === "export") setExportOpen(true);
                   if (key === "delete") setConfirmOpen(true);
                 }}
               >
                 <DropdownItem key="pin" startContent={<FontAwesomeIcon icon={faThumbtack} className="w-3.5" />}>
                   {item.pinned ? "取消釘選" : "釘選到最上面"}
+                </DropdownItem>
+                <DropdownItem key="export" startContent={<FontAwesomeIcon icon={faQrcode} className="w-3.5" />}>
+                  匯出 QR Code
                 </DropdownItem>
                 <DropdownItem
                   key="delete"
@@ -201,6 +207,8 @@ const CodeCard = (props: CodeCardProps) => {
           showValueLabel={true}
         />
       </div>
+
+      {exportOpen && <ExportItemModal item={item} onClose={() => setExportOpen(false)} />}
 
       <ConfirmModal
         isOpen={confirmOpen}

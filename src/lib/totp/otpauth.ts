@@ -1,4 +1,4 @@
-import { TOTP_ALGORITHMS, TOTP_DEFAULTS, TOTP_DIGITS, TOTP_PERIODS, TotpAlgorithm, TotpInput } from '@/types/Totp/Totp';
+import { TOTP_ALGORITHMS, TOTP_DEFAULTS, TOTP_DIGITS, TOTP_PERIODS, TotpAlgorithm, TotpInput, TotpItem } from '@/types/Totp/Totp';
 import { isValidSecret, normalizeSecret } from './crud';
 
 export type OtpauthResult =
@@ -15,15 +15,25 @@ const toAlgorithm = (value: string | null): TotpAlgorithm | undefined => {
 };
 
 /**
+ * 組出顯示名稱：label 可能是「Issuer:account」或只有 account，issuer 參數優先。
+ * 結果為「Issuer - account」，只有其中一個就用那個。
+ */
+export const composeName = (label: string, issuerParam = '') => {
+  const separator = label.indexOf(':');
+  const labelIssuer = separator >= 0 ? label.slice(0, separator).trim() : '';
+  const account = (separator >= 0 ? label.slice(separator + 1) : label).trim();
+  const issuer = issuerParam.trim() || labelIssuer;
+
+  if (issuer && account && issuer !== account) return `${issuer} - ${account}`;
+  return issuer || account || '未命名';
+};
+
+/**
  * 解析 otpauth://totp/Issuer:account?secret=...&issuer=...&digits=6&period=30&algorithm=SHA1
  * （Key URI Format，各服務的綁定 QR Code 內容就是這個）
  */
 export const parseOtpauthUri = (text: string): OtpauthResult => {
   const raw = text.trim();
-
-  if (raw.startsWith('otpauth-migration://')) {
-    return fail('這是 Google Authenticator 的「匯出帳戶」格式，目前不支援，請改用各服務的綁定 QR Code');
-  }
 
   let url: URL;
   try {
@@ -56,17 +66,25 @@ export const parseOtpauthUri = (text: string): OtpauthResult => {
   const algorithm = toAlgorithm(params.get('algorithm'));
   if (!algorithm) return fail(`不支援 ${params.get('algorithm')} 演算法`);
 
-  // label 可能是「Issuer:account」或只有 account
   const label = decodeURIComponent(url.pathname.replace(/^\//, '')).trim();
-  const separator = label.indexOf(':');
-  const labelIssuer = separator >= 0 ? label.slice(0, separator).trim() : '';
-  const account = separator >= 0 ? label.slice(separator + 1).trim() : label;
-  const issuer = params.get('issuer')?.trim() || labelIssuer;
-
-  const name = issuer && account ? `${issuer} - ${account}` : issuer || account || '未命名';
+  const name = composeName(label, params.get('issuer') ?? '');
+  // category 不是標準參數，是本站匯出備份時加上的，其他 App 會忽略
+  const category = params.get('category')?.trim() ?? '';
 
   return {
     success: true,
-    data: { name, secret, category: '', digits, period, algorithm },
+    data: { name, secret, category, digits, period, algorithm },
   };
+};
+
+/** 產生 otpauth:// 連結（可轉成 QR Code 給其他驗證器 App 掃） */
+export const buildOtpauthUri = (item: TotpItem) => {
+  const params = new URLSearchParams({
+    secret: normalizeSecret(item.secret),
+    algorithm: (item.algorithm ?? TOTP_DEFAULTS.algorithm).replace('-', ''),
+    digits: String(item.digits ?? TOTP_DEFAULTS.digits),
+    period: String(item.period ?? TOTP_DEFAULTS.period),
+  });
+  if (item.category) params.set('category', item.category);
+  return `otpauth://totp/${encodeURIComponent(item.name)}?${params.toString()}`;
 };

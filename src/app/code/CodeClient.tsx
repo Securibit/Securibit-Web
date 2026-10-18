@@ -5,9 +5,10 @@ import toast from 'react-hot-toast';
 import { useRouter } from 'nextjs-toploader/app';
 import { Button, Chip, Input, Switch } from '@heroui/react';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowsUpDown, faCheck, faMagnifyingGlass, faPlus, faTrashCan, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
+import { faArrowsUpDown, faCheck, faFileExport, faMagnifyingGlass, faPlus, faTrashCan, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import CodeCard from './_components/CodeCard';
 import TotpEditModal from './_components/TotpEditModal';
+import ExportModal from './_components/ExportModal';
 import ConfirmModal from '@/components/ui/Modal/ConfirmModal';
 import Spinner from '@/components/ui/Loading/Spinner';
 import PageContent from '@/components/layout/PageContent';
@@ -59,6 +60,7 @@ const CodeClient = () => {
 
   // 排序模式：顯示全部項目與上下移動按鈕（篩選中的列表無法正確換位置，所以先停用搜尋）
   const [sorting, setSorting] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   // 連按排序時只採用最後一次請求的結果，避免較早的回應蓋掉較新的順序
   const reorderSeq = useRef(0);
 
@@ -167,6 +169,15 @@ const CodeClient = () => {
                 onPress={() => setSorting(!sorting)}
               >
                 {sorting ? '完成排序' : '排序'}
+              </Button>
+            )}
+            {items && items.length > 0 && !sorting && (
+              <Button
+                variant="bordered"
+                startContent={<FontAwesomeIcon icon={faFileExport} className="w-3.5" />}
+                onPress={() => setExportOpen(true)}
+              >
+                匯出
               </Button>
             )}
             {items && items.length > 0 && !sorting && (
@@ -289,6 +300,8 @@ const CodeClient = () => {
           onSave={(input) => handleUpdate(editing.id, input)}
         />
       )}
+
+      {exportOpen && <ExportModal items={ordered} onClose={() => setExportOpen(false)} />}
 
       <ConfirmModal
         isOpen={confirmClearOpen}
