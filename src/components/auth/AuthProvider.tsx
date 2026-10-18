@@ -16,6 +16,7 @@ import { AppUser, toAppUser } from "@/types/authUser";
 import { Profile } from "@/types/Profile/Profile";
 import { AuthContextValue } from "@/types/Auth/Auth";
 import { AuthProviderProps } from "@/types/Auth/AuthProvider";
+import { showError } from "@/lib/errorDialog";
 
 // 掛在 Layout 最外層，全站只訂閱一次 Supabase 登入狀態，換頁不會重新抓
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -34,7 +35,7 @@ const AuthProvider = (props: AuthProviderProps) => {
     const result = await getUserData(uid);
     setProfile(result.success ? result.data : undefined);
     if (!result.success) {
-      toast.error('找不到使用者資料！', { position: 'top-right' });
+      showError('載入使用者資料失敗', result.message);
     }
     return result.data;
   }, []);
@@ -85,7 +86,7 @@ const AuthProvider = (props: AuthProviderProps) => {
   const login = useCallback(async () => {
     const result = await handleGoogleLogin();
     if (!result.success) {
-      toast.error(`登入失敗！\n失敗原因：${result.message}`, { position: 'top-right' });
+      showError('登入失敗', result.message);
     }
   }, []);
 
@@ -95,7 +96,7 @@ const AuthProvider = (props: AuthProviderProps) => {
       toast.success('登出成功！', { position: 'top-right' });
       router.push('/');
     } else {
-      toast.error(`登出失敗！\n錯誤訊息：${result.message}`, { position: 'top-right' });
+      showError('登出失敗', result.message);
     }
   }, [router]);
 

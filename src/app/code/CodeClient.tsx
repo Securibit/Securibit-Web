@@ -15,6 +15,7 @@ import PageHeader from '@/components/layout/PageHeader';
 import useAuth from '@/components/auth/useAuth';
 import { TotpResult, clearTotp, deleteTotp, loadTotp, updateTotp } from '@/lib/totp/crud';
 import { TotpInput, TotpItem } from '@/types/Totp/Totp';
+import { showError } from "@/lib/errorDialog";
 
 const CodeClient = () => {
   const { user } = useAuth();
@@ -52,7 +53,7 @@ const CodeClient = () => {
         setItems(result.data);
       } else {
         setItems([]);
-        toast.error(`載入驗證碼失敗！\n錯誤訊息：${result.message}`, { position: 'top-right' });
+        showError('載入驗證碼失敗', result.message);
       }
     });
   }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -63,24 +64,24 @@ const CodeClient = () => {
       setItems(result.data);
       toast.success(successText, { position: 'top-right' });
     } else {
-      toast.error(`${failText}\n錯誤訊息：${result.message}`, { position: 'top-right' });
+      showError(failText, result.message);
     }
     return result.success;
   };
 
   const handleUpdate = async (id: string, input: TotpInput) => {
     if (!user) return false;
-    return applyResult(await updateTotp(user.uid, id, input), '已儲存驗證碼！', '儲存驗證碼失敗！');
+    return applyResult(await updateTotp(user.uid, id, input), '已儲存驗證碼！', '儲存驗證碼失敗');
   };
 
   const handleDelete = async (id: string) => {
     if (!user) return;
-    applyResult(await deleteTotp(user.uid, id), '已成功刪除驗證碼！', '刪除驗證碼失敗！');
+    applyResult(await deleteTotp(user.uid, id), '已成功刪除驗證碼！', '刪除驗證碼失敗');
   };
 
   const handleClear = async () => {
     if (!user) return;
-    applyResult(await clearTotp(user.uid), '已成功清空驗證碼！', '清空驗證碼失敗！');
+    applyResult(await clearTotp(user.uid), '已成功清空驗證碼！', '清空驗證碼失敗');
   };
 
   return (

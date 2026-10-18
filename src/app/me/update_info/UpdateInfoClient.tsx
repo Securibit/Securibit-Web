@@ -12,6 +12,7 @@ import PageHeader from "@/components/layout/PageHeader";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import { deleteAccount, submitChange, syncGoogleUserData } from "@/lib/totp/account";
 import { Profile } from "@/types/Profile/Profile";
+import { showError } from "@/lib/errorDialog";
 
 type ProfileForm = Pick<Profile, 'name' | 'phoneNumber' | 'photoURL' | 'bgPhotoURL'>;
 
@@ -63,7 +64,7 @@ const UpdateInfoClient = () => {
       await refresh();
       toast.success('修改成功！', { position: 'top-right' });
     } else {
-      toast.error(`修改失敗！\n錯誤訊息：${result.message}`, { position: 'top-right' });
+      showError('修改失敗', result.message);
     }
   };
 
@@ -77,7 +78,7 @@ const UpdateInfoClient = () => {
       setForm(toForm(await refresh()));
       toast.success('同步 Google 資料成功！', { position: 'top-right' });
     } catch (error) {
-      toast.error(`同步 Google 資料失敗！\n錯誤訊息：${(error as Error).message}`, { position: 'top-right' });
+      showError('同步 Google 資料失敗', (error as Error).message);
     } finally {
       setSyncing(false);
     }
@@ -90,7 +91,7 @@ const UpdateInfoClient = () => {
       router.push('/');
       toast.success('刪除帳號成功！', { position: 'top-right' });
     } catch (error) {
-      toast.error(`刪除帳號失敗！\n錯誤訊息：${(error as Error).message}`, { position: 'top-right' });
+      showError('刪除帳號失敗', (error as Error).message);
     }
   };
 

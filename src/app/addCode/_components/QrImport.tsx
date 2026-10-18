@@ -9,6 +9,7 @@ import { decodeQrFromFile } from "@/lib/qr";
 import { parseOtpauthUri } from "@/lib/totp/otpauth";
 import { QrImportProps } from "@/types/AddCode/QrImport";
 import CameraScanModal from "./CameraScanModal";
+import { showError } from "@/lib/errorDialog";
 
 // 從 otpauth:// 連結、QR Code 圖片或相機匯入，解析後交給表單
 const QrImport = (props: QrImportProps) => {
@@ -20,7 +21,7 @@ const QrImport = (props: QrImportProps) => {
   const importText = (text: string) => {
     const result = parseOtpauthUri(text);
     if (!result.success) {
-      toast.error(result.message, { position: "top-right" });
+      showError("無法匯入", result.message);
       return false;
     }
     props.onImport(result.data);
@@ -36,10 +37,10 @@ const QrImport = (props: QrImportProps) => {
       if (text) {
         importText(text);
       } else {
-        toast.error("圖片中找不到 QR Code，請換一張清楚一點的截圖", { position: "top-right" });
+        showError("找不到 QR Code", "圖片中找不到 QR Code，請換一張清楚一點的截圖。");
       }
     } catch {
-      toast.error("無法讀取這張圖片", { position: "top-right" });
+      showError("無法讀取圖片", "這個檔案無法當成圖片讀取，請改用 PNG 或 JPG 截圖。");
     } finally {
       setDecoding(false);
       // 清空才能再次選同一個檔案

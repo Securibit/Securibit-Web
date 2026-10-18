@@ -14,6 +14,7 @@ import { addTotp, loadTotp } from "@/lib/totp/crud";
 import { TotpErrors, validateTotpInput } from "@/lib/totp/validate";
 import { TOTP_DEFAULTS, TotpInput, TotpItem } from "@/types/Totp/Totp";
 import QrImport from "./_components/QrImport";
+import { showError } from "@/lib/errorDialog";
 
 const EMPTY_FORM: TotpInput = { name: '', secret: '', category: '', ...TOTP_DEFAULTS };
 
@@ -73,7 +74,7 @@ const AddCodeClient = () => {
       setTotp({ ...EMPTY_FORM, category: totp.category });
       setFormKey((key) => key + 1);
     } else {
-      toast.error(`新增 TOTP 失敗！\n錯誤訊息：${result.message}`, { position: 'top-right' });
+      showError('新增驗證碼失敗', result.message);
     }
   };
 

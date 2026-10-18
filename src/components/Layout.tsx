@@ -3,6 +3,7 @@
 import { Toaster } from "react-hot-toast";
 import AuthProvider from "./auth/AuthProvider";
 import AuthGate from "./auth/AuthGate";
+import ErrorDialogHost from "./ui/Modal/ErrorDialogHost";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 import { LayoutData } from "@/types/Layout/Layout";
@@ -18,7 +19,9 @@ const Layout = ({ children }: LayoutData) => {
         </main>
         <Footer />
       </div>
+      {/* 成功訊息用 toast，錯誤一律用要按確定的對話框 */}
       <Toaster />
+      <ErrorDialogHost />
     </AuthProvider>
   );
 };

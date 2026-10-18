@@ -10,6 +10,7 @@ import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import { generateOtp } from "@/lib/totp/otp";
 import { TOTP_DEFAULTS } from "@/types/Totp/Totp";
 import { CodeCardProps } from "@/types/Code/CodeCard";
+import { showError } from "@/lib/errorDialog";
 
 // 每 4 位插一個空白方便閱讀（6 位數 → 123 456，8 位數 → 1234 5678）
 const formatOtp = (otp: string) =>
@@ -49,7 +50,7 @@ const CodeCard = (props: CodeCardProps) => {
       await navigator.clipboard.writeText(text);
       toast.success("已複製驗證碼！", { position: "top-right" });
     } catch {
-      toast.error("無法存取剪貼簿，請手動複製。", { position: "top-right" });
+      showError("無法複製", "瀏覽器不允許存取剪貼簿，請手動複製驗證碼。");
     }
   };
 

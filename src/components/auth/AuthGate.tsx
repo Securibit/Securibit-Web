@@ -3,10 +3,10 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useRouter } from "nextjs-toploader/app";
-import toast from "react-hot-toast";
 import Spinner from "@/components/ui/Loading/Spinner";
 import { AuthGateProps } from "@/types/Auth/AuthGate";
 import useAuth from "./useAuth";
+import { showError } from "@/lib/errorDialog";
 
 // 需要登入才能進的路徑（前綴比對）
 const PROTECTED_ROUTES = ['/code', '/addCode', '/me'];
@@ -29,7 +29,7 @@ const AuthGate = (props: AuthGateProps) => {
   useEffect(() => {
     if (!needLogin) return;
 
-    toast.error('請先登入！', { position: 'top-right' });
+    showError('請先登入', '這個頁面需要登入才能使用，請先使用 Google 登入。');
     // 用 replace：未登入的頁面不該留在上一頁的歷史裡
     router.replace('/');
   }, [needLogin, router]);
