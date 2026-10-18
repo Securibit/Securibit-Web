@@ -124,7 +124,8 @@ export const syncGoogleUserData = async (user: AppUser) => {
       email: user.email,
       photo_url: user.photoURL,
       email_verified: user.emailVerified,
-      phone_number: user.phoneNumber ?? '',
+      // Google 帳號通常沒有電話，沒有時保留使用者自己填的
+      ...(user.phoneNumber ? { phone_number: user.phoneNumber } : {}),
       creation_time: user.metadata.creationTime,
       last_sign_in_time: user.metadata.lastSignInTime,
       updated_at: new Date().toISOString(),

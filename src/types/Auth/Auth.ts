@@ -6,8 +6,8 @@ export interface AuthContextValue {
   loading: boolean;
   user?: AppUser;
   profile?: Profile;
-  // 重新讀取 profile（修改個人資料後使用）
-  refresh: () => Promise<void>;
+  // 重新讀取 profile（修改個人資料後使用），回傳最新資料
+  refresh: () => Promise<Profile | undefined>;
   login: () => Promise<void>;
   logout: () => Promise<void>;
 }

@@ -36,6 +36,7 @@ const AuthProvider = (props: AuthProviderProps) => {
     if (!result.success) {
       toast.error('找不到使用者資料！', { position: 'top-right' });
     }
+    return result.data;
   }, []);
 
   useEffect(() => {
@@ -77,7 +78,7 @@ const AuthProvider = (props: AuthProviderProps) => {
   }, [loadProfile]);
 
   const refresh = useCallback(async () => {
-    if (user) await loadProfile(user.uid);
+    return user ? loadProfile(user.uid) : undefined;
   }, [user, loadProfile]);
 
   // 登入（成功提示會在轉向回來後顯示，這裡只處理「立即失敗」如 provider 未啟用）

@@ -15,7 +15,10 @@ import useAuth from "./auth/useAuth";
 // 整個 Navbar
 const Navbar = () => {
   const router = useRouter();
-  const { user, login: handleLogin, logout: handleLogout } = useAuth();
+  const { user, profile, login: handleLogin, logout: handleLogout } = useAuth();
+  // 優先顯示使用者在個人頁面改過的名稱與大頭照
+  const displayName = profile?.name || user?.displayName;
+  const photoURL = profile?.photoURL || user?.photoURL;
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -85,14 +88,14 @@ const Navbar = () => {
 
                 <div className="relative">
                   <img
-                    src={user.photoURL ?? ''}
+                    src={photoURL ?? ''}
                     alt="大頭照"
                     referrerPolicy="no-referrer"
                     className="w-7 h-7 rounded-full"
                   />
                   <span className="top-0 left-5 absolute  w-3 h-3 bg-green-400 border-2 border-white dark:border-gray-blue-800 rounded-full"></span>
                 </div>
-                <p>{user?.displayName}</p>
+                <p>{displayName}</p>
               </button>
             }
 
