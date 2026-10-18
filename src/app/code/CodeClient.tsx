@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useRouter } from 'nextjs-toploader/app';
-import { Button, Chip, Input } from '@heroui/react';
+import { Button, Chip, Input, Switch } from '@heroui/react';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMagnifyingGlass, faPlus, faTrashCan, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import CodeCard from './_components/CodeCard';
@@ -17,6 +17,16 @@ import { TotpResult, clearTotp, deleteTotp, loadTotp, updateTotp } from '@/lib/t
 import { TotpInput, TotpItem } from '@/types/Totp/Totp';
 import { showError } from "@/lib/errorDialog";
 
+// 「隱藏驗證碼」偏好記在這個瀏覽器（私密視窗等讀寫失敗時就當沒設定）
+const HIDE_KEY = 'securibit:hideCodes';
+const readHidePref = () => {
+  try {
+    return localStorage.getItem(HIDE_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
 const CodeClient = () => {
   const { user } = useAuth();
   const router = useRouter();
@@ -26,6 +36,17 @@ const CodeClient = () => {
   const [keyword, setKeyword] = useState('');
   // 目前篩選的類別，undefined 代表全部
   const [category, setCategory] = useState<string>();
+  // AuthGate 確認登入後才掛上這個元件，不會在伺服器端執行，可以直接讀 localStorage
+  const [hideCodes, setHideCodes] = useState(readHidePref);
+
+  const toggleHideCodes = (hide: boolean) => {
+    setHideCodes(hide);
+    try {
+      localStorage.setItem(HIDE_KEY, hide ? '1' : '0');
+    } catch {
+      // 存不了就只在這次有效
+    }
+  };
 
   // 既有類別（去重、排序），給編輯表單當建議選項
   const categories = useMemo(
@@ -135,6 +156,9 @@ const CodeClient = () => {
               startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="w-3.5 text-gray-blue-400" />}
               className="sm:max-w-sm"
             />
+            <Switch size="sm" isSelected={hideCodes} onValueChange={toggleHideCodes}>
+              隱藏驗證碼（點一下才顯示）
+            </Switch>
             {categories.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 <Chip
@@ -173,6 +197,7 @@ const CodeClient = () => {
                     item={item}
                     onEdit={() => setEditing(item)}
                     onDelete={() => handleDelete(item.id)}
+                    hidden={hideCodes}
                   />
                 ))}
               </ul>

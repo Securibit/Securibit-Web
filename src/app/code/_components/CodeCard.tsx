@@ -14,7 +14,7 @@ import { showError } from "@/lib/errorDialog";
 
 // 每 4 位插一個空白方便閱讀（6 位數 → 123 456，8 位數 → 1234 5678）
 const formatOtp = (otp: string) =>
-  otp.length === 6 ? `${otp.slice(0, 3)} ${otp.slice(3)}` : otp.replace(/(\d{4})(?=\d)/g, '$1 ');
+  otp.length === 6 ? `${otp.slice(0, 3)} ${otp.slice(3)}` : otp.replace(/(.{4})(?=.)/g, '$1 ');
 
 const CodeCard = (props: CodeCardProps) => {
   const { item } = props;
@@ -30,12 +30,16 @@ const CodeCard = (props: CodeCardProps) => {
 
   // 參數或時間週期變了才重新產生驗證碼
   const otpKey = `${item.secret}|${item.digits}|${period}|${item.algorithm}|${counter}`;
-  const [otp, setOtp] = useState<{ key: string; value: string | null }>();
+  // value：目前的驗證碼，next：下一組（快到期時先顯示，不用等換碼）
+  const [otp, setOtp] = useState<{ key: string; value: string | null; next: string | null }>();
 
   useEffect(() => {
     let cancelled = false;
-    generateOtp(item, counter * period * 1000).then((value) => {
-      if (!cancelled) setOtp({ key: otpKey, value });
+    Promise.all([
+      generateOtp(item, counter * period * 1000),
+      generateOtp(item, (counter + 1) * period * 1000),
+    ]).then(([value, next]) => {
+      if (!cancelled) setOtp({ key: otpKey, value, next });
     });
     return () => {
       cancelled = true;
@@ -55,6 +59,10 @@ const CodeCard = (props: CodeCardProps) => {
   };
 
   const danger = timeLeft <= Math.min(10, period / 3);
+
+  // 隱藏模式下點一下才顯示，換下一組驗證碼時自動再藏起來
+  const [revealedCounter, setRevealedCounter] = useState<number>();
+  const revealed = !props.hidden || revealedCounter === counter;
 
   return (
     <li className="py-3 sm:py-4">
@@ -99,14 +107,34 @@ const CodeCard = (props: CodeCardProps) => {
         {/* 驗證碼（點擊複製） */}
         {otp === undefined ? (
           <p className="text-xl font-semibold text-gray-blue-400 tabular-nums">------</p>
-        ) : otp.value ? (
+        ) : otp.value && !revealed ? (
           <button
-            onClick={() => otp.value && copyToClipboard(otp.value)}
-            title="點擊複製"
-            className="text-xl sm:text-2xl font-semibold tabular-nums text-gray-blue-900 dark:text-white hover:text-tpp transition-colors"
+            onClick={() => setRevealedCounter(counter)}
+            title="點擊顯示"
+            aria-label="顯示驗證碼"
+            className="text-xl sm:text-2xl font-semibold tracking-widest text-gray-blue-400 hover:text-tpp transition-colors"
           >
-            {formatOtp(otp.value)}
+            {formatOtp('•'.repeat(otp.value.length))}
           </button>
+        ) : otp.value ? (
+          <div className="flex flex-col items-end">
+            <button
+              onClick={() => otp.value && copyToClipboard(otp.value)}
+              title="點擊複製"
+              className="text-xl sm:text-2xl font-semibold tabular-nums text-gray-blue-900 dark:text-white hover:text-tpp transition-colors"
+            >
+              {formatOtp(otp.value)}
+            </button>
+            {danger && otp.next && (
+              <button
+                onClick={() => otp.next && copyToClipboard(otp.next)}
+                title="點擊複製下一組"
+                className="text-xs tabular-nums text-gray-blue-500 hover:text-tpp transition-colors dark:text-gray-blue-400"
+              >
+                下一組 {formatOtp(otp.next)}
+              </button>
+            )}
+          </div>
         ) : (
           <p className="text-sm sm:text-xl font-semibold text-red-500">
             金鑰錯誤！
