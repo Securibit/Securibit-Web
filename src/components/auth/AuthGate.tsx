@@ -7,19 +7,21 @@ import Spinner from "@/components/ui/Loading/Spinner";
 import { AuthGateProps } from "@/types/Auth/AuthGate";
 import useAuth from "./useAuth";
 import { showError } from "@/lib/errorDialog";
+import { SITE } from "@/lib/permissions/bits";
 
 // 需要登入才能進的路徑（前綴比對）
-const PROTECTED_ROUTES = ['/code', '/addCode', '/me'];
+const PROTECTED_ROUTES = ['/code', '/addCode', '/me', '/groups', '/invite', '/admin'];
 
-const isProtected = (pathname: string) =>
-  PROTECTED_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+const matches = (pathname: string, route: string) => pathname === route || pathname.startsWith(`${route}/`);
+
+const isProtected = (pathname: string) => PROTECTED_ROUTES.some((route) => matches(pathname, route));
 
 /**
  * 導向保護：受保護頁在確認登入前先顯示 Spinner，未登入就帶回首頁，
  * 避免先畫出空的內容再跳走。公開頁面直接放行。
  */
 const AuthGate = (props: AuthGateProps) => {
-  const { loading, user } = useAuth();
+  const { loading, user, can } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -31,6 +33,14 @@ const AuthGate = (props: AuthGateProps) => {
 
   const guarded = isProtected(pathname);
   const needLogin = guarded && !loading && !user;
+  // 後台還要有「進入後台」權限
+  const denied = !loading && !!user && matches(pathname, '/admin') && !can(SITE.VIEW_ADMIN);
+
+  useEffect(() => {
+    if (!denied) return;
+    showError('沒有權限', '你沒有進入後台的權限。');
+    router.replace('/');
+  }, [denied, router]);
 
   useEffect(() => {
     if (!needLogin) return;
@@ -45,7 +55,7 @@ const AuthGate = (props: AuthGateProps) => {
 
   if (!guarded) return <>{props.children}</>;
 
-  if (loading || needLogin) {
+  if (loading || needLogin || denied) {
     return <Spinner block label="確認登入狀態…" />;
   }
 

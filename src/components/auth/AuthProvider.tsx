@@ -19,6 +19,17 @@ import { AuthContextValue } from "@/types/Auth/Auth";
 import { AuthProviderProps } from "@/types/Auth/AuthProvider";
 import { AuthPopupMessage } from "@/types/Auth/AuthPopup";
 import { showError } from "@/lib/errorDialog";
+import { rpc } from "@/lib/rpc";
+import { has } from "@/lib/permissions/bits";
+import { SiteAccess } from "@/types/Auth/Auth";
+
+// 還沒執行 0009 migration、或讀取失敗時：沒有任何全站權限
+const NO_ACCESS: SiteAccess = { permissions: 0, top_position: 0, roles: [] };
+
+const loadAccess = async () => {
+  const result = await rpc<SiteAccess | null>('me_permissions');
+  return result.success && result.data ? result.data : NO_ACCESS;
+};
 
 // 掛在 Layout 最外層，全站只訂閱一次 Supabase 登入狀態，換頁不會重新抓
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -28,6 +39,7 @@ const AuthProvider = (props: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<AppUser>();
   const [profile, setProfile] = useState<Profile>();
+  const [access, setAccess] = useState<SiteAccess>(NO_ACCESS);
   // 已載入過 profile 的 uid；切回分頁時 Supabase 會再發一次 SIGNED_IN，不必重抓
   const loadedUid = useRef<string | null>(null);
   // 這個分頁是否開了登入彈窗；同時開好幾個分頁時，只由發起的那個顯示提示、記錄登入
@@ -36,8 +48,9 @@ const AuthProvider = (props: AuthProviderProps) => {
   const loadProfile = useCallback(async (uid: string) => {
     // 先確保 profile 存在（沒有就依 email 接回舊資料），再讀取
     await ensureProfile();
-    const result = await getUserData(uid);
+    const [result, nextAccess] = await Promise.all([getUserData(uid), loadAccess()]);
     setProfile(result.success ? result.data : undefined);
+    setAccess(nextAccess);
     if (!result.success) {
       showError('載入使用者資料失敗', result.message);
     }
@@ -52,6 +65,7 @@ const AuthProvider = (props: AuthProviderProps) => {
         loadedUid.current = null;
         setUser(undefined);
         setProfile(undefined);
+        setAccess(NO_ACCESS);
         setLoading(false);
         return;
       }
@@ -138,8 +152,23 @@ const AuthProvider = (props: AuthProviderProps) => {
     }
   }, [router]);
 
+  const can = useCallback((bit: number) => has(access.permissions, bit), [access.permissions]);
+
   return (
-    <AuthContext.Provider value={{ loading, user, profile, refresh, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        loading,
+        user,
+        profile,
+        permissions: access.permissions,
+        topPosition: access.top_position,
+        siteRoles: access.roles,
+        can,
+        refresh,
+        login,
+        logout,
+      }}
+    >
       {props.children}
     </AuthContext.Provider>
   );

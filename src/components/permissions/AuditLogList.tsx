@@ -1,0 +1,117 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Button } from "@heroui/react";
+import Spinner from "@/components/ui/Loading/Spinner";
+import UserChip from "@/components/permissions/UserChip";
+import { auditActionText } from "@/lib/permissions/auditActions";
+import { showError } from "@/lib/errorDialog";
+import { formatDateTime } from "@/lib/utils";
+import { AuditLog } from "@/types/Permission/Permission";
+import { AuditLogListProps } from "@/types/Permission/AuditLogList";
+
+const TARGET_TYPE_TEXT: Record<string, string> = {
+  role: "身分組",
+  user: "使用者",
+  member: "成員",
+  account: "驗證碼",
+  invite: "邀請",
+  group: "群組",
+};
+
+// 目標的簡短說明：類型 +（detail.name 或縮短的 id）
+const targetText = (log: AuditLog) => {
+  if (!log.target_type && !log.target_id) return null;
+  const type = log.target_type ? (TARGET_TYPE_TEXT[log.target_type] ?? log.target_type) : "";
+  const name = typeof log.detail?.name === "string" && log.detail.name ? `「${log.detail.name}」` : "";
+  const id = !name && log.target_id ? (log.target_id.length > 12 ? `${log.target_id.slice(0, 8)}…` : log.target_id) : "";
+  return [type, name || id].filter(Boolean).join(" ");
+};
+
+// 操作紀錄列表：掛上時載入第一頁，「載入更多」用最後一筆的 id 往前載入
+// load 換了（例如換群組）時請由外層用 key 重新掛載
+const AuditLogList = (props: AuditLogListProps) => {
+  const pageSize = props.pageSize ?? 50;
+  const [logs, setLogs] = useState<AuditLog[] | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    props.load(null).then((result) => {
+      if (cancelled) return;
+      if (result.success) {
+        setLogs(result.data);
+        setHasMore(result.data.length >= pageSize);
+      } else {
+        setLogs([]);
+        showError("載入操作紀錄失敗", result.message);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadMore = async () => {
+    if (!logs || logs.length === 0) return;
+    setLoadingMore(true);
+    const result = await props.load(logs[logs.length - 1].id);
+    setLoadingMore(false);
+    if (!result.success) {
+      showError("載入操作紀錄失敗", result.message);
+      return;
+    }
+    // 避免重複（同一頁被載入兩次時）
+    setLogs((old) => {
+      const seen = new Set((old ?? []).map((log) => log.id));
+      return [...(old ?? []), ...result.data.filter((log) => !seen.has(log.id))];
+    });
+    setHasMore(result.data.length >= pageSize);
+  };
+
+  if (logs === null) return <Spinner />;
+
+  if (logs.length === 0) {
+    return (
+      <p className="py-10 text-center text-sm text-gray-blue-500 dark:text-gray-blue-400">還沒有任何紀錄</p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <ul className="divide-y divide-gray-blue-200 dark:divide-gray-blue-700">
+        {logs.map((log) => {
+          const target = targetText(log);
+          return (
+            <li
+              key={log.id}
+              className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:gap-4"
+            >
+              <UserChip user={log.actor} size="sm" className="sm:w-48 sm:flex-shrink-0" />
+              <p className="min-w-0 flex-1 text-sm text-gray-blue-800 dark:text-gray-blue-100">
+                <span className="font-medium">{auditActionText(log.action)}</span>
+                {target && (
+                  <span className="ml-2 break-all text-gray-blue-500 dark:text-gray-blue-400">{target}</span>
+                )}
+              </p>
+              <time
+                dateTime={log.created_at}
+                className="flex-shrink-0 text-xs tabular-nums text-gray-blue-500 dark:text-gray-blue-400"
+              >
+                {formatDateTime(log.created_at)}
+              </time>
+            </li>
+          );
+        })}
+      </ul>
+      {hasMore && (
+        <Button variant="bordered" className="self-center" onPress={loadMore} isLoading={loadingMore}>
+          載入更多
+        </Button>
+      )}
+    </div>
+  );
+};
+
+export default AuditLogList;
