@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCamera, faImage, faLink } from "@fortawesome/free-solid-svg-icons";
 import { decodeQrFromFile } from "@/lib/qr";
-import { parseOtpauthUri } from "@/lib/totp/otpauth";
+import { parseImportText } from "@/lib/totp/importText";
 import { QrImportProps } from "@/types/AddCode/QrImport";
 import CameraScanModal from "./CameraScanModal";
 import { showError } from "@/lib/errorDialog";
@@ -18,21 +18,34 @@ const QrImport = (props: QrImportProps) => {
   const [decoding, setDecoding] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // 一筆就帶入表單；多筆（Google Authenticator 匯出、備份檔）交給父層整批匯入
   const importText = (text: string) => {
-    const result = parseOtpauthUri(text);
-    if (!result.success) {
-      showError("無法匯入", result.message);
+    const result = parseImportText(text);
+    if (result.items.length === 0) {
+      showError("無法匯入", result.errors.join("\n"));
       return false;
     }
-    props.onImport(result.data);
-    toast.success(`已帶入「${result.data.name}」，確認後按新增`, { position: "top-right" });
+    if (result.items.length === 1 && result.errors.length === 0 && !result.batch) {
+      const [item] = result.items;
+      props.onImport(item);
+      toast.success(`已帶入「${item.name}」，確認後按新增`, { position: "top-right" });
+    } else {
+      props.onImportMany(result);
+    }
     return true;
   };
+
+  const isTextFile = (file: File) => file.type.startsWith("text/") || /\.txt$/i.test(file.name);
 
   const handleFile = async (file?: File) => {
     if (!file) return;
     setDecoding(true);
     try {
+      // 本站匯出的文字備份檔
+      if (isTextFile(file)) {
+        importText(await file.text());
+        return;
+      }
       const text = await decodeQrFromFile(file);
       if (text) {
         importText(text);
@@ -66,7 +79,7 @@ const QrImport = (props: QrImportProps) => {
           // 貼上完整連結時直接帶入，不用再按按鈕
           onPaste={(e) => {
             const text = e.clipboardData.getData("text");
-            if (text.trim().startsWith("otpauth://")) {
+            if (text.trim().startsWith("otpauth")) {
               e.preventDefault();
               importText(text);
             }
@@ -84,7 +97,7 @@ const QrImport = (props: QrImportProps) => {
           isLoading={decoding}
           onPress={() => fileRef.current?.click()}
         >
-          上傳 QR Code 圖片
+          上傳圖片或備份檔
         </Button>
         <Button
           variant="bordered"
@@ -97,7 +110,7 @@ const QrImport = (props: QrImportProps) => {
       <input
         ref={fileRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.txt,text/plain"
         className="hidden"
         onChange={(e) => handleFile(e.target.files?.[0])}
       />

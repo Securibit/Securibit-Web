@@ -11,10 +11,12 @@ import PageContent from "@/components/layout/PageContent";
 import PageHeader from "@/components/layout/PageHeader";
 import TotpForm from "@/components/totp/TotpForm";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
-import { addTotp, loadTotp, normalizeSecret } from "@/lib/totp/crud";
+import { addTotp, addTotps, loadTotp, normalizeSecret } from "@/lib/totp/crud";
+import { ImportTextResult } from "@/lib/totp/importText";
 import { TotpErrors, validateTotpInput } from "@/lib/totp/validate";
 import { TOTP_DEFAULTS, TotpInput, TotpItem } from "@/types/Totp/Totp";
 import QrImport from "./_components/QrImport";
+import BulkImportModal from "./_components/BulkImportModal";
 import { showError } from "@/lib/errorDialog";
 
 const EMPTY_FORM: TotpInput = { name: '', secret: '', category: '', ...TOTP_DEFAULTS };
@@ -36,6 +38,8 @@ const AddCodeClient = () => {
   const [formKey, setFormKey] = useState(0);
   // 金鑰和既有的某筆相同時，先問使用者要不要照樣新增
   const [duplicate, setDuplicate] = useState<TotpItem>();
+  // 一次匯入多筆的解析結果；有值時開整批匯入對話框
+  const [bulk, setBulk] = useState<ImportTextResult>();
 
   // 讀取既有驗證碼，只用來提供類別建議
   useEffect(() => {
@@ -55,6 +59,19 @@ const AddCodeClient = () => {
     setTotp({ ...input, category: totp.category || input.category });
     setErrors({});
     setFormKey((key) => key + 1);
+  };
+
+  const handleBulkImport = async (inputs: TotpInput[]) => {
+    if (!user) return false;
+    const result = await addTotps(user.uid, inputs);
+    if (!result.success) {
+      showError('匯入驗證碼失敗', result.message);
+      return false;
+    }
+    toast.success(`已匯入 ${inputs.length} 筆驗證碼！`, { position: 'top-right' });
+    setItems(result.data);
+    setLastAdded(inputs.length === 1 ? `「${inputs[0].name.trim()}」` : ` ${inputs.length} 筆驗證碼`);
+    return true;
   };
 
   // 新增 TOTP 資料（force：已確認重複也要新增）
@@ -79,7 +96,7 @@ const AddCodeClient = () => {
     if (result.success) {
       toast.success('新增 TOTP 成功！', { position: 'top-right' });
       setItems(result.data);
-      setLastAdded(totp.name.trim());
+      setLastAdded(`「${totp.name.trim()}」`);
       // 清空表單，類別保留方便連續新增同類
       setTotp({ ...EMPTY_FORM, category: totp.category });
       setFormKey((key) => key + 1);
@@ -92,7 +109,7 @@ const AddCodeClient = () => {
     <PageContent className="max-w-2xl">
       <PageHeader
         title="新增驗證碼"
-        subtitle="掃描服務提供的 QR Code，或手動輸入金鑰"
+        subtitle="掃描 QR Code、匯入 Google Authenticator 或備份檔，或手動輸入金鑰"
         right={
           <Button
             variant="light"
@@ -107,7 +124,7 @@ const AddCodeClient = () => {
       {lastAdded && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
           <FontAwesomeIcon icon={faCircleCheck} className="w-4" />
-          <span className="flex-1">已新增「{lastAdded}」，可以繼續新增下一筆。</span>
+          <span className="flex-1">已新增{lastAdded}，可以繼續新增下一筆。</span>
           <Button size="sm" color="success" variant="flat" onPress={() => router.push('/code')}>
             查看驗證碼
           </Button>
@@ -116,7 +133,7 @@ const AddCodeClient = () => {
 
       <div className="rounded-lg border border-gray-blue-200 bg-white p-4 shadow sm:p-6 dark:border-gray-blue-700 dark:bg-gray-blue-800">
         <h2 className="mb-3 font-semibold">快速匯入</h2>
-        <QrImport onImport={handleImport} />
+        <QrImport onImport={handleImport} onImportMany={setBulk} />
 
         <div className="my-6 flex items-center gap-3 text-sm text-gray-blue-400">
           <Divider className="flex-1" />
@@ -146,6 +163,16 @@ const AddCodeClient = () => {
           </Button>
         </form>
       </div>
+
+      {bulk && (
+        <BulkImportModal
+          result={bulk}
+          existing={items}
+          categories={categories}
+          onClose={() => setBulk(undefined)}
+          onConfirm={handleBulkImport}
+        />
+      )}
 
       <ConfirmModal
         isOpen={!!duplicate}
