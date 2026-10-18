@@ -87,12 +87,19 @@ const Navbar = () => {
               >
 
                 <div className="relative">
-                  <img
-                    src={photoURL ?? ''}
-                    alt="大頭照"
-                    referrerPolicy="no-referrer"
-                    className="w-7 h-7 rounded-full"
-                  />
+                  {photoURL ? (
+                    <img
+                      src={photoURL}
+                      alt="大頭照"
+                      referrerPolicy="no-referrer"
+                      className="w-7 h-7 rounded-full object-cover"
+                    />
+                  ) : (
+                    // 沒有大頭照時顯示名字的第一個字
+                    <span className="flex w-7 h-7 items-center justify-center rounded-full bg-tpp text-sm font-bold text-white">
+                      {displayName?.slice(0, 1) || '?'}
+                    </span>
+                  )}
                   <span className="top-0 left-5 absolute  w-3 h-3 bg-green-400 border-2 border-white dark:border-gray-blue-800 rounded-full"></span>
                 </div>
                 <p>{displayName}</p>
