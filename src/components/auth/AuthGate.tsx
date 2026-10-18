@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useRouter } from "nextjs-toploader/app";
 import Spinner from "@/components/ui/Loading/Spinner";
@@ -23,13 +23,22 @@ const AuthGate = (props: AuthGateProps) => {
   const router = useRouter();
   const pathname = usePathname();
 
+  // 這個分頁曾經登入過：之後變成未登入是使用者自己登出（或在別的分頁登出、刪除帳戶），不算錯誤
+  const wasSignedIn = useRef(false);
+  useEffect(() => {
+    if (user) wasSignedIn.current = true;
+  }, [user]);
+
   const guarded = isProtected(pathname);
   const needLogin = guarded && !loading && !user;
 
   useEffect(() => {
     if (!needLogin) return;
 
-    showError('請先登入', '這個頁面需要登入才能使用，請先使用 Google 登入。');
+    // 只有一開始就沒登入、直接打網址進來才提示
+    if (!wasSignedIn.current) {
+      showError('請先登入', '這個頁面需要登入才能使用，請先使用 Google 登入。');
+    }
     // 用 replace：未登入的頁面不該留在上一頁的歷史裡
     router.replace('/');
   }, [needLogin, router]);
