@@ -1,5 +1,5 @@
-// 定義使用者資料格式
-export interface UserData {
+// profiles 資料列轉成 App 內部使用的格式（欄位對齊原 Firebase 版本）
+export interface Profile {
   uid: string;
   name: string;
   email: string;
@@ -14,5 +14,4 @@ export interface UserData {
   lastLoginAt?: string;
   lastLoginIp?: string;
   lastLoginDevice?: string;
-  totp: any[];
 }

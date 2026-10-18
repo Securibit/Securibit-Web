@@ -7,7 +7,7 @@ import { useRouter } from 'next-nprogress-bar';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import CodeCard from '@/components/CodeCard';
-import ModalAlert from '@/components/Code/ModalAlert';
+import ConfirmModal from '@/components/ui/Modal/ConfirmModal';
 import { clearTotpItems, deleteTotpItem, loadUserData } from '@/lib/totp/crud';
 import { UserData, totpItems } from '@/types/userData';
 import { checkAuth } from '@/lib/totp/account';
@@ -15,6 +15,7 @@ import { checkAuth } from '@/lib/totp/account';
 const CodeClient = () => {
   const [userData, setUserData] = useState<UserData | undefined>();
   const [user, setUser] = useState<AppUser | undefined>();
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const router = useRouter();
 
   // 清空 TOTP 項目
@@ -57,11 +58,12 @@ const CodeClient = () => {
 
   // 當使用者登入狀態改變時，檢查使用者驗證
   useEffect(() => {
-    const unsubscribe = checkAuth((user, data) => {
+    const unsubscribe = checkAuth(async (user) => {
       if (user) {
         setUser(user);
-        if (data) {
-          setUserData(data);
+        const result = await loadUserData(user.uid);
+        if (result.success) {
+          setUserData(result.data);
         } else {
           toast.error('找不到使用者資料！', { position: 'top-right' });
         }
@@ -90,17 +92,27 @@ const CodeClient = () => {
           </div>
         ) : (
 
-          <ModalAlert
-            deleteTOTP={clearTotpItem}
-          >
+          <button onClick={() => setConfirmClearOpen(true)}>
             <span className="relative inline-flex items-center justify-center p-0.5 mb-2 mr-2 overflow-hidden text-sm font-medium text-gray-blue-900 rounded-lg group bg-gradient-to-br from-cyan-500 to-blue-500 group-hover:from-cyan-500 group-hover:to-blue-500 hover:text-white dark:text-white focus:ring-4 focus:outline-none focus:ring-cyan-200 dark:focus:ring-cyan-800">
               <span className="relative px-5 py-2.5 transition-all ease-in duration-75 bg-white dark:bg-gray-blue-900 rounded-md group-hover:bg-opacity-0">
                 點我清空所有驗證碼
               </span>
             </span>
-          </ModalAlert>
+          </button>
         )
       }
+      <ConfirmModal
+        isOpen={confirmClearOpen}
+        danger
+        title="清空所有驗證碼"
+        description="確定要清空所有驗證碼嗎？刪除後無法恢復，所有金鑰都會遺失。"
+        confirmLabel="全部清空"
+        onCancel={() => setConfirmClearOpen(false)}
+        onConfirm={async () => {
+          setConfirmClearOpen(false);
+          await clearTotpItem();
+        }}
+      />
       <div className="w-full p-4 bg-white border border-gray-blue-200 rounded-lg shadow sm:px-8 sm:pt-8 dark:bg-gray-blue-800 dark:border-gray-blue-700">
         <div className="flex items-center justify-between mb-4">
           <h5 className="text-xl font-bold leading-none text-gray-blue-900 dark:text-white">驗證碼</h5>

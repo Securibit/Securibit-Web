@@ -4,13 +4,13 @@ import { AppUser } from "@/types/authUser";
 import { useRouter } from "next-nprogress-bar";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { UserData } from "@/components/CheckLogin";
+import { Profile } from "@/types/Profile/Profile";
 import { checkAuth, deleteAccount, getUserData, submitChange, syncGoogleUserData } from "@/lib/totp/account";
-import ModalAlert from "@/components/Code/ModalAlert";
+import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 
 const UpdateInfoClient = () => {
   const [user, setUser] = useState<AppUser>();
-  const [userData, setUserData] = useState<UserData>(
+  const [userData, setUserData] = useState<Profile>(
     {
       uid: '',
       name: '',
@@ -23,9 +23,9 @@ const UpdateInfoClient = () => {
         creationTime: '',
         lastSignInTime: ''
       },
-      totp: []
     }
   );
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const router = useRouter();
 
   // 當使用者登入狀態改變時，檢查使用者驗證
@@ -66,7 +66,6 @@ const UpdateInfoClient = () => {
             creationTime: user_data.metadata.creationTime as string,
             lastSignInTime: user_data.metadata.lastSignInTime as string
           },
-          totp: []
         });
         toast.success('同步 Google 資料成功！', { position: 'top-right' });
       })
@@ -90,7 +89,6 @@ const UpdateInfoClient = () => {
         creationTime: userData.metadata.creationTime,
         lastSignInTime: userData.metadata.lastSignInTime,
       },
-      totp: userData.totp,
     };
 
     setUserData(updatedUserData);
@@ -164,16 +162,24 @@ const UpdateInfoClient = () => {
           </span>
         </button>
 
-        <ModalAlert
-          deleteTOTP={() => deleteAccountHandler(user as AppUser)}
-        >
-          <button type="button" className="relative inline-flex items-center justify-center p-0.5 mb-2 mr-2 overflow-hidden text-sm font-medium rounded-lg group bg-gradient-to-br focus:outline-none text-gray-blue-900 dark:text-white bg-red-500 hover:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900">
+        <button type="button" onClick={() => setConfirmDeleteOpen(true)} className="relative inline-flex items-center justify-center p-0.5 mb-2 mr-2 overflow-hidden text-sm font-medium rounded-lg group bg-gradient-to-br focus:outline-none text-gray-blue-900 dark:text-white bg-red-500 hover:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900">
             <span className="relative px-5 py-2.5 transition-all ease-in duration-75 bg-white dark:bg-gray-blue-900 rounded-md group-hover:bg-opacity-0">
               刪除帳戶
             </span>
-          </button>
-        </ModalAlert>
+        </button>
       </form>
+      <ConfirmModal
+        isOpen={confirmDeleteOpen}
+        danger
+        title="刪除帳戶"
+        description="確定要刪除帳戶嗎？帳戶與所有驗證碼金鑰都會永久刪除，無法恢復。"
+        confirmLabel="刪除帳戶"
+        onCancel={() => setConfirmDeleteOpen(false)}
+        onConfirm={async () => {
+          setConfirmDeleteOpen(false);
+          await deleteAccountHandler(user as AppUser);
+        }}
+      />
     </div>
   );
 };

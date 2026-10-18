@@ -12,7 +12,6 @@ import { toast } from 'react-hot-toast';
 import Image from "next/image";
 import { Button } from "@heroui/react";
 import Sidebar from "./Sidebar/Sidebar";
-import { UserData } from '@/types/userData';
 import { Bars3Icon } from '@heroicons/react/24/solid';
 import { checkAuth, handleGoogleLogin, logout } from "@/lib/totp/account";
 
@@ -20,7 +19,6 @@ import { checkAuth, handleGoogleLogin, logout } from "@/lib/totp/account";
 const Navbar = () => {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [userData, setUserData] = useState<UserData | undefined>();
   const [user, setUser] = useState<AppUser | undefined>();
 
   // 登入（成功提示會在轉向回來後由 _app 顯示，這裡只處理「立即失敗」如 provider 未啟用）
@@ -45,12 +43,9 @@ const Navbar = () => {
 
   // 當使用者登入狀態改變時，檢查使用者驗證
   useEffect(() => {
-    const unsubscribe = checkAuth((user, data) => {
+    const unsubscribe = checkAuth((user) => {
       if (user) {
         setUser(user);
-        if (data) {
-          setUserData(data);
-        }
       } else {
         setUser(undefined);
       }

@@ -5,7 +5,7 @@ import { TOTP } from "totp-generator";
 import { useInterval } from 'react-use';
 import { CircularProgress, Progress } from "@heroui/react";
 import { toast } from "react-hot-toast";
-import ModalAlert from "./Code/ModalAlert";
+import ConfirmModal from "./ui/Modal/ConfirmModal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash } from "@fortawesome/free-solid-svg-icons";
 import { isBase32 } from "@/lib/totp/crud";
@@ -52,6 +52,7 @@ const CodeCard = (props: CodeCardProps) => {
   };
 
   const [timeLeft, setTimeLeft] = useState(0);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     setTimeLeft(calculateTimeLeft());
@@ -87,13 +88,23 @@ const CodeCard = (props: CodeCardProps) => {
             {/* <img className="w-8 h-8 rounded-full" src="/docs/images/people/profile-picture-1.jpg" alt="Neil image" /> */}
 
             {/* Delete Btn */}
-            <ModalAlert
-              deleteTOTP={props.deleteCode}
-            >
+            <button onClick={() => setConfirmOpen(true)} aria-label="刪除驗證碼">
               <div className="rounded-full border-2 border-red-500 w-10 h-10 flex items-center justify-center">
                 <FontAwesomeIcon icon={faTrash} className="w-5 h-5 text-red-500" />
               </div>
-            </ModalAlert>
+            </button>
+            <ConfirmModal
+              isOpen={confirmOpen}
+              danger
+              title="刪除驗證碼"
+              description={`確定要刪除「${props.name}」嗎？刪除後無法恢復，金鑰也會一併遺失。`}
+              confirmLabel="刪除"
+              onCancel={() => setConfirmOpen(false)}
+              onConfirm={() => {
+                setConfirmOpen(false);
+                props.deleteCode();
+              }}
+            />
           </div>
 
           {/* TOTP Name */}

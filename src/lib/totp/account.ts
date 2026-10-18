@@ -1,9 +1,9 @@
-import { UserData } from '@/components/CheckLogin';
+import { Profile } from '@/types/Profile/Profile';
 import { supabase } from '@/config/supabase';
 import { AppUser, toAppUser } from '@/types/authUser';
 
-// 將 profiles 資料列（snake_case）轉成 App 內部使用的 UserData
-const rowToUserData = (row: any): UserData => ({
+// 將 profiles 資料列（snake_case）轉成 App 內部使用的 Profile
+export const rowToProfile = (row: any): Profile => ({
   uid: row.id,
   name: row.name ?? '',
   email: row.email ?? '',
@@ -18,7 +18,6 @@ const rowToUserData = (row: any): UserData => ({
   lastLoginAt: row.last_login_at ?? '',
   lastLoginIp: row.last_login_ip ?? '',
   lastLoginDevice: row.last_login_device ?? '',
-  totp: row.totp ?? [],
 });
 
 // 記錄這次登入的時間 / IP / 裝置（IP 由後端讀請求 header 取得）
@@ -45,7 +44,7 @@ export const ensureProfile = async () => {
 
 // 驗證是否登入並載入使用者資料（對應原 onAuthStateChanged 行為）
 export const checkAuth = (
-  callback: (user: AppUser | undefined, userData?: UserData) => void
+  callback: (user: AppUser | undefined, userData?: Profile) => void
 ): (() => void) => {
   const {
     data: { subscription },
@@ -62,7 +61,7 @@ export const checkAuth = (
         .maybeSingle();
 
       if (!error && data) {
-        callback(appUser, rowToUserData(data));
+        callback(appUser, rowToProfile(data));
       } else {
         callback(appUser);
       }
@@ -109,7 +108,7 @@ export const logout = async () => {
 // 從 profiles 取得使用者資料
 export const getUserData = async (
   uid: string
-): Promise<{ success: boolean; data?: UserData; message?: string }> => {
+): Promise<{ success: boolean; data?: Profile; message?: string }> => {
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
@@ -123,13 +122,13 @@ export const getUserData = async (
   if (!data) {
     return { success: false, message: '找不到使用者資料' };
   }
-  return { success: true, data: rowToUserData(data) };
+  return { success: true, data: rowToProfile(data) };
 };
 
 // 更新使用者資料
 export const submitChange = async (
   uid: string,
-  updated: Partial<UserData>
+  updated: Partial<Profile>
 ): Promise<{ success: boolean; message?: string }> => {
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (updated.name !== undefined) patch.name = updated.name;

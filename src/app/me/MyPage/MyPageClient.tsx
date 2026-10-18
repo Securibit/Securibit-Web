@@ -4,13 +4,13 @@ import { useRouter } from "next-nprogress-bar";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import PersonalCard from "@/components/PersonalCard";
-import { UserData } from "@/components/CheckLogin";
+import { Profile } from "@/types/Profile/Profile";
 import { AppUser } from "@/types/authUser";
 import { checkAuth } from "@/lib/totp/account";
 
 const MyPageClient = () => {
   const [user, setUser] = useState<AppUser>();
-  const [userData, setUserData] = useState<UserData>();
+  const [userData, setUserData] = useState<Profile>();
   const router = useRouter();
 
   // 一進頁面就驗證，如果沒登入就導回首頁
