@@ -5,7 +5,7 @@ import { useInterval } from 'react-use';
 import { CircularProgress, Progress } from "@heroui/react";
 import { toast } from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faPen, faTrash } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import { generateOtp } from "@/lib/totp/otp";
 import { TOTP_DEFAULTS } from "@/types/Totp/Totp";
@@ -67,6 +67,13 @@ const CodeCard = (props: CodeCardProps) => {
       <div className="flex items-center gap-3 sm:gap-4">
         {/* 操作按鈕 */}
         <div className="flex flex-shrink-0 gap-2">
+          <button
+            onClick={props.onEdit}
+            aria-label="編輯驗證碼"
+            className="rounded-full border-2 border-tpp w-10 h-10 flex items-center justify-center hover:bg-tpp/10 transition-colors"
+          >
+            <FontAwesomeIcon icon={faPen} className="w-4 h-4 text-tpp" />
+          </button>
           <button
             onClick={() => setConfirmOpen(true)}
             aria-label="刪除驗證碼"

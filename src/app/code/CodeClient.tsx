@@ -1,25 +1,33 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next-nprogress-bar';
 import { Button } from '@heroui/react';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faTrashCan, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import CodeCard from './_components/CodeCard';
+import TotpEditModal from './_components/TotpEditModal';
 import ConfirmModal from '@/components/ui/Modal/ConfirmModal';
 import Spinner from '@/components/ui/Loading/Spinner';
 import PageContent from '@/components/layout/PageContent';
 import PageHeader from '@/components/layout/PageHeader';
 import useAuth from '@/components/auth/useAuth';
-import { TotpResult, clearTotp, deleteTotp, loadTotp } from '@/lib/totp/crud';
-import { TotpItem } from '@/types/Totp/Totp';
+import { TotpResult, clearTotp, deleteTotp, loadTotp, updateTotp } from '@/lib/totp/crud';
+import { TotpInput, TotpItem } from '@/types/Totp/Totp';
 
 const CodeClient = () => {
   const { user } = useAuth();
   const router = useRouter();
   const [items, setItems] = useState<TotpItem[]>();
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [editing, setEditing] = useState<TotpItem>();
+
+  // 既有類別（去重、排序），給編輯表單當建議選項
+  const categories = useMemo(
+    () => [...new Set((items ?? []).map((item) => item.category).filter(Boolean))].sort(),
+    [items]
+  );
 
   // 登入狀態由 AuthGate 確認過，這裡只負責載入驗證碼
   useEffect(() => {
@@ -42,6 +50,12 @@ const CodeClient = () => {
     } else {
       toast.error(`${failText}\n錯誤訊息：${result.message}`, { position: 'top-right' });
     }
+    return result.success;
+  };
+
+  const handleUpdate = async (id: string, input: TotpInput) => {
+    if (!user) return false;
+    return applyResult(await updateTotp(user.uid, id, input), '已儲存驗證碼！', '儲存驗證碼失敗！');
   };
 
   const handleDelete = async (id: string) => {
@@ -99,11 +113,22 @@ const CodeClient = () => {
               <CodeCard
                 key={item.id}
                 item={item}
+                onEdit={() => setEditing(item)}
                 onDelete={() => handleDelete(item.id)}
               />
             ))}
           </ul>
         </div>
+      )}
+
+      {editing && (
+        <TotpEditModal
+          key={editing.id}
+          item={editing}
+          categories={categories}
+          onClose={() => setEditing(undefined)}
+          onSave={(input) => handleUpdate(editing.id, input)}
+        />
       )}
 
       <ConfirmModal
