@@ -1,95 +1,111 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next-nprogress-bar';
+import { Button } from '@heroui/react';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
-import CodeCard from '@/components/CodeCard';
+import { faPlus, faTrashCan, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
+import CodeCard from './_components/CodeCard';
 import ConfirmModal from '@/components/ui/Modal/ConfirmModal';
-import { clearTotpItems, deleteTotpItem, loadUserData } from '@/lib/totp/crud';
-import { UserData, totpItems } from '@/types/userData';
+import Spinner from '@/components/ui/Loading/Spinner';
+import PageContent from '@/components/layout/PageContent';
+import PageHeader from '@/components/layout/PageHeader';
 import useAuth from '@/components/auth/useAuth';
+import { TotpResult, clearTotp, deleteTotp, loadTotp } from '@/lib/totp/crud';
+import { TotpItem } from '@/types/Totp/Totp';
 
 const CodeClient = () => {
-  const [userData, setUserData] = useState<UserData | undefined>();
   const { user } = useAuth();
-  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const router = useRouter();
-
-  // 清空 TOTP 項目
-  const clearTotpItem = async () => {
-    if (!user) {
-      toast.error('請先登入！', { position: 'top-right' });
-      return;
-    }
-
-    const result = await clearTotpItems(user.uid);
-    if (result.success) {
-      toast.success('已成功清空驗證碼！', { position: 'top-right' });
-      const updatedUserData = await loadUserData(user.uid);
-      if (updatedUserData.success) {
-        setUserData(updatedUserData.data);  // 更新使用者資料
-      }
-    } else {
-      toast.error(`清空驗證碼失敗！\n錯誤訊息：\n${result.message}`, { position: 'top-right' });
-    }
-  };
-
-  // 刪除 TOTP 項目
-  const deleteTotpItemHandler = async (totpCode: string) => {
-    if (!user) {
-      toast.error('請先登入！', { position: 'top-right' });
-      return;
-    }
-
-    const result = await deleteTotpItem(user.uid, totpCode);
-    if (result.success) {
-      toast.success('已成功刪除驗證碼！', { position: 'top-right' });
-      const updatedUserData = await loadUserData(user.uid);
-      if (updatedUserData.success) {
-        setUserData(updatedUserData.data);  // 刪除成功後更新使用者資料
-      }
-    } else {
-      toast.error(`刪除驗證碼失敗！\n錯誤訊息：\n${result.message}`, { position: 'top-right' });
-    }
-  };
+  const [items, setItems] = useState<TotpItem[]>();
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
   // 登入狀態由 AuthGate 確認過，這裡只負責載入驗證碼
   useEffect(() => {
     if (!user) return;
-    loadUserData(user.uid).then((result) => {
+    loadTotp(user.uid).then((result) => {
       if (result.success) {
-        setUserData(result.data);
+        setItems(result.data);
       } else {
-        toast.error('找不到使用者資料！', { position: 'top-right' });
+        setItems([]);
+        toast.error(`載入驗證碼失敗！\n錯誤訊息：${result.message}`, { position: 'top-right' });
       }
     });
   }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return (
-    <div className="container pt-5 pl-5 pr-5">
-      {
-        userData?.totp.length === 0 ? (
-          <div className="flex items-center p-4 mb-4 text-red-800 border border-red-300 rounded-lg bg-red-50 dark:bg-gray-blue-800 dark:text-red-400 dark:border-red-800 text-lg" role="alert">
-            <FontAwesomeIcon icon={faTriangleExclamation} className="inline w-4 h-4 mr-3" />
-            <span className="sr-only">Info</span>
-            <div>
-              <span className="font-bold">喔不!</span> 驗證碼是空的！！！
-              <button className="underline underline-offset-4 text-cyan-300" onClick={() => router.push('/addCode')}>點我立刻去新增驗證碼？</button>
-            </div>
-          </div>
-        ) : (
+  // 資料層回傳最新陣列，成功就直接換掉畫面上的資料
+  const applyResult = (result: TotpResult, successText: string, failText: string) => {
+    if (result.success) {
+      setItems(result.data);
+      toast.success(successText, { position: 'top-right' });
+    } else {
+      toast.error(`${failText}\n錯誤訊息：${result.message}`, { position: 'top-right' });
+    }
+  };
 
-          <button onClick={() => setConfirmClearOpen(true)}>
-            <span className="relative inline-flex items-center justify-center p-0.5 mb-2 mr-2 overflow-hidden text-sm font-medium text-gray-blue-900 rounded-lg group bg-gradient-to-br from-cyan-500 to-blue-500 group-hover:from-cyan-500 group-hover:to-blue-500 hover:text-white dark:text-white focus:ring-4 focus:outline-none focus:ring-cyan-200 dark:focus:ring-cyan-800">
-              <span className="relative px-5 py-2.5 transition-all ease-in duration-75 bg-white dark:bg-gray-blue-900 rounded-md group-hover:bg-opacity-0">
-                點我清空所有驗證碼
-              </span>
-            </span>
-          </button>
-        )
-      }
+  const handleDelete = async (id: string) => {
+    if (!user) return;
+    applyResult(await deleteTotp(user.uid, id), '已成功刪除驗證碼！', '刪除驗證碼失敗！');
+  };
+
+  const handleClear = async () => {
+    if (!user) return;
+    applyResult(await clearTotp(user.uid), '已成功清空驗證碼！', '清空驗證碼失敗！');
+  };
+
+  return (
+    <PageContent>
+      <PageHeader
+        title="驗證碼"
+        subtitle="點擊驗證碼即可複製"
+        right={
+          <>
+            {items && items.length > 0 && (
+              <Button
+                variant="bordered"
+                color="danger"
+                startContent={<FontAwesomeIcon icon={faTrashCan} className="w-3.5" />}
+                onPress={() => setConfirmClearOpen(true)}
+              >
+                清空全部
+              </Button>
+            )}
+            <Button
+              color="primary"
+              startContent={<FontAwesomeIcon icon={faPlus} className="w-3.5" />}
+              onPress={() => router.push('/addCode')}
+            >
+              新增驗證碼
+            </Button>
+          </>
+        }
+      />
+
+      {items === undefined ? (
+        <Spinner block label="載入驗證碼…" />
+      ) : items.length === 0 ? (
+        <div className="flex items-center p-4 text-red-800 border border-red-300 rounded-lg bg-red-50 dark:bg-gray-blue-800 dark:text-red-400 dark:border-red-800 text-lg" role="alert">
+          <FontAwesomeIcon icon={faTriangleExclamation} className="inline w-4 h-4 mr-3" />
+          <div>
+            <span className="font-bold">喔不!</span> 驗證碼是空的！！！
+            <button className="ml-1 underline underline-offset-4 text-cyan-500 dark:text-cyan-300" onClick={() => router.push('/addCode')}>點我立刻去新增驗證碼？</button>
+          </div>
+        </div>
+      ) : (
+        <div className="w-full p-4 bg-white border border-gray-blue-200 rounded-lg shadow sm:px-8 dark:bg-gray-blue-800 dark:border-gray-blue-700">
+          <ul role="list" className="divide-y divide-gray-blue-200 dark:divide-gray-blue-700">
+            {items.map((item) => (
+              <CodeCard
+                key={item.id}
+                item={item}
+                onDelete={() => handleDelete(item.id)}
+              />
+            ))}
+          </ul>
+        </div>
+      )}
+
       <ConfirmModal
         isOpen={confirmClearOpen}
         danger
@@ -99,37 +115,10 @@ const CodeClient = () => {
         onCancel={() => setConfirmClearOpen(false)}
         onConfirm={async () => {
           setConfirmClearOpen(false);
-          await clearTotpItem();
+          await handleClear();
         }}
       />
-      <div className="w-full p-4 bg-white border border-gray-blue-200 rounded-lg shadow sm:px-8 sm:pt-8 dark:bg-gray-blue-800 dark:border-gray-blue-700">
-        <div className="flex items-center justify-between mb-4">
-          <h5 className="text-xl font-bold leading-none text-gray-blue-900 dark:text-white">驗證碼</h5>
-          <button
-            onClick={() => router.push('/addCode')}
-            className="text-sm border-tpp border-2 rounded-lg px-2 py-2 hover:bg-tpp/30dark:hover:bg-tpp-30"
-          >
-            新增驗證碼
-          </button>
-        </div>
-        <div className="flow-root">
-          <ul role="list" className="divide-y divide-gray-blue-200 dark:divide-gray-blue-700">
-            {
-              userData?.totp.map((items: totpItems) => (
-                <div key={items.name}>
-                  <CodeCard
-                    code={items.secret}
-                    name={items.name}
-                    category={items.category}
-                    deleteCode={() => deleteTotpItemHandler(items.secret)}
-                  />
-                </div>
-              ))
-            }
-          </ul>
-        </div>
-      </div>
-    </div>
+    </PageContent>
   );
 };
 

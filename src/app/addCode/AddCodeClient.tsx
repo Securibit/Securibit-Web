@@ -4,11 +4,11 @@ import InputLabel from "@/components/Input/InputLabel";
 import useAuth from "@/components/auth/useAuth";
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { totpItems } from "@/types/userData";
+import { TotpInput } from "@/types/Totp/Totp";
 import { addTotp } from "@/lib/totp/crud";
 
 const AddCodeClient = () => {
-  const [totp, setTotp] = useState<totpItems>({ name: '', secret: '', category: '' });
+  const [totp, setTotp] = useState<TotpInput>({ name: '', secret: '', category: '' });
   const { user } = useAuth();
 
   // 新增 TOTP 資料
