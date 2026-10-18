@@ -12,6 +12,7 @@ import PageHeader from "@/components/layout/PageHeader";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import { deleteAccount, submitChange, syncGoogleUserData } from "@/lib/totp/account";
 import { Profile } from "@/types/Profile/Profile";
+import VaultSettings from "./_components/VaultSettings";
 import { showError } from "@/lib/errorDialog";
 
 type ProfileForm = Pick<Profile, 'name' | 'phoneNumber' | 'photoURL' | 'bgPhotoURL'>;
@@ -169,6 +170,8 @@ const UpdateInfoClient = () => {
           </Button>
         </div>
       </form>
+
+      <VaultSettings />
 
       <div className="mt-6 rounded-lg border border-red-300 p-4 sm:p-6 dark:border-red-800">
         <h2 className="font-semibold text-red-600 dark:text-red-400">刪除帳戶</h2>

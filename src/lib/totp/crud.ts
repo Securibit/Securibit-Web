@@ -1,5 +1,7 @@
 import { supabase } from '@/config/supabase';
 import { TOTP_DEFAULTS, TotpInput, TotpItem } from '@/types/Totp/Totp';
+import { VaultInfo } from '@/types/Vault/Vault';
+import { decodeItems, encodeSecret } from '@/lib/vault/codec';
 
 export type TotpResult =
   | { success: true; data: TotpItem[] }
@@ -56,8 +58,17 @@ const writeTotp = async (uid: string, items: TotpItem[]): Promise<TotpResult> =>
   return { success: true, data: items };
 };
 
-// 讀取驗證碼；舊資料沒有 id 時補上並立即寫回（0005 migration 執行前接回的資料也能編輯 / 刪除）
-export const loadTotp = async (uid: string): Promise<TotpResult> => {
+/*
+ * 以下函式的 key 是金鑰加密用的 CryptoKey（使用者有啟用加密才會有）：
+ * 寫入前把金鑰加密，回傳的陣列解密後才交給畫面。沒有 key 就照原樣讀寫。
+ */
+
+const decodeResult = async (result: TotpResult, key?: CryptoKey): Promise<TotpResult> =>
+  result.success && key ? { success: true, data: await decodeItems(result.data, key) } : result;
+
+// 讀取資料庫裡的原始內容（金鑰可能是密文）；舊資料沒有 id 時補上並立即寫回
+// （0005 migration 執行前接回的資料也能編輯 / 刪除）
+export const loadRawTotp = async (uid: string): Promise<TotpResult> => {
   const result = await readTotp(uid);
   if (!result.success) return result;
 
@@ -68,6 +79,9 @@ export const loadTotp = async (uid: string): Promise<TotpResult> => {
   );
   return writeTotp(uid, withIds);
 };
+
+// 讀取驗證碼
+export const loadTotp = async (uid: string, key?: CryptoKey) => decodeResult(await loadRawTotp(uid), key);
 
 // RPC 回傳 null：totp_update 代表找不到該筆，其他代表找不到使用者資料
 const NOT_FOUND_ITEM = '找不到這筆驗證碼，可能已在其他裝置刪除';
@@ -88,7 +102,7 @@ const callRpc = async (
   const { data, error } = await supabase.rpc(fn, args);
 
   if (error?.code === 'PGRST202') {
-    const result = await loadTotp(uid);
+    const result = await loadRawTotp(uid);
     if (!result.success) return result;
     const next = fallback(result.data);
     return typeof next === 'string' ? { success: false, message: next } : writeTotp(uid, next);
@@ -108,21 +122,30 @@ const cleanPatch = (patch: Partial<TotpInput>): Partial<TotpInput> => {
 };
 
 // 新增一或多筆 TOTP
-export const addTotps = async (uid: string, inputs: TotpInput[]): Promise<TotpResult> => {
-  const items = inputs.map((input) => ({ id: crypto.randomUUID(), ...cleanInput(input) }));
-  return callRpc(uid, 'totp_add', { items }, (current) => [...current, ...items]);
+export const addTotps = async (uid: string, inputs: TotpInput[], key?: CryptoKey): Promise<TotpResult> => {
+  const items = await Promise.all(
+    inputs.map(async (input) => {
+      const cleaned = cleanInput(input);
+      return { id: crypto.randomUUID(), ...cleaned, secret: await encodeSecret(cleaned.secret, key) };
+    })
+  );
+  const result = await callRpc(uid, 'totp_add', { items }, (current) => [...current, ...items]);
+  return decodeResult(result, key);
 };
 
-export const addTotp = (uid: string, input: TotpInput) => addTotps(uid, [input]);
+export const addTotp = (uid: string, input: TotpInput, key?: CryptoKey) => addTotps(uid, [input], key);
 
 // 修改一筆 TOTP（只覆蓋 patch 裡有的欄位）
 export const updateTotp = async (
   uid: string,
   id: string,
-  patch: Partial<TotpInput>
+  patch: Partial<TotpInput>,
+  key?: CryptoKey
 ): Promise<TotpResult> => {
   const cleaned = cleanPatch(patch);
-  return callRpc(
+  if (cleaned.secret !== undefined) cleaned.secret = await encodeSecret(cleaned.secret, key);
+
+  const result = await callRpc(
     uid,
     'totp_update',
     { item_id: id, patch: cleaned },
@@ -132,23 +155,45 @@ export const updateTotp = async (
         : NOT_FOUND_ITEM,
     NOT_FOUND_ITEM
   );
+  return decodeResult(result, key);
 };
 
 // 刪除一筆 TOTP
-export const deleteTotp = async (uid: string, id: string): Promise<TotpResult> =>
-  callRpc(uid, 'totp_delete', { item_id: id }, (current) =>
+export const deleteTotp = async (uid: string, id: string, key?: CryptoKey): Promise<TotpResult> => {
+  const result = await callRpc(uid, 'totp_delete', { item_id: id }, (current) =>
     current.filter((item) => item.id !== id)
   );
+  return decodeResult(result, key);
+};
 
 // 清空所有 TOTP
 export const clearTotp = async (uid: string): Promise<TotpResult> =>
   callRpc(uid, 'totp_clear', {}, () => []);
 
 // 依 ids 順序重新排列（ids 裡沒有的接在最後）
-export const reorderTotp = async (uid: string, ids: string[]): Promise<TotpResult> =>
-  callRpc(uid, 'totp_reorder', { ids }, (current) => {
+export const reorderTotp = async (uid: string, ids: string[], key?: CryptoKey): Promise<TotpResult> => {
+  const result = await callRpc(uid, 'totp_reorder', { ids }, (current) => {
     const rank = new Map(ids.map((id, index) => [id, index]));
     return [...current].sort(
       (a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity)
     );
   });
+  return decodeResult(result, key);
+};
+
+/**
+ * 更新加密設定，並一次換掉多筆金鑰（啟用、改密碼、停用時用）。
+ * secrets：{ 項目 id: 新的 secret }。需要 0007 migration，沒有退回方案。
+ */
+export const saveVault = async (
+  vault: VaultInfo | null,
+  secrets: Record<string, string>
+): Promise<TotpResult> => {
+  const { data, error } = await supabase.rpc('totp_set_vault', { new_vault: vault, secrets });
+  if (error?.code === 'PGRST202') {
+    return { success: false, message: '資料庫還沒有加密功能，請先在 Supabase 執行 0007_vault.sql。' };
+  }
+  if (error) return { success: false, message: error.message };
+  if (data === null) return { success: false, message: NOT_FOUND_USER };
+  return { success: true, data: data as TotpItem[] };
+};

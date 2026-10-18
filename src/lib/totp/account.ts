@@ -18,6 +18,7 @@ export const rowToProfile = (row: any): Profile => ({
   lastLoginAt: row.last_login_at ?? '',
   lastLoginIp: row.last_login_ip ?? '',
   lastLoginDevice: row.last_login_device ?? '',
+  vault: row.vault ?? null,
 });
 
 // 記錄這次登入的時間 / IP / 裝置（IP 由後端讀請求 header 取得）

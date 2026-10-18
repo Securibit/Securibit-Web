@@ -1,3 +1,5 @@
+import { VaultInfo } from "@/types/Vault/Vault";
+
 // profiles 資料列轉成 App 內部使用的格式（欄位對齊原 Firebase 版本）
 export interface Profile {
   uid: string;
@@ -14,4 +16,6 @@ export interface Profile {
   lastLoginAt?: string;
   lastLoginIp?: string;
   lastLoginDevice?: string;
+  // 金鑰加密設定，null 代表未啟用
+  vault: VaultInfo | null;
 }

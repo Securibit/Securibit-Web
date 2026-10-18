@@ -116,6 +116,8 @@ const CodeCard = (props: CodeCardProps) => {
               </DropdownTrigger>
               <DropdownMenu
                 aria-label="驗證碼操作"
+                // 金鑰錯誤時匯出的 QR Code 也不能用
+                disabledKeys={otp?.value === null ? ["export"] : []}
                 onAction={(key) => {
                   if (key === "pin") props.onTogglePin();
                   if (key === "export") setExportOpen(true);

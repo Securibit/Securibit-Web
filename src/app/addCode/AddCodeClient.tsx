@@ -7,6 +7,7 @@ import { Button, Divider } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft, faCircleCheck } from "@fortawesome/free-solid-svg-icons";
 import useAuth from "@/components/auth/useAuth";
+import useVault from "@/components/vault/useVault";
 import PageContent from "@/components/layout/PageContent";
 import PageHeader from "@/components/layout/PageHeader";
 import TotpForm from "@/components/totp/TotpForm";
@@ -28,6 +29,7 @@ const isDefaultAdvanced = (input: TotpInput) =>
 
 const AddCodeClient = () => {
   const { user } = useAuth();
+  const { key } = useVault();
   const router = useRouter();
   const [totp, setTotp] = useState<TotpInput>(EMPTY_FORM);
   const [errors, setErrors] = useState<TotpErrors>({});
@@ -44,10 +46,10 @@ const AddCodeClient = () => {
   // 讀取既有驗證碼，只用來提供類別建議
   useEffect(() => {
     if (!user) return;
-    loadTotp(user.uid).then((result) => {
+    loadTotp(user.uid, key).then((result) => {
       if (result.success) setItems(result.data);
     });
-  }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.uid, key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const categories = useMemo(
     () => [...new Set(items.map((item) => item.category).filter(Boolean))].sort(),
@@ -63,7 +65,7 @@ const AddCodeClient = () => {
 
   const handleBulkImport = async (inputs: TotpInput[]) => {
     if (!user) return false;
-    const result = await addTotps(user.uid, inputs);
+    const result = await addTotps(user.uid, inputs, key);
     if (!result.success) {
       showError('匯入驗證碼失敗', result.message);
       return false;
@@ -90,7 +92,7 @@ const AddCodeClient = () => {
     }
 
     setSaving(true);
-    const result = await addTotp(user.uid, totp);
+    const result = await addTotp(user.uid, totp, key);
     setSaving(false);
 
     if (result.success) {

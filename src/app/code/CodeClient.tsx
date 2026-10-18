@@ -14,7 +14,8 @@ import Spinner from '@/components/ui/Loading/Spinner';
 import PageContent from '@/components/layout/PageContent';
 import PageHeader from '@/components/layout/PageHeader';
 import useAuth from '@/components/auth/useAuth';
-import { TotpResult, clearTotp, deleteTotp, loadTotp, reorderTotp, updateTotp } from '@/lib/totp/crud';
+import useVault from '@/components/vault/useVault';
+import { TotpResult, clearTotp, deleteTotp, isValidSecret, loadTotp, reorderTotp, updateTotp } from '@/lib/totp/crud';
 import { TotpInput, TotpItem } from '@/types/Totp/Totp';
 import { showError } from "@/lib/errorDialog";
 
@@ -30,6 +31,8 @@ const readHidePref = () => {
 
 const CodeClient = () => {
   const { user } = useAuth();
+  // 有啟用加密時的金鑰（VaultGate 確認解鎖後才會掛上這個元件）
+  const { key } = useVault();
   const router = useRouter();
   const [items, setItems] = useState<TotpItem[]>();
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
@@ -83,7 +86,7 @@ const CodeClient = () => {
   // 登入狀態由 AuthGate 確認過，這裡只負責載入驗證碼
   useEffect(() => {
     if (!user) return;
-    loadTotp(user.uid).then((result) => {
+    loadTotp(user.uid, key).then((result) => {
       if (result.success) {
         setItems(result.data);
       } else {
@@ -91,7 +94,7 @@ const CodeClient = () => {
         showError('載入驗證碼失敗', result.message);
       }
     });
-  }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.uid, key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 資料層回傳最新陣列，成功就直接換掉畫面上的資料
   const applyResult = (result: TotpResult, successText: string, failText: string) => {
@@ -106,18 +109,18 @@ const CodeClient = () => {
 
   const handleUpdate = async (id: string, input: TotpInput) => {
     if (!user) return false;
-    return applyResult(await updateTotp(user.uid, id, input), '已儲存驗證碼！', '儲存驗證碼失敗');
+    return applyResult(await updateTotp(user.uid, id, input, key), '已儲存驗證碼！', '儲存驗證碼失敗');
   };
 
   const handleDelete = async (id: string) => {
     if (!user) return;
-    applyResult(await deleteTotp(user.uid, id), '已成功刪除驗證碼！', '刪除驗證碼失敗');
+    applyResult(await deleteTotp(user.uid, id, key), '已成功刪除驗證碼！', '刪除驗證碼失敗');
   };
 
   const handleTogglePin = async (item: TotpItem) => {
     if (!user) return;
     applyResult(
-      await updateTotp(user.uid, item.id, { pinned: !item.pinned }),
+      await updateTotp(user.uid, item.id, { pinned: !item.pinned }, key),
       item.pinned ? '已取消釘選' : '已釘選到最上面',
       item.pinned ? '取消釘選失敗' : '釘選失敗'
     );
@@ -134,7 +137,7 @@ const CodeClient = () => {
     const previous = items;
     setItems(next);
     const seq = ++reorderSeq.current;
-    const result = await reorderTotp(user.uid, next.map((item) => item.id));
+    const result = await reorderTotp(user.uid, next.map((item) => item.id), key);
     if (seq !== reorderSeq.current) return;
     if (result.success) {
       setItems(result.data);
@@ -301,7 +304,10 @@ const CodeClient = () => {
         />
       )}
 
-      {exportOpen && <ExportModal items={ordered} onClose={() => setExportOpen(false)} />}
+      {/* 解不開的金鑰（顯示「金鑰錯誤」的項目）不匯出 */}
+      {exportOpen && (
+        <ExportModal items={ordered.filter((item) => isValidSecret(item.secret))} onClose={() => setExportOpen(false)} />
+      )}
 
       <ConfirmModal
         isOpen={confirmClearOpen}
