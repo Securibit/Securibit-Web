@@ -5,13 +5,9 @@ export interface SidebarProps {
 
 export interface SidebarListItemProps {
   icon: React.ElementType;
-  link: string;
   text: string;
+  // 有 link 就換頁；沒有就只執行 onClick（例如登入、登出）
+  link?: string;
   onClick?: () => void;
-  disabled?: boolean;
-  chip?: {
-    value: string;
-    size: 'sm' | 'md' | 'lg';
-    color: "blue-gray" | "gray" | "brown" | "deep-orange" | "orange" | "amber" | "yellow" | "lime" | "light-green" | "green" | "teal" | "cyan" | "light-blue" | "blue" | "indigo" | "deep-purple" | "purple" | "pink" | "red";
-  };
+  active?: boolean;
 }

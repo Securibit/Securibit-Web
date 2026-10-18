@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import SEO from "@/config/SEO.json";
 import UpdateInfoClient from "./UpdateInfoClient";
 
 export const metadata: Metadata = {
-  title: "更改個人資料 - TOTP 2FA",
+  title: SEO.UpdateInfo.title,
+  description: SEO.UpdateInfo.description,
 };
 
 const Page = () => <UpdateInfoClient />;

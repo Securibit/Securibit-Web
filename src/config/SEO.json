@@ -1,65 +1,83 @@
 {
     "default": {
-      "title": "首頁 - TOTP 2FA",
-      "description": "全台灣最強大的二步驟驗證器。從台灣的區塊鏈程式團隊打造的最強大二步驟驗證器，支援基於 OTP、TOTP、HOTP 一次性密碼演算法的驗證碼。",
-      "image": "/imgs/icon.png",
-      "type": "website",
-      "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
-      "author": "TershiXia",
-      "copyright": "TershiXia"
+        "title": "首頁 - TOTP 2FA",
+        "description": "全台灣最強大的二步驟驗證器。從台灣的區塊鏈程式團隊打造的最強大二步驟驗證器，支援基於 OTP、TOTP、HOTP 一次性密碼演算法的驗證碼。",
+        "image": "/imgs/icon.png",
+        "type": "website",
+        "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
+        "author": "TershiXia",
+        "copyright": "TershiXia"
     },
     "Index": {
-      "title": "首頁 - TOTP 2FA",
-      "description": "全台灣最強大的二步驟驗證器。從台灣的區塊鏈程式團隊打造的最強大二步驟驗證器，支援基於 OTP、TOTP、HOTP 一次性密碼演算法的驗證碼。",
-      "image": "/imgs/icon.png",
-      "type": "website",
-      "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
-      "author": "TershiXia",
-      "copyright": "TershiXia"
+        "title": "首頁 - TOTP 2FA",
+        "description": "全台灣最強大的二步驟驗證器。從台灣的區塊鏈程式團隊打造的最強大二步驟驗證器，支援基於 OTP、TOTP、HOTP 一次性密碼演算法的驗證碼。",
+        "image": "/imgs/icon.png",
+        "type": "website",
+        "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
+        "author": "TershiXia",
+        "copyright": "TershiXia"
     },
     "Code": {
-      "title": "驗證碼 - TOTP 2FA",
-      "description": "全台灣最強大的二步驟驗證器。從台灣的區塊鏈程式團隊打造的最強大二步驟驗證器，支援基於 OTP、TOTP、HOTP 一次性密碼演算法的驗證碼。",
-      "image": "/imgs/icon.png",
-      "type": "website",
-      "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
-      "author": "TershiXia",
-      "copyright": "TershiXia"
+        "title": "驗證碼",
+        "description": "全台灣最強大的二步驟驗證器。從台灣的區塊鏈程式團隊打造的最強大二步驟驗證器，支援基於 OTP、TOTP、HOTP 一次性密碼演算法的驗證碼。",
+        "image": "/imgs/icon.png",
+        "type": "website",
+        "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
+        "author": "TershiXia",
+        "copyright": "TershiXia"
     },
     "AddCode": {
-      "title": "新增驗證碼 - TOTP 2FA",
-      "description": "全台灣最強大的二步驟驗證器。從台灣的區塊鏈程式團隊打造的最強大二步驟驗證器，支援基於 OTP、TOTP、HOTP 一次性密碼演算法的驗證碼。",
-      "image": "/imgs/icon.png",
-      "type": "website",
-      "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
-      "author": "TershiXia",
-      "copyright": "TershiXia"
+        "title": "新增驗證碼",
+        "description": "全台灣最強大的二步驟驗證器。從台灣的區塊鏈程式團隊打造的最強大二步驟驗證器，支援基於 OTP、TOTP、HOTP 一次性密碼演算法的驗證碼。",
+        "image": "/imgs/icon.png",
+        "type": "website",
+        "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
+        "author": "TershiXia",
+        "copyright": "TershiXia"
     },
     "NotFound": {
-      "title": "404頁面找不到｜首頁 - TOTP 2FA",
-      "description": "找不到這個頁面喔！",
-      "image": "/imgs/icon.png",
-      "type": "website",
-      "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
-      "author": "TershiXia",
-      "copyright": "TershiXia"
+        "title": "404 找不到頁面",
+        "description": "找不到這個頁面喔！",
+        "image": "/imgs/icon.png",
+        "type": "website",
+        "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
+        "author": "TershiXia",
+        "copyright": "TershiXia"
     },
     "About": {
-      "title": "關於我們｜首頁 - TOTP 2FA",
-      "description": "全台灣最強大的二步驟驗證器。從台灣的區塊鏈程式團隊打造的最強大二步驟驗證器，支援基於 OTP、TOTP、HOTP 一次性密碼演算法的驗證碼。",
-      "image": "/imgs/icon.png",
-      "type": "website",
-      "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
-      "author": "TershiXia",
-      "copyright": "TershiXia"
+        "title": "關於我們",
+        "description": "TOTP 2FA 是一個網頁版的兩步驟驗證器，登入 Google 帳號就能在任何裝置上查看驗證碼。",
+        "image": "/imgs/icon.png",
+        "type": "website",
+        "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
+        "author": "TershiXia",
+        "copyright": "TershiXia"
     },
     "Disclaimer": {
-      "title": "免責聲明｜首頁 - TOTP 2FA",
-      "description": "訪問和使用本網站時，請您仔細閱讀並遵守此免責聲明條款。",
-      "image": "/imgs/icon.png",
-      "type": "website",
-      "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
-      "author": "TershiXia",
-      "copyright": "TershiXia"
+        "title": "免責聲明",
+        "description": "訪問和使用本網站時，請您仔細閱讀並遵守此免責聲明條款。",
+        "image": "/imgs/icon.png",
+        "type": "website",
+        "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
+        "author": "TershiXia",
+        "copyright": "TershiXia"
+    },
+    "MyPage": {
+        "title": "個人頁面",
+        "description": "查看您的帳戶資料與最後登入資訊。",
+        "image": "/imgs/icon.png",
+        "type": "website",
+        "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
+        "author": "TershiXia",
+        "copyright": "TershiXia"
+    },
+    "UpdateInfo": {
+        "title": "管理帳戶",
+        "description": "修改個人資料、同步 Google 資料或刪除帳戶。",
+        "image": "/imgs/icon.png",
+        "type": "website",
+        "keyword": "2fa,二步驟,驗證器,totp,驗證碼,安全",
+        "author": "TershiXia",
+        "copyright": "TershiXia"
     }
-  }
+}

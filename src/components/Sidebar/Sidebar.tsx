@@ -1,104 +1,114 @@
 "use client";
 
-import React, { useEffect } from "react";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerBody,
-  Chip,
-} from "@heroui/react";
-import { SidebarListItemProps, SidebarProps } from "@/types/Sidebar/Sidebar";
+import { Drawer, DrawerBody, DrawerContent, DrawerFooter, DrawerHeader } from "@heroui/react";
+import { usePathname } from "next/navigation";
 import { useRouter } from "next-nprogress-bar";
-import { CurrencyDollarIcon } from "@heroicons/react/24/solid";
+import {
+  ArrowLeftEndOnRectangleIcon,
+  ArrowRightStartOnRectangleIcon,
+  DocumentTextIcon,
+  HomeIcon,
+  InformationCircleIcon,
+  KeyIcon,
+  PlusCircleIcon,
+  UserCircleIcon,
+} from "@heroicons/react/24/outline";
+import { cn } from "@/lib/utils";
+import { SidebarListItemProps, SidebarProps } from "@/types/Sidebar/Sidebar";
+import useAuth from "../auth/useAuth";
+import Themes from "../Themes";
 
 const SidebarListItem = (props: SidebarListItemProps) => {
   const router = useRouter();
 
   return (
     <button
-      disabled={props.disabled}
       onClick={() => {
-        props.onClick && props.onClick();
-        router.push(props.link);
+        props.onClick?.();
+        if (props.link) router.push(props.link);
       }}
-      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/10"
+      className={cn(
+        "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/10",
+        props.active && "bg-tpp/15 text-tpp"
+      )}
     >
       <props.icon className="h-5 w-5" />
       <span className="flex-1">{props.text}</span>
-      {props.chip && (
-        <Chip size={props.chip.size} variant="flat" className="rounded-full">
-          {props.chip.value}
-        </Chip>
-      )}
     </button>
   );
 };
 
+// 手機版側欄：依登入狀態顯示可用項目
 const Sidebar = (props: SidebarProps) => {
-  const router = useRouter();
-
-  useEffect(() => {
-    // 與外部受控狀態同步（HeroUI Drawer 由 isOpen 控制）
-  }, [props.isDrawerOpen]);
+  const pathname = usePathname();
+  const { user, profile, login, logout } = useAuth();
 
   const closeDrawer = () => props.setIsDrawerOpen(false);
+
+  const links = [
+    { icon: HomeIcon, text: "首頁", link: "/" },
+    ...(user
+      ? [
+          { icon: KeyIcon, text: "驗證碼", link: "/code" },
+          { icon: PlusCircleIcon, text: "新增驗證碼", link: "/addCode" },
+          { icon: UserCircleIcon, text: "個人頁面", link: "/me/MyPage" },
+        ]
+      : []),
+    { icon: InformationCircleIcon, text: "關於我們", link: "/about" },
+    { icon: DocumentTextIcon, text: "免責聲明", link: "/disclaimer" },
+  ];
 
   return (
     <Drawer
       isOpen={props.isDrawerOpen}
       onOpenChange={(open) => props.setIsDrawerOpen(open)}
       placement="right"
-      className="text-white dark:bg-blue-gray-900"
+      size="xs"
+      className="text-black dark:text-white dark:bg-gray-blue-900"
     >
       <DrawerContent>
-        <DrawerHeader>
-          <button
-            className="flex items-center gap-4"
-            onClick={() => {
-              router.push("/");
-              closeDrawer();
-            }}
-          >
-            <span className="text-xl font-semibold text-black dark:text-white">
-              Bityo
+        <DrawerHeader className="flex flex-col gap-1">
+          <span className="text-xl font-semibold">TOTP 2FA 驗證器</span>
+          {user && (
+            <span className="text-sm font-normal text-gray-blue-500 dark:text-gray-blue-400">
+              {profile?.name || user.displayName}
             </span>
-          </button>
+          )}
         </DrawerHeader>
-        <DrawerBody className="dark:text-blue-gray-100">
-          <SidebarListItem
-            icon={CurrencyDollarIcon}
-            text={"驗證碼"}
-            link={"/code"}
-            disabled={false}
-            onClick={() => {
-              router.push("/code");
-              closeDrawer();
-            }}
-          />
-
-          <SidebarListItem
-            icon={CurrencyDollarIcon}
-            text={"新增驗證碼"}
-            link={"/addCode"}
-            disabled={false}
-            onClick={() => {
-              router.push("/addCode");
-              closeDrawer();
-            }}
-          />
-
-          <SidebarListItem
-            icon={CurrencyDollarIcon}
-            text={"我的頁面"}
-            link={"/me/MyPage"}
-            disabled={false}
-            onClick={() => {
-              router.push("/me/MyPage");
-              closeDrawer();
-            }}
-          />
+        <DrawerBody className="gap-1">
+          {links.map((item) => (
+            <SidebarListItem
+              key={item.link}
+              {...item}
+              active={pathname === item.link}
+              onClick={closeDrawer}
+            />
+          ))}
         </DrawerBody>
+        <DrawerFooter className="flex flex-col items-stretch gap-3">
+          <div className="px-3">
+            <Themes />
+          </div>
+          {user ? (
+            <SidebarListItem
+              icon={ArrowRightStartOnRectangleIcon}
+              text="登出"
+              onClick={() => {
+                closeDrawer();
+                logout();
+              }}
+            />
+          ) : (
+            <SidebarListItem
+              icon={ArrowLeftEndOnRectangleIcon}
+              text="使用 Google 登入"
+              onClick={() => {
+                closeDrawer();
+                login();
+              }}
+            />
+          )}
+        </DrawerFooter>
       </DrawerContent>
     </Drawer>
   );
