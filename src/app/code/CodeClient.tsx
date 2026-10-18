@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { AppUser } from '@/types/authUser';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next-nprogress-bar';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -10,11 +9,11 @@ import CodeCard from '@/components/CodeCard';
 import ConfirmModal from '@/components/ui/Modal/ConfirmModal';
 import { clearTotpItems, deleteTotpItem, loadUserData } from '@/lib/totp/crud';
 import { UserData, totpItems } from '@/types/userData';
-import { checkAuth } from '@/lib/totp/account';
+import useAuth from '@/components/auth/useAuth';
 
 const CodeClient = () => {
   const [userData, setUserData] = useState<UserData | undefined>();
-  const [user, setUser] = useState<AppUser | undefined>();
+  const { user } = useAuth();
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const router = useRouter();
 
@@ -56,27 +55,17 @@ const CodeClient = () => {
     }
   };
 
-  // 當使用者登入狀態改變時，檢查使用者驗證
+  // 登入狀態由 AuthGate 確認過，這裡只負責載入驗證碼
   useEffect(() => {
-    const unsubscribe = checkAuth(async (user) => {
-      if (user) {
-        setUser(user);
-        const result = await loadUserData(user.uid);
-        if (result.success) {
-          setUserData(result.data);
-        } else {
-          toast.error('找不到使用者資料！', { position: 'top-right' });
-        }
+    if (!user) return;
+    loadUserData(user.uid).then((result) => {
+      if (result.success) {
+        setUserData(result.data);
       } else {
-        setUser(undefined);
-        router.push('/');
-        toast.error('請先登入！', { position: 'top-right' });
+        toast.error('找不到使用者資料！', { position: 'top-right' });
       }
     });
-
-    return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="container pt-5 pl-5 pr-5">

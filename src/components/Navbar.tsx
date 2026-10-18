@@ -1,58 +1,21 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
-/* eslint-disable @next/next/no-html-link-for-pages */
 
 import { faKey, faPlus, faRightFromBracket } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Themes from "./Themes";
-import { useEffect, useState } from "react";
-import { AppUser } from "@/types/authUser";
+import { useState } from "react";
 import { useRouter } from 'next-nprogress-bar';
-import { toast } from 'react-hot-toast';
 import Image from "next/image";
 import { Button } from "@heroui/react";
 import Sidebar from "./Sidebar/Sidebar";
 import { Bars3Icon } from '@heroicons/react/24/solid';
-import { checkAuth, handleGoogleLogin, logout } from "@/lib/totp/account";
+import useAuth from "./auth/useAuth";
 
 // 整個 Navbar
 const Navbar = () => {
   const router = useRouter();
-  const [isOpen, setIsOpen] = useState(false);
-  const [user, setUser] = useState<AppUser | undefined>();
-
-  // 登入（成功提示會在轉向回來後由 _app 顯示，這裡只處理「立即失敗」如 provider 未啟用）
-  const handleLogin = async () => {
-    const result = await handleGoogleLogin();
-
-    if (!result.success) {
-      toast.error(`登入失敗！\n失敗原因：${result.message}`, { position: 'top-right' });
-    }
-  };
-
-  // 登出
-  const handleLogout = async () => {
-    const result = await logout();
-
-    if (result.success) {
-      toast.success('登出成功！', { position: 'top-right' });
-    } else {
-      toast.error(`登出失敗！\n錯誤訊息：${result.message}`, { position: 'top-right' });
-    }
-  };
-
-  // 當使用者登入狀態改變時，檢查使用者驗證
-  useEffect(() => {
-    const unsubscribe = checkAuth((user) => {
-      if (user) {
-        setUser(user);
-      } else {
-        setUser(undefined);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const { user, login: handleLogin, logout: handleLogout } = useAuth();
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -122,7 +85,9 @@ const Navbar = () => {
 
                 <div className="relative">
                   <img
-                    src={user.photoURL as string}
+                    src={user.photoURL ?? ''}
+                    alt="大頭照"
+                    referrerPolicy="no-referrer"
                     className="w-7 h-7 rounded-full"
                   />
                   <span className="top-0 left-5 absolute  w-3 h-3 bg-green-400 border-2 border-white dark:border-gray-blue-800 rounded-full"></span>

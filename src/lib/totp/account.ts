@@ -1,6 +1,6 @@
 import { Profile } from '@/types/Profile/Profile';
 import { supabase } from '@/config/supabase';
-import { AppUser, toAppUser } from '@/types/authUser';
+import { AppUser } from '@/types/authUser';
 
 // 將 profiles 資料列（snake_case）轉成 App 內部使用的 Profile
 export const rowToProfile = (row: any): Profile => ({
@@ -42,40 +42,9 @@ export const ensureProfile = async () => {
   if (error) console.error('ensure_profile 失敗:', error.message);
 };
 
-// 驗證是否登入並載入使用者資料（對應原 onAuthStateChanged 行為）
-export const checkAuth = (
-  callback: (user: AppUser | undefined, userData?: Profile) => void
-): (() => void) => {
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange(async (_event, session) => {
-    const sUser = session?.user;
-    if (sUser) {
-      const appUser = toAppUser(sUser);
-      // 先確保 profile 存在，再讀取
-      await ensureProfile();
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', sUser.id)
-        .maybeSingle();
-
-      if (!error && data) {
-        callback(appUser, rowToProfile(data));
-      } else {
-        callback(appUser);
-      }
-    } else {
-      callback(undefined);
-    }
-  });
-
-  return () => subscription.unsubscribe();
-};
-
 // login（Google OAuth 轉向流程）
 export const handleGoogleLogin = async () => {
-  // 設旗標：轉向回來、session 真的建立後，才由 _app 顯示「登入成功」
+  // 設旗標：轉向回來、session 真的建立後，才由 AuthProvider 顯示「登入成功」
   if (typeof window !== 'undefined') {
     sessionStorage.setItem('pendingLogin', '1');
   }

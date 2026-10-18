@@ -1,8 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
-import { supabase } from "@/config/supabase";
-import {useRouter} from "next-nprogress-bar";
-import toast from "react-hot-toast";
+import { useRouter } from "next-nprogress-bar";
+import useAuth from "./auth/useAuth";
 
 interface Props {
   uid: string;
@@ -30,20 +29,7 @@ const fmt = (iso?: string) => {
 
 const PersonalCard = (props: Props) => {
   const router = useRouter();
-
-  const logout_btn = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast.error(`登出失敗！\n錯誤訊息：\n${error.message}`, {
-        position: "top-right"
-      });
-    } else {
-      toast.success('登出成功！', {
-        position: "top-right"
-      });
-    }
-    router.push('/');
-  }
+  const { logout } = useAuth();
 
   return (
     <>
@@ -97,7 +83,7 @@ const PersonalCard = (props: Props) => {
           
           <div className="flex mt-4 space-x-3 md:mt-6">
             <button onClick={() => router.push('/me/update_info')} className="inline-flex items-center px-4 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 focus:outline-none dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-900">管理帳戶</button>
-            <button onClick={logout_btn} className="inline-flex items-center px-4 py-2 text-sm font-medium text-center text-gray-blue-900 bg-white border border-gray-blue-300 rounded-lg hover:bg-gray-blue-100 focus:ring-4 focus:outline-none focus:ring-gray-blue-200 dark:bg-gray-blue-800 dark:text-white dark:border-gray-blue-600 dark:hover:bg-gray-blue-700 dark:hover:border-gray-blue-700 dark:focus:ring-gray-blue-700">登出帳戶</button>
+            <button onClick={logout} className="inline-flex items-center px-4 py-2 text-sm font-medium text-center text-gray-blue-900 bg-white border border-gray-blue-300 rounded-lg hover:bg-gray-blue-100 focus:ring-4 focus:outline-none focus:ring-gray-blue-200 dark:bg-gray-blue-800 dark:text-white dark:border-gray-blue-600 dark:hover:bg-gray-blue-700 dark:hover:border-gray-blue-700 dark:focus:ring-gray-blue-700">登出帳戶</button>
           </div>
         </div>
       </div>

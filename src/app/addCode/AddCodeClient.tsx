@@ -1,38 +1,15 @@
 "use client";
 
 import InputLabel from "@/components/Input/InputLabel";
-import { supabase } from "@/config/supabase";
-import { AppUser, toAppUser } from "@/types/authUser";
-import { ensureProfile } from "@/lib/totp/account";
-import { useRouter } from "next-nprogress-bar";
-import { useEffect, useState } from "react";
+import useAuth from "@/components/auth/useAuth";
+import { useState } from "react";
 import toast from "react-hot-toast";
 import { totpItems } from "@/types/userData";
 import { addTotp } from "@/lib/totp/crud";
 
 const AddCodeClient = () => {
   const [totp, setTotp] = useState<totpItems>({ name: '', secret: '', category: '' });
-  const [user, setUser] = useState<AppUser>();
-  const router = useRouter();
-
-  // 一進頁面就驗證，如果沒登入就導回首頁
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        await ensureProfile();
-        setUser(toAppUser(session.user));
-      } else {
-        setUser(undefined);
-        toast.error("請先登入！", {
-          position: "top-right"
-        });
-        router.push('/');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { user } = useAuth();
 
   // 新增 TOTP 資料
   const handleAddTotp = async () => {

@@ -2,52 +2,31 @@
 
 import { AppUser } from "@/types/authUser";
 import { useRouter } from "next-nprogress-bar";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import toast from "react-hot-toast";
 import { Profile } from "@/types/Profile/Profile";
-import { checkAuth, deleteAccount, getUserData, submitChange, syncGoogleUserData } from "@/lib/totp/account";
+import { deleteAccount, submitChange, syncGoogleUserData } from "@/lib/totp/account";
+import useAuth from "@/components/auth/useAuth";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 
 const UpdateInfoClient = () => {
-  const [user, setUser] = useState<AppUser>();
-  const [userData, setUserData] = useState<Profile>(
-    {
-      uid: '',
-      name: '',
-      email: '',
-      phoneNumber: '',
-      photoURL: '',
-      bgPhotoURL: '',
-      emailVerified: false,
-      metadata: {
-        creationTime: '',
-        lastSignInTime: ''
-      },
-    }
-  );
+  const { user, profile } = useAuth();
+  // AuthGate 放行時 profile 已載入完成，直接拿來當表單初始值
+  const [userData, setUserData] = useState<Profile>(() => profile ?? {
+    uid: '',
+    name: '',
+    email: '',
+    phoneNumber: '',
+    photoURL: '',
+    bgPhotoURL: '',
+    emailVerified: false,
+    metadata: {
+      creationTime: '',
+      lastSignInTime: ''
+    },
+  });
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const router = useRouter();
-
-  // 當使用者登入狀態改變時，檢查使用者驗證
-  useEffect(() => {
-    const unsubscribe = checkAuth((user, data) => {
-      if (user) {
-        setUser(user);
-        if (data) {
-          setUserData(data);
-        } else {
-          toast.error('找不到使用者資料！', { position: 'top-right' });
-        }
-      } else {
-        setUser(undefined);
-        router.push('/');
-        toast.error('請先登入！', { position: 'top-right' });
-      }
-    });
-
-    return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // 將 Google 資料同步到用戶資料
   const getGoogleData = async () => {
