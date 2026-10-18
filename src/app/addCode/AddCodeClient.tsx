@@ -10,7 +10,8 @@ import useAuth from "@/components/auth/useAuth";
 import PageContent from "@/components/layout/PageContent";
 import PageHeader from "@/components/layout/PageHeader";
 import TotpForm from "@/components/totp/TotpForm";
-import { addTotp, loadTotp } from "@/lib/totp/crud";
+import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
+import { addTotp, loadTotp, normalizeSecret } from "@/lib/totp/crud";
 import { TotpErrors, validateTotpInput } from "@/lib/totp/validate";
 import { TOTP_DEFAULTS, TotpInput, TotpItem } from "@/types/Totp/Totp";
 import QrImport from "./_components/QrImport";
@@ -33,6 +34,8 @@ const AddCodeClient = () => {
   const [lastAdded, setLastAdded] = useState<string>();
   // 匯入時換 key 讓表單重新掛上，進階設定才會依匯入值決定是否展開
   const [formKey, setFormKey] = useState(0);
+  // 金鑰和既有的某筆相同時，先問使用者要不要照樣新增
+  const [duplicate, setDuplicate] = useState<TotpItem>();
 
   // 讀取既有驗證碼，只用來提供類別建議
   useEffect(() => {
@@ -54,13 +57,20 @@ const AddCodeClient = () => {
     setFormKey((key) => key + 1);
   };
 
-  // 新增 TOTP 資料
-  const handleAddTotp = async () => {
+  // 新增 TOTP 資料（force：已確認重複也要新增）
+  const handleAddTotp = async (force = false) => {
     if (!user) return;
 
     const nextErrors = validateTotpInput(totp);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
+
+    const secret = normalizeSecret(totp.secret);
+    const existing = items.find((item) => normalizeSecret(item.secret) === secret);
+    if (existing && !force) {
+      setDuplicate(existing);
+      return;
+    }
 
     setSaving(true);
     const result = await addTotp(user.uid, totp);
@@ -136,6 +146,18 @@ const AddCodeClient = () => {
           </Button>
         </form>
       </div>
+
+      <ConfirmModal
+        isOpen={!!duplicate}
+        title="已經有相同的金鑰"
+        description={`「${duplicate?.name ?? ""}」使用相同的金鑰，產生的驗證碼會一模一樣。確定還要再新增一筆嗎？`}
+        confirmLabel="仍要新增"
+        onCancel={() => setDuplicate(undefined)}
+        onConfirm={async () => {
+          setDuplicate(undefined);
+          await handleAddTotp(true);
+        }}
+      />
     </PageContent>
   );
 };
