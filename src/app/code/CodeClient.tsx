@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next-nprogress-bar';
-import { Button } from '@heroui/react';
+import { Button, Chip, Input } from '@heroui/react';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faTrashCan, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faPlus, faTrashCan, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import CodeCard from './_components/CodeCard';
 import TotpEditModal from './_components/TotpEditModal';
 import ConfirmModal from '@/components/ui/Modal/ConfirmModal';
@@ -22,12 +22,27 @@ const CodeClient = () => {
   const [items, setItems] = useState<TotpItem[]>();
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [editing, setEditing] = useState<TotpItem>();
+  const [keyword, setKeyword] = useState('');
+  // 目前篩選的類別，undefined 代表全部
+  const [category, setCategory] = useState<string>();
 
   // 既有類別（去重、排序），給編輯表單當建議選項
   const categories = useMemo(
     () => [...new Set((items ?? []).map((item) => item.category).filter(Boolean))].sort(),
     [items]
   );
+
+  // 篩選中的類別被刪光或改名時，自動回到全部
+  const activeCategory = category && categories.includes(category) ? category : undefined;
+
+  // 名稱或類別包含關鍵字（不分大小寫），再依類別篩選
+  const filtered = useMemo(() => {
+    const q = keyword.trim().toLowerCase();
+    return (items ?? []).filter((item) =>
+      (!activeCategory || item.category === activeCategory) &&
+      (!q || item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q))
+    );
+  }, [items, keyword, activeCategory]);
 
   // 登入狀態由 AuthGate 確認過，這裡只負責載入驗證碼
   useEffect(() => {
@@ -107,18 +122,62 @@ const CodeClient = () => {
           </div>
         </div>
       ) : (
-        <div className="w-full p-4 bg-white border border-gray-blue-200 rounded-lg shadow sm:px-8 dark:bg-gray-blue-800 dark:border-gray-blue-700">
-          <ul role="list" className="divide-y divide-gray-blue-200 dark:divide-gray-blue-700">
-            {items.map((item) => (
-              <CodeCard
-                key={item.id}
-                item={item}
-                onEdit={() => setEditing(item)}
-                onDelete={() => handleDelete(item.id)}
-              />
-            ))}
-          </ul>
-        </div>
+        <>
+          <div className="mb-4 flex flex-col gap-3">
+            <Input
+              aria-label="搜尋驗證碼"
+              placeholder="搜尋名稱或類別"
+              value={keyword}
+              onValueChange={setKeyword}
+              isClearable
+              onClear={() => setKeyword('')}
+              startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="w-3.5 text-gray-blue-400" />}
+              className="sm:max-w-sm"
+            />
+            {categories.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                <Chip
+                  as="button"
+                  variant={activeCategory ? 'bordered' : 'solid'}
+                  color="primary"
+                  onClick={() => setCategory(undefined)}
+                >
+                  全部 {items.length}
+                </Chip>
+                {categories.map((name) => (
+                  <Chip
+                    key={name}
+                    as="button"
+                    variant={activeCategory === name ? 'solid' : 'bordered'}
+                    color="primary"
+                    onClick={() => setCategory(activeCategory === name ? undefined : name)}
+                  >
+                    {name} {items.filter((item) => item.category === name).length}
+                  </Chip>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {filtered.length === 0 ? (
+            <p className="py-10 text-center text-gray-blue-500 dark:text-gray-blue-400">
+              沒有符合條件的驗證碼
+            </p>
+          ) : (
+            <div className="w-full p-4 bg-white border border-gray-blue-200 rounded-lg shadow sm:px-8 dark:bg-gray-blue-800 dark:border-gray-blue-700">
+              <ul role="list" className="divide-y divide-gray-blue-200 dark:divide-gray-blue-700">
+                {filtered.map((item) => (
+                  <CodeCard
+                    key={item.id}
+                    item={item}
+                    onEdit={() => setEditing(item)}
+                    onDelete={() => handleDelete(item.id)}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
       )}
 
       {editing && (
