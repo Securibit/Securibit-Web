@@ -1,6 +1,6 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
-import { useRouter } from "next-nprogress-bar";
+import { useRouter } from "nextjs-toploader/app";
 import { Button } from "@heroui/react";
 import { formatDateTime } from "@/lib/utils";
 import { PersonalCardProps } from "@/types/Profile/PersonalCard";

@@ -2,7 +2,7 @@
 
 import { Drawer, DrawerBody, DrawerContent, DrawerFooter, DrawerHeader } from "@heroui/react";
 import { usePathname } from "next/navigation";
-import { useRouter } from "next-nprogress-bar";
+import { useRouter } from "nextjs-toploader/app";
 import {
   ArrowLeftEndOnRectangleIcon,
   ArrowRightStartOnRectangleIcon,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next-nprogress-bar";
+import { useRouter } from "nextjs-toploader/app";
 import toast from "react-hot-toast";
 import { Button, Input } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";

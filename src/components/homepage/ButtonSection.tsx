@@ -2,7 +2,7 @@
 
 import { faCircleInfo, faKey } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useRouter } from "next-nprogress-bar";
+import { useRouter } from "nextjs-toploader/app";
 import useAuth from "../auth/useAuth";
 
 const ButtonSection = () => {

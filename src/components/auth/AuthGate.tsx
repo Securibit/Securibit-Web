@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { useRouter } from "next-nprogress-bar";
+import { useRouter } from "nextjs-toploader/app";
 import toast from "react-hot-toast";
 import Spinner from "@/components/ui/Loading/Spinner";
 import { AuthGateProps } from "@/types/Auth/AuthGate";

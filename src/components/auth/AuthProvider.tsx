@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next-nprogress-bar";
+import { useRouter } from "nextjs-toploader/app";
 import toast from "react-hot-toast";
 import { supabase } from "@/config/supabase";
 import {

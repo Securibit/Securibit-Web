@@ -5,7 +5,7 @@ import { faKey, faPlus, faRightFromBracket } from "@fortawesome/free-solid-svg-i
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Themes from "./Themes";
 import { useState } from "react";
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from 'nextjs-toploader/app';
 import Image from "next/image";
 import { Button } from "@heroui/react";
 import Sidebar from "./Sidebar/Sidebar";
