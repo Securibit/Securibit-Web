@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@heroui/react";
 import Spinner from "@/components/ui/Loading/Spinner";
 import UserChip from "@/components/permissions/UserChip";
-import { auditActionText } from "@/lib/permissions/auditActions";
+import { auditActionText, auditChangeText } from "@/lib/permissions/auditActions";
 import { showError } from "@/lib/errorDialog";
 import { formatDateTime } from "@/lib/utils";
 import { AuditLog } from "@/types/Permission/Permission";
@@ -81,15 +81,22 @@ const AuditLogList = (props: AuditLogListProps) => {
       <ul className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
         {logs.map((log) => {
           const target = targetText(log);
+          const change = auditChangeText(log.action, log.detail);
           return (
             <li key={log.id} className="grid gap-x-4 gap-y-1 px-5 py-3 sm:grid-cols-[9.5rem_11rem_1fr] sm:items-center">
               <time dateTime={log.created_at} className="text-[13px] tabular-nums text-ink-muted">
                 {formatDateTime(log.created_at)}
               </time>
-              <UserChip user={log.actor} size="sm" className="min-w-0" />
+              {/* 操作者是 null：系統自動做的事（登入時套用身分組、email 同步），或做這件事的人已刪除帳號；資料庫分不出這兩種 */}
+              {log.actor ? (
+                <UserChip user={log.actor} size="sm" className="min-w-0" />
+              ) : (
+                <span className="text-[15px] text-ink-muted">系統或已刪除的使用者</span>
+              )}
               <p className="min-w-0 text-[15px]">
                 <span className="text-ink-muted">{auditActionText(log.action)}</span>
                 {target && <span className="ml-2 break-all text-ink">{target}</span>}
+                {change && <span className="ml-2 break-all text-ink-muted">{change}</span>}
               </p>
             </li>
           );

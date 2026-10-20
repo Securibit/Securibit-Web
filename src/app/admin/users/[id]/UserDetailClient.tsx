@@ -25,6 +25,13 @@ import UserEditModal from "./_components/UserEditModal";
 import DeleteUserModal from "./_components/DeleteUserModal";
 import UserTotpList from "./_components/UserTotpList";
 import InfoRow from "./_components/InfoRow";
+import ActivitySection from "@/components/activity/ActivitySection";
+import LoginHistoryList from "@/components/activity/LoginHistoryList";
+import AccountActivityList from "@/components/activity/AccountActivityList";
+import { loadAdminUserActivity, loadAdminUserLoginHistory } from "@/lib/users/activity";
+
+// 登入紀錄 / 操作紀錄每次載入的筆數
+const ACTIVITY_PAGE_SIZE = 10;
 
 // 讀取使用者詳情；失敗時跳錯誤並回傳 null
 const fetchUser = async (userId: string) => {
@@ -42,7 +49,7 @@ const BackLink = () => (
   </Link>
 );
 
-// 後台使用者詳情：像 iOS 設定的分組列表（帳號、登入紀錄、身分組、2FA），最後是刪除
+// 後台使用者詳情：像 iOS 設定的分組列表（帳號、登入資訊、身分組、2FA、登入紀錄、操作紀錄），最後是刪除
 const UserDetailClient = (props: UserDetailClientProps) => {
   const { userId } = props;
   const router = useRouter();
@@ -184,13 +191,14 @@ const UserDetailClient = (props: UserDetailClientProps) => {
           {isSelf && <p className="mt-2 px-5 text-[13px] text-ink-muted">這是你自己的帳號，請到「個人頁面」修改資料</p>}
         </section>
 
-        {/* 登入紀錄 */}
+        {/* 登入資訊 */}
         <section>
-          <h2 className="mb-2 px-5 text-[13px] font-normal text-ink-muted">登入紀錄</h2>
+          <h2 className="mb-2 px-5 text-[13px] font-normal text-ink-muted">登入資訊</h2>
           <dl className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
             <InfoRow label="建立時間">{formatDateTime(detail.creation_time)}</InfoRow>
             <InfoRow label="最後登入">{formatDateTime(detail.last_login_at)}</InfoRow>
-            <InfoRow label="IP">{detail.last_login_ip || "無"}</InfoRow>
+            {/* 階層不比對方高時資料庫不給 IP（null） */}
+            <InfoRow label="IP">{detail.last_login_ip || (detail.last_login_at && detail.last_login_ip === null ? "不公開" : "無")}</InfoRow>
             <InfoRow label="裝置">{detail.last_login_device || "無"}</InfoRow>
           </dl>
         </section>
@@ -225,6 +233,26 @@ const UserDetailClient = (props: UserDetailClientProps) => {
 
         {/* 2FA */}
         {can(SITE.VIEW_USER_TOTP) && canReachTotp && <UserTotpList user={detail} canManage={can(SITE.MANAGE_USER_TOTP)} />}
+
+        {/* 每次登入 */}
+        <ActivitySection title="登入紀錄">
+          <LoginHistoryList
+            load={(beforeId) => loadAdminUserLoginHistory(detail.id, beforeId, ACTIVITY_PAGE_SIZE)}
+            pageSize={ACTIVITY_PAGE_SIZE}
+            paginate
+          />
+        </ActivitySection>
+
+        {/* 帳號操作紀錄 */}
+        <ActivitySection title="帳號操作紀錄">
+          <AccountActivityList
+            load={(beforeId) => loadAdminUserActivity(detail.id, beforeId, ACTIVITY_PAGE_SIZE)}
+            pageSize={ACTIVITY_PAGE_SIZE}
+            subjectId={detail.id}
+            viewer="admin"
+            paginate
+          />
+        </ActivitySection>
 
         {/* 刪除 */}
         {canManageUser && (

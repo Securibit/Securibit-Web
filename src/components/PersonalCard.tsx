@@ -56,7 +56,7 @@ const PersonalCard = (props: PersonalCardProps) => {
       ],
     },
     {
-      title: '登入紀錄',
+      title: '登入資訊',
       rows: [
         ['建立時間', formatDateTime(profile.metadata.creationTime)],
         ['最後登入', formatDateTime(profile.lastLoginAt)],
@@ -103,6 +103,8 @@ const PersonalCard = (props: PersonalCardProps) => {
           </dl>
         </section>
       ))}
+
+      {props.children}
 
       <button onClick={logout} className="rounded-[18px] border border-line/70 bg-surface py-3 text-center text-[17px] text-alarm hover:bg-surface-1">
         登出

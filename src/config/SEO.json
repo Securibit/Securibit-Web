@@ -115,5 +115,13 @@
     "AdminAudit": {
         "title": "操作紀錄",
         "description": "後台：全站操作紀錄"
+    },
+    "UserPage": {
+        "title": "使用者",
+        "description": "使用者的個人頁面"
+    },
+    "MyActivity": {
+        "title": "活動紀錄",
+        "description": "查看您的登入紀錄與帳號操作紀錄。"
     }
 }

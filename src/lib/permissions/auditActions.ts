@@ -32,6 +32,27 @@ export const AUDIT_ACTION_TEXT: Record<string, string> = {
   'group.account.clear': '清空驗證碼',
   'group.encryption.enable': '開啟加密',
   'group.encryption.disable': '關閉加密',
+  // 使用者的帳號變更（0014；target_type 'user'）
+  'user.username': '變更 @ID',
+  'user.name': '變更名稱',
+  'user.photo': '變更大頭照',
+  'user.background': '變更背景圖',
+  'user.phone': '變更電話',
+  'user.email': '變更電子郵件',
+  'user.vault.enable': '啟用金鑰加密',
+  'user.vault.password': '變更加密密碼',
+  'user.vault.disable': '停用金鑰加密',
+  'user.vault.reset': '重設加密密碼',
+  'user.default_group': '變更預設群組',
 };
 
 export const auditActionText = (action: string) => AUDIT_ACTION_TEXT[action] ?? action;
+
+// 帳號變更（user.*）的「舊值 → 新值」，給全站操作紀錄顯示；圖片網址太長不顯示
+const CHANGE_ACTIONS = new Set(['user.username', 'user.name', 'user.phone', 'user.email', 'user.default_group']);
+
+export const auditChangeText = (action: string, detail: Record<string, unknown> | null | undefined) => {
+  if (!CHANGE_ACTIONS.has(action) || !detail) return null;
+  const show = (value: unknown) => (typeof value === 'string' && value ? value : '（無）');
+  return `${show(detail.old)} → ${show(detail.new)}`;
+};

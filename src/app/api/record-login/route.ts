@@ -30,21 +30,39 @@ function clientIp(req: NextRequest): string {
   return hops[hops.length - 1] ?? '';
 }
 
+// 登入方式：auth user 的 app_metadata.provider（google / email…），只留安全的字元
+function loginProvider(provider: unknown): string | null {
+  return typeof provider === 'string' && /^[a-z0-9_-]{1,32}$/i.test(provider) ? provider.toLowerCase() : null;
+}
+
 export async function POST(req: NextRequest) {
   const auth = await authenticate(req);
   if (auth instanceof NextResponse) return auth;
 
   const ua = req.headers.get('user-agent') ?? '';
+  const ip = clientIp(req);
+  const device = parseDevice(ua);
 
   const { error } = await auth.admin
     .from('profiles')
     .update({
       last_login_at: new Date().toISOString(),
-      last_login_ip: clientIp(req),
-      last_login_device: parseDevice(ua),
+      last_login_ip: ip,
+      last_login_device: device,
     })
     .eq('id', auth.user.id);
 
   if (error) return serverError('記錄登入失敗', error);
+
+  // 每次登入另外留一筆登入紀錄（0014_activity_log.sql 的 login_history）
+  const { error: historyError } = await auth.admin.from('login_history').insert({
+    user_id: auth.user.id,
+    ip: ip || null,
+    device,
+    user_agent: ua.slice(0, 512) || null,
+    provider: loginProvider(auth.user.app_metadata?.provider),
+  });
+
+  if (historyError) return serverError('記錄登入紀錄失敗', historyError);
   return NextResponse.json({ success: true });
 }
