@@ -1,83 +1,250 @@
 @import "tailwindcss";
 @config "../../tailwind.config.ts";
 @plugin "./hero.ts";
-@plugin "daisyui";
 @source "../../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}";
 
-/* 在 globals.css 或相應的 CSS 模塊文件中 */
-.justify-text {
-  text-align: justify;
-  text-align-last: center;
-  /* 這會使最後一行文字置中 */
+/* ============================================================
+   儀表／終端機工業風
+   - 一個主色：磷光綠 phos；一個銳利的強調色：警示橘紅 alarm；其餘全是灰階
+   - 字體：標題 Chakra Petch（中文落到 Noto Sans TC 粗體）、內文 霞鶩文楷、數字 IBM Plex Mono
+   - 顏色在 :root（淺色）與 .dark 切換，Tailwind 透過 @theme inline 對應成工具類別：
+       bg-surface / bg-surface-1 / bg-surface-2   底色、面板、更亮一層
+       text-ink / text-ink-muted / text-ink-dim     文字三階
+       border-line / border-line-strong             格線
+       text-phos / bg-phos / text-phos-ink          主色與主色上的字
+       text-alarm / bg-alarm                        強調色
+       font-display / font-body / font-mono         三種字體
+   ============================================================ */
+:root {
+  --bg: #E8ECEA;
+  --bg-1: #F4F6F5;
+  --bg-2: #FFFFFF;
+  --fg: #0E1412;
+  --fg-muted: #4F5E58;
+  --fg-dim: #7B8A84;
+  --line: #C9D1CD;
+  --line-strong: #A9B4AE;
+  --grid: rgba(14, 20, 18, 0.07);
+  --halo: rgba(10, 140, 95, 0.10);
+  --phos: #0A8C5F;
+  --phos-ink: #FFFFFF;
+  --phos-glow: rgba(10, 140, 95, 0.25);
+  --alarm: #D63A1B;
+  /* 掃描線只在深色模式出現 */
+  --scan: 0;
 }
 
-/* 或者使用 Tailwind 的 @layer 指令來擴展你的工具類 */
-@layer utilities {
-  .justify-text {
-    @apply text-justify;
-    text-align-last: center;
-  }
+.dark {
+  --bg: #0B0E11;
+  --bg-1: #11161B;
+  --bg-2: #171D23;
+  --fg: #E6EDEA;
+  --fg-muted: #8A9BA5;
+  --fg-dim: #5C6B74;
+  --line: #263038;
+  --line-strong: #3A4751;
+  --grid: rgba(230, 237, 234, 0.045);
+  --halo: rgba(23, 255, 173, 0.08);
+  --phos: #17FFAD;
+  --phos-ink: #06100C;
+  --phos-glow: rgba(23, 255, 173, 0.35);
+  --alarm: #FF5A36;
+  --scan: 1;
+}
+
+@theme inline {
+  --color-surface: var(--bg);
+  --color-surface-1: var(--bg-1);
+  --color-surface-2: var(--bg-2);
+  --color-ink: var(--fg);
+  --color-ink-muted: var(--fg-muted);
+  --color-ink-dim: var(--fg-dim);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-phos: var(--phos);
+  --color-phos-ink: var(--phos-ink);
+  --color-alarm: var(--alarm);
+
+  --font-sans: var(--font-wenkai), var(--font-noto-tc), system-ui, sans-serif;
+  --font-body: var(--font-wenkai), var(--font-noto-tc), system-ui, sans-serif;
+  --font-display: var(--font-chakra), var(--font-noto-tc), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
 @layer base {
-  .text-edge-outline {
-    -webkit-text-stroke: 1px rgba(255, 255, 255, 0.3);
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    color: var(--fg);
+    background-color: var(--bg);
+    /* 背景三層：頂部一抹磷光、細格線、掃描線（深色才有） */
+    background-image:
+      radial-gradient(70% 45% at 50% 0%, var(--halo) 0%, transparent 70%),
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+      repeating-linear-gradient(0deg, rgba(0, 0, 0, calc(0.13 * var(--scan))) 0 1px, transparent 1px 3px);
+    background-size: 100% 70vh, 32px 32px, 32px 32px, auto 3px;
+    background-repeat: no-repeat, repeat, repeat, repeat;
+    line-height: 1.7;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+  }
+
+  ::selection {
+    background: var(--phos);
+    color: var(--phos-ink);
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--phos);
+    outline-offset: 2px;
   }
 }
 
-.swiper-pagination-bullet {
-  width: 16px;
-  /* 長方形的寬度 */
-  height: 4px;
-  /* 長方形的高度 */
-  border-radius: 0;
-  /* 無圓角 */
-  margin-right: 4px;
-  /* 指示器之間的間距 */
-  opacity: 1;
-  /* 完全不透明 */
-  background: #28C8C8;
-  /* 指示器的顏色 */
+@layer components {
+  /* 小型技術標籤：全大寫、寬字距，用在區塊編號、欄位名、狀態 */
+  .tech-label {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+
+  /* 儀表讀數：等寬、等寬數字 */
+  .readout {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.08em;
+  }
+
+  /* 面板：1px 邊框 + 左上、右下兩個磷光角標 */
+  .panel {
+    position: relative;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+  }
+  .panel::before,
+  .panel::after {
+    content: "";
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-color: var(--phos);
+    border-style: solid;
+    pointer-events: none;
+  }
+  .panel::before {
+    top: -1px;
+    left: -1px;
+    border-width: 2px 0 0 2px;
+  }
+  .panel::after {
+    bottom: -1px;
+    right: -1px;
+    border-width: 0 2px 2px 0;
+  }
+
+  /* 狀態燈 */
+  .led {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    background: var(--phos);
+    box-shadow: 0 0 8px var(--phos-glow);
+  }
+  .led-off {
+    background: var(--fg-dim);
+    box-shadow: none;
+  }
+  .led-alarm {
+    background: var(--alarm);
+    box-shadow: 0 0 8px var(--alarm);
+  }
+
+  /* 分隔線；rule-accent 左邊先來一段磷光 */
+  .rule {
+    height: 1px;
+    background: var(--line);
+  }
+  .rule-accent {
+    height: 1px;
+    background: linear-gradient(90deg, var(--phos) 0 48px, var(--line) 48px);
+  }
+
+  /* 斜線填充，用在空狀態、停用區塊 */
+  .hatch {
+    background-image: repeating-linear-gradient(135deg, var(--line) 0 1px, transparent 1px 8px);
+  }
+
+  /* 磷光發光的文字（讀數用） */
+  .glow {
+    text-shadow: 0 0 18px var(--phos-glow);
+  }
+
+  /*
+   * 載入動畫：整頁只編排這一次。
+   * 把 .boot 加在容器上，直接子元素會依序淡入，之後就不再動。
+   */
+  .boot > * {
+    animation: boot-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .boot > :nth-child(1) { animation-delay: 0ms; }
+  .boot > :nth-child(2) { animation-delay: 60ms; }
+  .boot > :nth-child(3) { animation-delay: 120ms; }
+  .boot > :nth-child(4) { animation-delay: 180ms; }
+  .boot > :nth-child(5) { animation-delay: 240ms; }
+  .boot > :nth-child(6) { animation-delay: 300ms; }
+  .boot > :nth-child(7) { animation-delay: 360ms; }
+  .boot > :nth-child(8) { animation-delay: 420ms; }
+  .boot > :nth-child(9) { animation-delay: 480ms; }
+  .boot > :nth-child(10) { animation-delay: 540ms; }
+  .boot > :nth-child(11) { animation-delay: 600ms; }
+  .boot > :nth-child(n + 12) { animation-delay: 660ms; }
 }
 
-.swiper-pagination-bullet-active {
-  width: 40px;
-  /* 活動指示器的寬度 */
-}
-
-/* Swiper 自定義 */
-
-/* sm以上 右下 */
-.swiper-pagination {
-  bottom: 30px !important;
-  left: auto !important;
-  right: auto !important;
-  text-align: center !important;
-}
-
-/* sm以下 中下 */
-@media (max-width: 640px) {
-  .swiper-pagination {
-    text-align: center !important;
-    right: 0 !important;
-    left: 0 !important;
+@keyframes boot-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
-/* inactive */
-.swiper-pagination-bullet.custom-bullet {
-  width: 8px;
-  height: 8px;
-  background-color: rgb(255, 255, 255);
-  border-radius: 50%;
-  margin: 0 5px;
-  transition: background-color 0.3s ease;
+/* 讀數換碼時閃一下 */
+@keyframes settle {
+  0% {
+    opacity: 0.2;
+    letter-spacing: 0.3em;
+  }
+  100% {
+    opacity: 1;
+    letter-spacing: 0.08em;
+  }
+}
+.settle {
+  animation: settle 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
-/* active */
-.swiper-pagination-bullet-active.custom-bullet-active {
-  width: 8px;
-  height: 8px;
-  background-color: rgb(255, 255, 255);
-  border-radius: 5px;
+@media (prefers-reduced-motion: reduce) {
+  .boot > *,
+  .settle {
+    animation: none;
+  }
 }

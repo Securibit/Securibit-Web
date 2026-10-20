@@ -17,7 +17,6 @@
     "@heroui/theme": "^2.4.26",
     "@supabase/supabase-js": "^2.108.2",
     "clsx": "^2.1.1",
-    "daisyui": "^5.5.23",
     "framer-motion": "^12.40.0",
     "jsqr": "^1.4.0",
     "next": "^16.2.9",
@@ -28,7 +27,6 @@
     "react-dom": "^19.2.7",
     "react-hot-toast": "^2.6.0",
     "react-use": "^17.6.1",
-    "swiper": "^12.2.0",
     "tailwind-merge": "^3.7.0",
     "totp-generator": "^2.0.1"
   },

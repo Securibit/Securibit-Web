@@ -1,7 +1,8 @@
 "use client";
 
-import { faCircleInfo, faKey } from "@fortawesome/free-solid-svg-icons";
+import { faArrowRight, faKey } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { Button } from "@heroui/react";
 import { useRouter } from "nextjs-toploader/app";
 import useAuth from "../auth/useAuth";
 
@@ -10,22 +11,26 @@ const ButtonSection = () => {
   const { user, login } = useAuth();
 
   return (
-    <div className="mt-5 grid grid-cols-1 gap-3 sm:w-fit sm:grid-cols-2 items-center">
-      <button
+    <div className="flex flex-col gap-3 sm:flex-row">
+      <Button
         // 未登入時直接帶去 Google 登入，不要先跳到驗證碼頁再被擋回來
-        onClick={() => (user ? router.push('/code') : login())}
-        className="flex items-center justify-center rounded-lg px-2 py-2 border-2 border-tpp hover:bg-tpp/50 dark:hover:bg-tpp/50 text-white"
+        onPress={() => (user ? router.push('/code') : login())}
+        color="primary"
+        size="lg"
+        className="font-display tracking-[0.12em]"
+        startContent={<FontAwesomeIcon icon={faKey} className="w-4" />}
       >
-        <FontAwesomeIcon icon={faKey} className="mr-2 w-4" />
         {user ? '前往驗證碼' : '開始使用'}
-      </button>
-      <button
-        onClick={() => router.push('/about')}
-        className="flex items-center justify-center px-2 py-2 rounded-lg border-2 border-[#17FFAD] hover:bg-[#17FFAD]/50 dark:hover:bg-tpp/50 text-white"
+      </Button>
+      <Button
+        onPress={() => router.push('/about')}
+        variant="bordered"
+        size="lg"
+        className="border-line-strong font-display tracking-[0.12em] text-ink"
+        endContent={<FontAwesomeIcon icon={faArrowRight} className="w-3.5" />}
       >
-        <FontAwesomeIcon icon={faCircleInfo} className="mr-2 w-4" />
-        了解更多
-      </button>
+        怎麼運作
+      </Button>
     </div>
   )
 }

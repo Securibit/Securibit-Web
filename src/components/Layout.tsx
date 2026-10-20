@@ -22,7 +22,7 @@ const Layout = ({ children }: LayoutData) => {
   return (
     <AuthProvider>
       <VaultProvider>
-        <div className="min-h-screen flex flex-col">
+        <div className="flex min-h-screen flex-col">
           <Navbar />
           <main className="flex-grow">
             <AuthGate>{children}</AuthGate>
@@ -30,7 +30,19 @@ const Layout = ({ children }: LayoutData) => {
           <Footer />
         </div>
         {/* 成功訊息用 toast，錯誤一律用要按確定的對話框 */}
-        <Toaster />
+        <Toaster
+          toastOptions={{
+            style: {
+              background: 'var(--bg-1)',
+              color: 'var(--fg)',
+              border: '1px solid var(--line)',
+              borderRadius: 2,
+              fontFamily: 'var(--font-body)',
+            },
+            success: { iconTheme: { primary: 'var(--phos)', secondary: 'var(--phos-ink)' } },
+            error: { iconTheme: { primary: 'var(--alarm)', secondary: '#fff' } },
+          }}
+        />
         <ErrorDialogHost />
       </VaultProvider>
     </AuthProvider>

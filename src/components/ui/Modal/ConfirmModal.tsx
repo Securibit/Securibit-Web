@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import { cn } from "@/lib/utils";
 import { ConfirmModalProps } from "@/types/Modal/ConfirmModal";
 
 // 確認對話框：由呼叫端控制開關，確認期間鎖住按鈕避免重複送出
@@ -23,22 +22,19 @@ const ConfirmModal = (props: ConfirmModalProps) => {
     <Modal
       isOpen={props.isOpen}
       onOpenChange={(open) => !open && props.onCancel()}
-      className="dark:bg-gray-blue-800"
+      className="border border-line bg-surface-1 text-ink"
     >
       <ModalContent>
-        <ModalHeader className="flex items-center gap-2 text-black dark:text-white">
-          <FontAwesomeIcon
-            icon={faTriangleExclamation}
-            className={props.danger ? "w-4 text-red-500" : "w-4 text-tpp"}
-          />
+        <ModalHeader className="flex items-center gap-3 border-b border-line font-display tracking-wide">
+          <span className={cn("led", props.danger && "led-alarm")} aria-hidden />
           {props.title}
         </ModalHeader>
         {props.description && (
-          <ModalBody className="text-black dark:text-white font-normal">
+          <ModalBody className="py-5 font-normal text-ink-muted">
             {props.description}
           </ModalBody>
         )}
-        <ModalFooter>
+        <ModalFooter className="border-t border-line">
           <Button variant="bordered" onPress={props.onCancel} isDisabled={pending}>
             {props.cancelLabel ?? "取消"}
           </Button>

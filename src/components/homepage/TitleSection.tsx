@@ -1,31 +1,37 @@
 import ButtonSection from "./ButtonSection";
+import LiveReadout from "./LiveReadout";
 
+// 首頁主視覺：左邊文字佔 7 欄，右邊的儀表往下壓、跨過分隔線
 const TitleSection = () => {
   return (
-    <div className="absolute inset-x-0 top-0 z-10 flex flex-col text-center pt-[120px] md:pt-[150px] xl:pt-[180px] 2xl:pt-[210px] px-5">
-      <div className="hidden z-10 w-full h-px animate-glow md:block animate-fade-left bg-gradient-to-r from-tpp/0 via-tpp/50 to-tpp/0" />
-      <h1 className="py-3.5 px-0.5 text-transparent duration-1000 bg-transparent cursor-default text-edge-outline animate-title font-display whitespace-nowrap bg-clip-text z-40 text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl text-center font-medium">
-        {/* 標題 */}
-        <span className="bg-gradient-to-r from-tpp via-tpp to-[#2878c8] inline-block text-transparent bg-clip-text">
-          全台灣最強大的
-        </span>
-        <br className="sm:hidden" />
-        {/* 子標題 */}
-        <span className="bg-gradient-to-r from-[#17ff8f] to-[#17FFAD] inline-block text-transparent bg-clip-text">
-          二步驟驗證器
-        </span>
-      </h1>
-      <div className="hidden w-full screen h-px animate-glow md:block animate-fade-right bg-gradient-to-r from-tpp/0 via-tpp/50 to-tpp/0" />
-      {/* 描述 */}
-      <p className="text-center text-lg sm:text-xl mt-3 text-neutral-100 dark:text-neutral-300 animate-fade-in">
-        從台灣的區塊鏈程式團隊打造的最強大二步驟驗證器，支援基於 OTP、TOTP、HOTP 一次性密碼演算法的驗證碼。
-      </p>
+    <section className="container mx-auto px-5 pt-14 pb-16 sm:pt-20 lg:pt-24 lg:pb-28">
+      <div className="boot grid grid-cols-12 gap-x-6 gap-y-8">
+        <p className="tech-label col-span-12 flex items-center gap-3">
+          <span className="led" />
+          SECURIBIT // TOTP · HOTP · RFC 6238
+        </p>
 
-      {/* 按鈕 */}
-      <div className="w-full flex justify-center animate-fade-in">
-        <ButtonSection />
+        <h1 className="col-span-12 font-display text-[2.75rem] font-black leading-[1.05] tracking-tight text-ink sm:text-6xl lg:col-span-7 lg:text-7xl">
+          你的 2FA，
+          <br />
+          <span className="text-phos">像儀表一樣</span>可靠。
+        </h1>
+
+        <p className="col-span-12 max-w-md text-lg text-ink-muted lg:col-span-5 lg:self-end lg:pb-2">
+          驗證碼在你的瀏覽器裡算出來，金鑰可以用自己的密碼加密，也能放進群組、照權限分享給團隊的人。由台灣的區塊鏈團隊 Bityo 打造。
+        </p>
+
+        <div className="col-span-12 lg:col-span-7">
+          <ButtonSection />
+        </div>
+
+        <div className="col-span-12 lg:col-span-5 lg:translate-y-14">
+          <LiveReadout />
+        </div>
       </div>
-    </div>
+
+      <div className="rule-accent mt-12 lg:-mt-10" />
+    </section>
   )
 }
 

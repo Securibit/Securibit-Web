@@ -18,24 +18,10 @@ const config: Config = {
       ...defaultTheme.screens,
     },
     extend: {
-      animation: {
-        "fade-in": "fade-in 3s ease-in-out forwards",
-        title: "title 3s ease-out forwards",
-        "fade-left": "fade-left 3s ease-in-out forwards",
-        "fade-right": "fade-right 3s ease-in-out forwards",
-      },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-conic':
           'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
-      },
-      fontSize: {
-        'h1': ['5rem', '7.5rem'],
-        'h2': ['4rem', '6rem'],
-        'h3': ['3rem', '4.5rem'],
-        'h4': ['2.5rem', '3.75rem'],
-        'h5': ['2rem', '3rem'],
-        'h6': ['1.75rem', '2.625rem'],
       },
       colors: {
         'tpp': '#28C8C7',
@@ -90,66 +76,6 @@ const config: Config = {
         btn: "0px 1px 2px rgba(4, 10, 34, 0.15)",
         "btn-hover": "0px 1px 2px rgba(0, 0, 0, 0.15)",
         "btn-light": "0px 1px 2px rgba(0, 0, 0, 0.1)",
-      },
-      keyframes: {
-        "fade-in": {
-          "0%": {
-            opacity: "0%",
-          },
-          "75%": {
-            opacity: "0%",
-          },
-          "100%": {
-            opacity: "100%",
-          },
-        },
-        "fade-left": {
-          "0%": {
-            transform: "translateX(100%)",
-            opacity: "0%",
-          },
-
-          "30%": {
-            transform: "translateX(0%)",
-            opacity: "100%",
-          },
-          "100%": {
-            opacity: "0%",
-          },
-        },
-        "fade-right": {
-          "0%": {
-            transform: "translateX(-100%)",
-            opacity: "0%",
-          },
-
-          "30%": {
-            transform: "translateX(0%)",
-            opacity: "100%",
-          },
-          "100%": {
-            opacity: "0%",
-          },
-        },
-        title: {
-          "0%": {
-            "line-height": "0%",
-            "letter-spacing": "0.25em",
-            opacity: "0",
-          },
-          "25%": {
-            "line-height": "0%",
-            opacity: "0%",
-          },
-          "80%": {
-            opacity: "100%",
-          },
-
-          "100%": {
-            "line-height": "100%",
-            opacity: "100%",
-          },
-        },
       },
     },
   },

@@ -1,11 +1,19 @@
 import '@/styles/globals.css'
-import 'swiper/css'
-import 'swiper/css/free-mode'
-import 'swiper/css/pagination'
 import type { Metadata } from 'next'
+import { Chakra_Petch, IBM_Plex_Mono, LXGW_WenKai_TC, Noto_Sans_TC } from 'next/font/google'
 import NextTopLoader from 'nextjs-toploader'
 import SEO from '@/config/SEO.json'
+import { cn } from '@/lib/utils'
 import { Providers } from './providers'
+
+// 標題（拉丁）：方正的儀表字
+const chakra = Chakra_Petch({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--font-chakra', display: 'swap' })
+// 讀數、ID、時間
+const plexMono = IBM_Plex_Mono({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-plex-mono', display: 'swap' })
+// 內文（中文）
+const wenKai = LXGW_WenKai_TC({ subsets: ['latin'], weight: ['400', '700'], variable: '--font-wenkai', display: 'swap' })
+// 標題（中文）：Chakra Petch 沒有漢字，落到這個粗黑體
+const notoTc = Noto_Sans_TC({ subsets: ['latin'], weight: ['700', '900'], variable: '--font-noto-tc', display: 'swap' })
 
 export const metadata: Metadata = {
   title: {
@@ -18,10 +26,14 @@ export const metadata: Metadata = {
 
 const RootLayout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <html lang="zh-Hant" suppressHydrationWarning>
-      <body className="h-full text-black bg-white dark:bg-gray-blue-900 dark:text-white transition duration-300 ease-in-out">
-        {/* 換頁時頂部的進度條，顏色取品牌色 tpp */}
-        <NextTopLoader color="#28C8C7" height={3} showSpinner={false} shadow="0 0 10px #28C8C7,0 0 5px #28C8C7" />
+    <html
+      lang="zh-Hant"
+      suppressHydrationWarning
+      className={cn(chakra.variable, plexMono.variable, wenKai.variable, notoTc.variable)}
+    >
+      <body className="min-h-full font-body antialiased">
+        {/* 換頁時頂部的進度條，顏色取主色磷光綠 */}
+        <NextTopLoader color="#17FFAD" height={2} showSpinner={false} shadow="0 0 10px #17FFAD" />
         <Providers>{children}</Providers>
       </body>
     </html>
