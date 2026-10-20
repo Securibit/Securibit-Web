@@ -2,14 +2,26 @@ import { Role } from '@/types/Permission/Permission';
 
 /*
  * 前端判斷「能不能管理」，只用來決定按鈕要不要顯示；真正的檢查在資料庫的 RPC。
- * 規則（Discord）：擁有者 / 管理員不受限；其他人只能管理 position 比自己最高身分組低的身分組與成員。
+ * 規則（Discord）：群組擁有者（或全站管理）、全站「最高位身分組的持有者」不受限；
+ * 其他人（包含一般的全站 ADMINISTRATOR）只能管理 position 比自己最高身分組低的身分組與成員。
  */
 
 export interface Actor {
-  // 擁有者（群組）或全站 ADMINISTRATOR：不受階層限制
+  // 群組：擁有者 / 全站 ADMINISTRATOR / MANAGE_GROUPS；全站：最高位身分組的持有者（見 isSiteRoot）
   unrestricted: boolean;
   topPosition: number;
 }
+
+/**
+ * 全站：是不是「最高位身分組的持有者」（同 SQL 的 site_is_root）。
+ * 自己有身分組，而且沒有任何「有人持有」的身分組比自己的最高身分組還高。
+ */
+export const isSiteRoot = (topPosition: number, roles: Pick<Role, 'position' | 'is_default' | 'member_count'>[]) =>
+  topPosition > 0 && !roles.some((role) => !role.is_default && role.member_count > 0 && role.position > topPosition);
+
+/** 指派身分組時：新加入的身分組權限不能超過自己（permissions 是已展開的權限，管理員是全部） */
+export const canGrantRole = (actorPermissions: number, role: Pick<Role, 'permissions'>) =>
+  (role.permissions & ~actorPermissions) === 0;
 
 /** 能不能編輯 / 刪除 / 指派這個身分組（@everyone 只能改權限，指派另外排除） */
 export const canManageRole = (actor: Actor, role: Pick<Role, 'position' | 'is_default'>) =>

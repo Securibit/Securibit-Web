@@ -21,7 +21,7 @@ Supabase 會配一個全新的 uuid，所以無法用 uid 對應舊資料。
 ## 1. 建立 Supabase 專案與資料表
 
 1. 在 https://supabase.com 建立專案
-2. 進 SQL Editor，依序貼上並執行 `supabase/migrations/` 裡的每個檔案（0001 → 0009，都可重複執行）：
+2. 進 SQL Editor，依序貼上並執行 `supabase/migrations/` 裡的每個檔案（0001 → 0010，都可重複執行）：
    - `0001_init.sql`：`profiles`、`legacy_import`、RLS 政策與 `handle_new_user` 觸發器
    - `0002_migration_notice.sql`：舊使用者第一次登入的遷移提示
    - `0003_ensure_profile.sql`：登入時自動建立 profile、接回舊資料
@@ -33,10 +33,24 @@ Supabase 會配一個全新的 uuid，所以無法用 uid 對應舊資料。
      （原本的資料會自動搬過去，之後寫進 `profiles.totp` 的舊資料也會自動轉存）
    - `0009_groups_permissions.sql`：全站身分組與後台、群組（成員、身分組、邀請、單筆驗證碼權限覆寫）、操作紀錄。
      執行時會把 `marryhan25648@gmail.com` 設為「管理員」（還沒註冊的話，第一次登入時自動套用）
+   - `0010_security_fixes.sql`：安全性修正（規則細節見 `docs/groups-and-permissions.md` 第 6 節）：
+     - email **驗證過**才接回 `legacy_import` 舊資料、套用 `site_pending_roles`、比對 Email 邀請（未驗證的先保留，之後登入時再套）
+     - 使用者只能直接改 `profiles` 的名稱、大頭照、背景、電話等顯示欄位；email、驗證狀態、加密設定、@ID、登入紀錄等只能走 RPC / 後端
+     - 改加密密碼時比對舊的 `check`，兩台裝置同時改會擋下後到的那個；已啟用加密時不能存入明文金鑰
+       （`totp_set_vault` 多了第三個參數 `expected_check`，舊的兩個參數版本會被刪掉，**要和新版前端一起部署**）
+     - 全站只有「最高位身分組的持有者」不受階層限制；後台看 / 改 / 刪別人的 2FA 也要遵守階層
+     - 指派身分組、設定驗證碼覆寫時，不能給出（或拿掉）自己沒有的權限
+     - 邀請碼改成 16 碼安全亂數、有效時間預設 7 天且最長 30 天；成員離開或被踢時撤銷他建立的邀請
+     - 群組成員的 email 只給有「移除成員」或「管理身分組」的人看
+     - 會嘗試啟用 `pgcrypto`（Supabase 預設已安裝在 `extensions` schema）
 
 > **部署新版前端前，必須先執行 0008、0009**，否則驗證碼頁會顯示錯誤
 > （「資料庫還沒更新，請先在 Supabase 執行 0008_accounts.sql。」），群組與後台也無法使用。
 > 0008、0009 會自己補上 0002 / 0004 / 0007 加的 profiles 欄位，所以就算中間幾個檔案漏跑，也能直接執行。
+
+> **0010 之後請到 Supabase 後台確認**：Authentication → Providers → Email。
+> 網站只用 Google 登入，建議直接**關閉 Email provider**；若要保留，務必開啟 **Confirm email**。
+> 否則別人可以用你的 email 註冊（自動視為已驗證），搶走 pending 的管理員身分組或舊資料。
 
 ## 2. 設定 Google 登入
 

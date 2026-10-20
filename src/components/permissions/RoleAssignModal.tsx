@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button, Checkbox, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
 import { toast } from "react-hot-toast";
-import { canManageRole, sortRoles } from "@/lib/permissions/hierarchy";
+import { canGrantRole, canManageRole, sortRoles } from "@/lib/permissions/hierarchy";
 import { showError } from "@/lib/errorDialog";
 import { cn } from "@/lib/utils";
 import { RoleAssignModalProps } from "@/types/Permission/RoleAssignModal";
@@ -42,11 +42,14 @@ const RoleAssignForm = (props: RoleAssignModalProps & { onClose: () => void }) =
           <ul className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
             {roles.map((role) => {
               const manageable = canManageRole(props.actor, role);
+              // 還沒有的身分組：權限超過自己的不能加（原本就有的可以照常移除）
+              const tooStrong = !props.selected.includes(role.id) && !canGrantRole(props.actorPermissions, role);
+              const disabled = !manageable || tooStrong;
               return (
                 <li key={role.id} className="flex items-center justify-between gap-4 px-5 py-2.5">
                   <Checkbox
                     isSelected={checked.includes(role.id)}
-                    isDisabled={!manageable || saving}
+                    isDisabled={disabled || saving}
                     onValueChange={(on) => toggle(role.id, on)}
                     classNames={{ base: "max-w-full", label: "min-w-0" }}
                   >
@@ -59,7 +62,11 @@ const RoleAssignForm = (props: RoleAssignModalProps & { onClose: () => void }) =
                       <span className="truncate">{role.name}</span>
                     </span>
                   </Checkbox>
-                  {!manageable && <span className="shrink-0 text-[13px] text-ink-muted">比你的身分組高</span>}
+                  {!manageable ? (
+                    <span className="shrink-0 text-[13px] text-ink-muted">比你的身分組高</span>
+                  ) : (
+                    tooStrong && <span className="shrink-0 text-[13px] text-ink-muted">權限超過你</span>
+                  )}
                 </li>
               );
             })}

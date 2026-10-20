@@ -14,7 +14,7 @@ import RoleAssignModal from "@/components/permissions/RoleAssignModal";
 import useAuth from "@/components/auth/useAuth";
 import { loadAdminUser, loadSiteRoles, setUserSiteRoles } from "@/lib/admin/admin";
 import { SITE, SITE_PERMISSIONS, permissionName } from "@/lib/permissions/bits";
-import { Actor, canManageMember, sortRoles } from "@/lib/permissions/hierarchy";
+import { Actor, canManageMember, isSiteRoot, sortRoles } from "@/lib/permissions/hierarchy";
 import { showError } from "@/lib/errorDialog";
 import { formatDateTime } from "@/lib/utils";
 import { AdminUserDetail } from "@/types/Admin/Admin";
@@ -46,13 +46,17 @@ const BackLink = () => (
 const UserDetailClient = (props: UserDetailClientProps) => {
   const { userId } = props;
   const router = useRouter();
-  const { user: me, can, topPosition, refresh } = useAuth();
+  const { user: me, can, permissions, topPosition, refresh } = useAuth();
   const allowed = can(SITE.VIEW_USERS);
-  const actor = useMemo<Actor>(() => ({ unrestricted: can(SITE.ADMINISTRATOR), topPosition }), [can, topPosition]);
-
   // undefined：載入中；null：找不到 / 載入失敗
   const [detail, setDetail] = useState<AdminUserDetail | null>();
   const [roles, setRoles] = useState<Role[]>([]);
+  const [rolesLoaded, setRolesLoaded] = useState(false);
+  // 只有最高位身分組的持有者不受階層限制（一般管理員也要遵守）；身分組載入前先當作受限
+  const actor = useMemo<Actor>(
+    () => ({ unrestricted: rolesLoaded && isSiteRoot(topPosition, roles), topPosition }),
+    [roles, rolesLoaded, topPosition]
+  );
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [rolesOpen, setRolesOpen] = useState(false);
@@ -69,8 +73,10 @@ const UserDetailClient = (props: UserDetailClientProps) => {
     });
     loadSiteRoles().then((result) => {
       if (cancelled) return;
-      if (result.success) setRoles(sortRoles(result.data));
-      else showError("載入身分組失敗", result.message);
+      if (result.success) {
+        setRoles(sortRoles(result.data));
+        setRolesLoaded(true);
+      } else showError("載入身分組失敗", result.message);
     });
     return () => {
       cancelled = true;
@@ -93,6 +99,8 @@ const UserDetailClient = (props: UserDetailClientProps) => {
   // 修改資料、刪除：要「管理使用者」、階層比對方高，而且不是自己
   const canManageUser = can(SITE.MANAGE_USERS) && !isSelf && canManageMember(actor, { top_position: detail.top_position });
   const canAssignRoles = can(SITE.MANAGE_ROLES);
+  // 2FA：自己的，或階層比對方高才看得到 / 改得到（資料庫同樣檢查）
+  const canReachTotp = isSelf || canManageMember(actor, { top_position: detail.top_position });
   const userRoles = roles.filter((role) => detail.role_ids.includes(role.id));
 
   const copyId = async () => {
@@ -216,7 +224,7 @@ const UserDetailClient = (props: UserDetailClientProps) => {
         </section>
 
         {/* 2FA */}
-        {can(SITE.VIEW_USER_TOTP) && <UserTotpList user={detail} canManage={can(SITE.MANAGE_USER_TOTP)} />}
+        {can(SITE.VIEW_USER_TOTP) && canReachTotp && <UserTotpList user={detail} canManage={can(SITE.MANAGE_USER_TOTP)} />}
 
         {/* 刪除 */}
         {canManageUser && (
@@ -248,6 +256,7 @@ const UserDetailClient = (props: UserDetailClientProps) => {
         roles={roles}
         selected={detail.role_ids}
         actor={actor}
+        actorPermissions={permissions}
         onSave={saveRoles}
       />
     </div>

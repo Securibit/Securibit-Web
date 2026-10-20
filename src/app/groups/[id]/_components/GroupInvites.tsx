@@ -14,12 +14,12 @@ import { UserBrief } from "@/types/Permission/Permission";
 import { GroupInvitesProps } from "@/types/Group/GroupInvites";
 import InviteCreated, { copyInviteUrl } from "./InviteCreated";
 
-// 有效時間（小時），null = 永不過期
-const EXPIRES_OPTIONS: { key: string; label: string; hours: number | null }[] = [
+// 有效時間（小時）：最長 30 天（資料庫也會擋）
+const EXPIRES_OPTIONS: { key: string; label: string; hours: number }[] = [
   { key: "1", label: "1 小時", hours: 1 },
   { key: "24", label: "1 天", hours: 24 },
   { key: "168", label: "7 天", hours: 168 },
-  { key: "never", label: "永不過期", hours: null },
+  { key: "720", label: "30 天", hours: 720 },
 ];
 
 // 使用次數，null = 不限
@@ -61,7 +61,7 @@ const GroupInvites = ({ detail, onChanged }: GroupInvitesProps) => {
   const [cancelling, setCancelling] = useState<string>();
 
   const handleCreate = async () => {
-    const hours = EXPIRES_OPTIONS.find((option) => option.key === expiresKey)?.hours ?? null;
+    const hours = EXPIRES_OPTIONS.find((option) => option.key === expiresKey)?.hours ?? 168;
     const uses = USES_OPTIONS.find((option) => option.key === usesKey)?.uses ?? null;
     setCreating(true);
     const result = await createInvite(gid, hours, uses);

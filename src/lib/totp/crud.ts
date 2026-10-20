@@ -115,7 +115,11 @@ export const reorderTotp = async (uid: string, ids: string[], key?: CryptoKey): 
 
 /**
  * 更新加密設定，並一次換掉多筆金鑰（啟用、改密碼、停用時用）。
- * secrets：{ 項目 id: 新的 secret }。
+ * secrets：{ 項目 id: 新的 secret }；加密設定有變時要涵蓋全部驗證碼。
+ * expectedCheck：送出前畫面上的 vault.check（未啟用為 null）；和資料庫不同代表別的裝置改過，資料庫會拒絕。
  */
-export const saveVault = async (vault: VaultInfo | null, secrets: Record<string, string>): Promise<TotpResult> =>
-  callRpc('totp_set_vault', { new_vault: vault, secrets });
+export const saveVault = async (
+  vault: VaultInfo | null,
+  secrets: Record<string, string>,
+  expectedCheck: string | null
+): Promise<TotpResult> => callRpc('totp_set_vault', { new_vault: vault, secrets, expected_check: expectedCheck });

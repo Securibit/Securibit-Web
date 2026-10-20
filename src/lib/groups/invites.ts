@@ -5,7 +5,7 @@ import { Invitation, InviteInfo } from '@/types/Group/Group';
 export const inviteUrl = (code: string) =>
   typeof window === 'undefined' ? `/invite/${code}` : `${window.location.origin}/invite/${code}`;
 
-// expiresInHours / maxUses：null 代表不過期 / 不限次數
+// expiresInHours：最長 720（30 天），null 由資料庫預設 7 天；maxUses：null 代表不限次數
 export const createInvite = (gid: string, expiresInHours: number | null, maxUses: number | null) =>
   rpc<string>('group_invite_create', { gid, expires_in_hours: expiresInHours, max_uses: maxUses });
 

@@ -41,7 +41,8 @@ const VaultProvider = (props: VaultProviderProps) => {
 
     const secrets: Record<string, string> = {};
     for (const item of plain) secrets[item.id] = await encryptText(key, item.secret);
-    await saveVault(info, secrets);
+    // 加密設定不變，只補加密這幾筆
+    await saveVault(info, secrets, info.check);
   }, []);
 
   // 有啟用加密時，先看這台裝置有沒有記住金鑰
@@ -92,6 +93,7 @@ const VaultProvider = (props: VaultProviderProps) => {
   }, [uid, vault]);
 
   // 用新的加密設定重新寫入所有金鑰；decrypt 把目前存的值轉回明文。
+  // 送出時附上目前的 vault.check，別的裝置先改過密碼或新增了驗證碼，資料庫會拒絕（請使用者重新整理）。
   // 呼叫端要先更新 keyState 再 refresh profile，否則新設定進來時會被當成「還沒確認」而先鎖住
   const rewrite = useCallback(
     async (
@@ -112,10 +114,10 @@ const VaultProvider = (props: VaultProviderProps) => {
         return { success: false, message: "有金鑰無法解密，可能是在其他裝置用舊密碼新增的。請先刪除顯示「金鑰錯誤」的項目再試一次。" };
       }
 
-      const saved = await saveVault(next?.info ?? null, secrets);
+      const saved = await saveVault(next?.info ?? null, secrets, vault?.check ?? null);
       return saved.success ? { success: true } : saved;
     },
-    [uid]
+    [uid, vault]
   );
 
   const enable = useCallback(
@@ -176,12 +178,12 @@ const VaultProvider = (props: VaultProviderProps) => {
     if (!uid) return { success: false, message: "尚未登入" };
     const cleared = await clearTotp(uid);
     if (!cleared.success) return cleared;
-    const saved = await saveVault(null, {});
+    const saved = await saveVault(null, {}, vault?.check ?? null);
     if (!saved.success) return saved;
     await deleteDeviceKey(uid);
     await refresh();
     return { success: true };
-  }, [uid, refresh]);
+  }, [uid, vault, refresh]);
 
   return (
     <VaultContext.Provider

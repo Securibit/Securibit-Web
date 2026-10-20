@@ -150,18 +150,16 @@ export const getUserData = async (
   return { success: true, data: rowToProfile(data) };
 };
 
-// 更新使用者資料
+// 更新使用者資料（0010 起 email / 驗證狀態不能直接改，以 auth.users 為準，ensure_profile 會同步）
 export const submitChange = async (
   uid: string,
   updated: Partial<Profile>
 ): Promise<{ success: boolean; message?: string }> => {
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (updated.name !== undefined) patch.name = updated.name;
-  if (updated.email !== undefined) patch.email = updated.email;
   if (updated.photoURL !== undefined) patch.photo_url = updated.photoURL;
   if (updated.bgPhotoURL !== undefined) patch.bg_photo_url = updated.bgPhotoURL;
   if (updated.phoneNumber !== undefined) patch.phone_number = updated.phoneNumber;
-  if (updated.emailVerified !== undefined) patch.email_verified = updated.emailVerified;
 
   const { error } = await supabase.from('profiles').update(patch).eq('id', uid);
   if (error) {
@@ -171,15 +169,13 @@ export const submitChange = async (
   return { success: true };
 };
 
-// 同步 Google（auth）使用者資料至 profiles
+// 同步 Google（auth）使用者資料至 profiles（email 與驗證狀態由 ensure_profile 從 auth.users 同步，這裡不寫）
 export const syncGoogleUserData = async (user: AppUser) => {
   const { error } = await supabase
     .from('profiles')
     .update({
       name: user.displayName,
-      email: user.email,
       photo_url: user.photoURL,
-      email_verified: user.emailVerified,
       // Google 帳號通常沒有電話，沒有時保留使用者自己填的
       ...(user.phoneNumber ? { phone_number: user.phoneNumber } : {}),
       creation_time: user.metadata.creationTime,

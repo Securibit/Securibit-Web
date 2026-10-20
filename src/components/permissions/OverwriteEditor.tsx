@@ -254,12 +254,17 @@ const OverwriteEditorBody = (props: OverwriteEditorProps & { onClose: () => void
                   <div className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
                     {GROUP_OVERWRITE_PERMISSIONS.map((def) => {
                       const state = bitState(currentOverwrite, def.bit);
-                      const disabled = !editable || saving;
+                      // 自己在這筆驗證碼沒有的權限不能變更（允許、拒絕都一樣；擁有者 / 全站管理例外）
+                      const owned = actor.unrestricted || (account.permissions & def.bit) !== 0;
+                      const disabled = !editable || !owned || saving;
                       return (
                         <div key={def.key} className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
                           <div className="min-w-0">
                             <p className="text-[17px]">{def.name}</p>
                             <p className="text-[13px] text-ink-muted">{def.description}</p>
+                            {editable && !owned && (
+                              <p className="text-[13px] text-ink-muted">你在這筆驗證碼沒有這個權限，無法變更</p>
+                            )}
                           </div>
                           <Tabs
                             aria-label={def.name}

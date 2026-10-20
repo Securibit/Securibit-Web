@@ -149,6 +149,7 @@ const GroupMembers = ({ detail, actor, onChanged }: GroupMembersProps) => {
           roles={detail.roles}
           selected={assigning.role_ids}
           actor={actor}
+          actorPermissions={detail.permissions}
           onSave={async (roleIds) => {
             const result = await setMemberRoles(gid, assigning.id, roleIds);
             if (result.success) await onChanged();

@@ -84,7 +84,7 @@
   - 編輯身分組權限時，只能開啟自己有的位元（群組 ADMINISTRATOR 例外）。
   - 設定覆寫時，對身分組的覆寫要該身分組比自己低；對成員的覆寫要該成員比自己低；`@everyone` 都可以。
   - 全站 `ADMINISTRATOR` / `MANAGE_GROUPS` 在群組裡視同擁有者（但不能轉移擁有權、不能刪除群組以外……見各函式）。
-- **全站**：沒有擁有者。全站 `ADMINISTRATOR` 不受階層限制；其他人照上面的規則。
+- **全站**：沒有擁有者。只有「最高位身分組的持有者」不受階層限制（0010 起；一般的 `ADMINISTRATOR` 也要遵守）；其他人照上面的規則。
   另外保護：不能讓全站「最後一位」擁有 ADMINISTRATOR 的使用者失去它（刪身分組、改權限、移除指派、刪除使用者都要擋）。
 
 ## 2. 資料表
@@ -475,3 +475,30 @@ src/app/admin/                     後台（總覽、使用者、使用者詳情
 - `marryhan25648@gmail.com`：已有 profile 就直接指派「管理員」，還沒有才寫進 `site_pending_roles`（避免之後被移除管理員後，下次登入又被加回去）。
 - `@everyone` 的 id 固定 `00000000-0000-0000-0000-000000000000`，「管理員」固定 `00000000-0000-0000-0000-000000000001`。
 - `/api/delete-account` 刪除前呼叫 `can_delete_self()`。
+- **0010 安全性修正（`0010_security_fixes.sql`）**：
+  - **全站階層**：只有「最高位身分組的持有者」（`site_is_root`：自己有身分組，而且沒有任何人的最高身分組比自己高；
+    只看有人持有的身分組，最上面的身分組沒人時由下一個有人持有的身分組接手）不受階層限制。
+    一般 `ADMINISTRATOR` 仍有全部權限位元，但不能動比自己高或同位的身分組與使用者。前端 `isSiteRoot()` 同規則。
+  - **後台 2FA**：`admin_user_totp`、`admin_update_user_totp`、`admin_delete_user_totp` 目標是自己，或 `site_can_manage_user` 管得到對方才行。
+  - **指派身分組**：`group_set_member_roles`、`site_set_user_roles` 新加入的身分組，權限必須是呼叫者（已展開）權限的子集，
+    超過時 raise「只能指派權限不超過你自己的身分組」。群組擁有者 / 全站管理例外；全站沒有例外（管理員本來就是全有），
+    避免最高位但沒有 ADMINISTRATOR 的人替自己升權。移除既有身分組不受這條限制。
+  - **驗證碼覆寫**：取代上面「新開的允許」規則——允許與拒絕中**有變動的位元**（新舊 XOR）都必須是呼叫者在這筆驗證碼本身就有的權限，
+    否則 raise「只能變更你自己在這筆驗證碼擁有的權限」（例如沒有 VIEW_SECRETS 的人不能拿掉 @everyone 對 VIEW_SECRETS 的拒絕）。擁有者 / 全站管理例外。
+  - **最後一位管理員**：`site_assert_admin_left` 先 `pg_advisory_xact_lock(hashtext('site_admins'))` 再數（改成 volatile），
+    兩個交易同時拿掉不同管理員時後到的會被擋。群組沒有「最後一位管理員」檢查（永遠有擁有者），不需要對應處理。
+    `/api/delete-account`、`/api/admin/delete-user` 的「檢查 → 刪除」橫跨兩次請求，仍無法完全避免同時刪除兩位管理員的極端情況。
+  - **email 驗證**：`handle_new_user` / `ensure_profile` 只有在 `auth.users.email_confirmed_at` 有值時才接回 `legacy_import`、套用 `site_pending_roles`
+    （`claim_verified_email`）；未驗證時保留在暫存表，之後登入發現已驗證再套（舊資料搬進已存在的 profile，`migrated = true`）。
+    `user_email()` 只回傳已驗證的 email，所以未驗證的人看不到、也不能接受 Email 邀請。`ensure_profile` 每次會把 `profiles.email` / `email_verified` 同步成 auth.users。
+  - **profiles 欄位權限**：`authenticated` 只有 select 與 `update (name, photo_url, bg_photo_url, phone_number, creation_time, last_sign_in_time, migration_notified, updated_at)`；
+    不能 insert / delete，也不能直接改 email、email_verified、vault、username、last_login_*、migrated、totp。`user_brief`、`display_name` 的 email 改從 auth.users 取。
+  - **加密設定**：`totp_set_vault(new_vault, secrets, expected_check default null)`：鎖住自己那列後比對目前 `vault.check` 與 `expected_check`
+    （null 對 null 相同），不同就 raise「加密設定已在其他裝置變更，請重新整理」。加密設定有變時 secrets 必須涵蓋自己全部驗證碼；
+    有加密時送來的金鑰都要是 `enc:v1:`，停用時都要是明文；new_vault 必須有字串 `check`。
+    `totp_add` / `totp_update`：已啟用加密時金鑰不是 `enc:v1:` 開頭就 raise（擋明文；舊密碼的密文仍擋不到）。
+  - **邀請**：邀請碼 = 12 bytes 安全亂數（`extensions.gen_random_bytes`，沒有 pgcrypto 時用兩個 `gen_random_uuid` 的亂數部分）轉 URL 安全 base64，16 碼；
+    `group_invite_create` 有效時間 null 時預設 7 天、最長 720 小時（30 天），前端「永不過期」改成「30 天」。既有的永不過期連結在執行 0010 時改成 30 天後到期。
+    成員離開或被踢時，撤銷他建立的邀請連結並刪除他送出的 Email / @ID 邀請。
+  - **成員 email**：`group_detail` 的成員、邀請建立者、Email 邀請者，以及 `group_invite_info` 的邀請者，只有擁有者 / 全站管理、
+    或有 KICK_MEMBERS / MANAGE_ROLES 的人拿得到 email（`group_sees_emails`），其他成員是 null。

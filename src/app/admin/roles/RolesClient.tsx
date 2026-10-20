@@ -7,7 +7,7 @@ import RoleEditor from "@/components/permissions/RoleEditor";
 import useAuth from "@/components/auth/useAuth";
 import { createSiteRole, deleteSiteRole, loadSiteRoles, reorderSiteRoles, updateSiteRole } from "@/lib/admin/admin";
 import { SITE, SITE_PERMISSIONS } from "@/lib/permissions/bits";
-import { Actor, sortRoles } from "@/lib/permissions/hierarchy";
+import { Actor, isSiteRoot, sortRoles } from "@/lib/permissions/hierarchy";
 import { showError } from "@/lib/errorDialog";
 import { Role } from "@/types/Permission/Permission";
 
@@ -23,12 +23,12 @@ const fetchRoles = async () => {
 const RolesClient = () => {
   const { can, permissions, topPosition, refresh } = useAuth();
   const canManage = can(SITE.MANAGE_ROLES);
-  const actor = useMemo<Actor>(
-    () => ({ unrestricted: can(SITE.ADMINISTRATOR), topPosition }),
-    [can, topPosition]
-  );
-
   const [roles, setRoles] = useState<Role[]>();
+  // 只有最高位身分組的持有者不受階層限制（一般管理員也要遵守）
+  const actor = useMemo<Actor>(
+    () => ({ unrestricted: isSiteRoot(topPosition, roles ?? []), topPosition }),
+    [roles, topPosition]
+  );
 
   // 失敗時保留畫面上原本的清單（第一次載入失敗就顯示空的）
   const applyRoles = useCallback((data: Role[] | undefined) => setRoles((prev) => data ?? prev ?? []), []);
