@@ -36,20 +36,15 @@ const VaultUnlock = (props: VaultUnlockProps) => {
   };
 
   return (
-    <div className={cn(!props.compact && "boot mx-auto max-w-md py-10")}>
+    <div className={cn(!props.compact && "mx-auto max-w-sm py-10")}>
       {!props.compact && (
-        <div className="mb-6">
-          <p className="tech-label flex items-center gap-2">
-            <span className={cn("led", error ? "led-alarm" : "led-off")} aria-hidden />
-            LOCKED // VAULT
-          </p>
-          <h1 className="mt-3 font-display text-2xl font-bold text-ink sm:text-3xl">驗證碼已加密</h1>
-          <p className="mt-2 text-sm text-ink-muted">輸入你設定的加密密碼來解鎖。</p>
-          <div className="rule-accent mt-4" />
+        <div className="mb-6 text-center">
+          <h1 className="text-[22px] font-semibold text-ink">驗證碼已加密</h1>
+          <p className="mt-1 text-[15px] text-ink-muted">輸入你設定的加密密碼來解鎖</p>
         </div>
       )}
       <form
-        className={cn("flex flex-col gap-3", !props.compact && "panel p-5")}
+        className="flex flex-col gap-4"
         onSubmit={(e) => {
           e.preventDefault();
           handleUnlock();
@@ -58,7 +53,9 @@ const VaultUnlock = (props: VaultUnlockProps) => {
         <Input
           label="加密密碼"
           type="password"
-          variant="bordered"
+          variant="flat"
+          labelPlacement="outside"
+          size="lg"
           autoComplete="current-password"
           autoFocus={!props.compact}
           value={passphrase}
@@ -68,17 +65,16 @@ const VaultUnlock = (props: VaultUnlockProps) => {
           }}
           isInvalid={!!error}
           errorMessage={error}
-          classNames={{ input: "font-mono tracking-[0.08em]" }}
         />
-        <Checkbox size="sm" isSelected={remember} onValueChange={setRemember} classNames={{ label: "text-sm text-ink-muted" }}>
+        <Checkbox size="sm" isSelected={remember} onValueChange={setRemember} classNames={{ label: "text-[15px] text-ink-muted" }}>
           在這台裝置記住（登出或按「立即鎖定」就會忘記）
         </Checkbox>
-        <Button type="submit" color="primary" className="font-display tracking-[0.08em]" isLoading={pending} isDisabled={!passphrase}>
+        <Button type="submit" color="primary" radius="full" size="lg" isLoading={pending} isDisabled={!passphrase}>
           {pending ? "解鎖中…" : "解鎖"}
         </Button>
         <button
           type="button"
-          className="self-start text-sm text-ink-muted underline underline-offset-4 transition-colors hover:text-alarm"
+          className={cn("text-[15px] text-alarm hover:underline", props.compact ? "self-start" : "self-center")}
           onClick={() => setConfirmReset(true)}
         >
           忘記密碼？

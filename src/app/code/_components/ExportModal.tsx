@@ -14,6 +14,14 @@ import ExportWarning from "./ExportWarning";
 
 const today = () => new Date().toISOString().slice(0, 10).replace(/-/g, "");
 
+// 翻頁用的小圓鈕
+const pageButtonClass =
+  "flex h-8 w-8 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-1 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent";
+
+// 分組列表裡的一列動作：藍字
+const actionRowClass =
+  "flex w-full items-center gap-3 px-5 py-3 text-left text-[17px] text-accent transition-colors hover:bg-surface-1";
+
 // 全部匯出：Google Authenticator 的匯入 QR Code，或每行一個 otpauth 連結的文字備份
 const ExportModal = (props: ExportModalProps) => {
   const googleItems = useMemo(() => props.items.filter(canExportToGoogle), [props.items]);
@@ -42,7 +50,7 @@ const ExportModal = (props: ExportModalProps) => {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(backupText);
-      toast.success("已複製全部連結！", { position: "top-right" });
+      toast.success("已複製全部連結", { position: "top-right" });
     } catch {
       showError("無法複製", "瀏覽器不允許存取剪貼簿，請改用下載。");
     }
@@ -56,80 +64,75 @@ const ExportModal = (props: ExportModalProps) => {
       onOpenChange={(open) => !open && props.onClose()}
       size="lg"
       scrollBehavior="inside"
-      className="border border-line bg-surface-1 text-ink"
+      className="bg-surface text-ink"
     >
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-1 border-b border-line font-display tracking-wide">
-          <span className="tech-label">EXPORT // ALL</span>
-          匯出全部驗證碼
-          <span className="font-mono text-[11px] font-normal tracking-[0.08em] text-ink-dim">{props.items.length} ITEMS</span>
+        <ModalHeader className="flex flex-col gap-1">
+          <span>匯出全部驗證碼</span>
+          <span className="text-[13px] font-normal text-ink-muted">共 {props.items.length} 筆</span>
         </ModalHeader>
-        <ModalBody className="py-5">
+        <ModalBody className="gap-5">
           <ExportWarning />
-          <Tabs
-            aria-label="匯出方式"
-            fullWidth
-            variant="underlined"
-            color="primary"
-            classNames={{
-              tabList: "gap-0 border-b border-line p-0",
-              tab: "h-10 font-display tracking-[0.08em]",
-              cursor: "h-0.5",
-            }}
-          >
+          <Tabs aria-label="匯出方式" fullWidth variant="light" radius="full">
             <Tab key="google" title="Google Authenticator">
               {migrationUris.length === 0 ? (
-                <div className="hatch border border-line p-8 text-center">
-                  <p className="tech-label">NO DATA</p>
-                  <p className="mt-2 text-sm text-ink-muted">沒有可以匯出到 Google Authenticator 的驗證碼。</p>
+                <div className="rounded-[18px] bg-surface-1 px-6 py-12 text-center text-ink-muted">
+                  沒有可以匯出到 Google Authenticator 的驗證碼
                 </div>
               ) : (
-                <div className="flex flex-col items-center gap-3">
-                  <p className="text-sm text-ink-muted">
+                <div className="flex flex-col items-center gap-4">
+                  <p className="text-center text-[15px] text-ink-muted">
                     在 Google Authenticator 選「轉移帳戶 → 匯入帳戶」，依序掃描
-                    {migrationUris.length > 1 ? ` ${migrationUris.length} 張` : "這張"} QR Code。
+                    {migrationUris.length > 1 ? ` ${migrationUris.length} 張` : "這張"} QR Code
                   </p>
                   <QrCode value={migrationUris[page]} size={260} alt={`第 ${page + 1} 張匯出 QR Code`} />
                   {migrationUris.length > 1 && (
                     <div className="flex items-center gap-3">
-                      <Button isIconOnly size="sm" variant="bordered" aria-label="上一張" isDisabled={page === 0} onPress={() => setPage(page - 1)}>
+                      <button type="button" aria-label="上一張" disabled={page === 0} onClick={() => setPage(page - 1)} className={pageButtonClass}>
                         <FontAwesomeIcon icon={faChevronLeft} className="w-3" />
-                      </Button>
-                      <span className="font-mono text-sm tabular-nums tracking-[0.08em]">
-                        {String(page + 1).padStart(2, "0")} / {String(migrationUris.length).padStart(2, "0")}
+                      </button>
+                      <span className="text-[15px] tabular-nums text-ink-muted">
+                        {page + 1} / {migrationUris.length}
                       </span>
-                      <Button isIconOnly size="sm" variant="bordered" aria-label="下一張" isDisabled={page === migrationUris.length - 1} onPress={() => setPage(page + 1)}>
+                      <button
+                        type="button"
+                        aria-label="下一張"
+                        disabled={page === migrationUris.length - 1}
+                        onClick={() => setPage(page + 1)}
+                        className={pageButtonClass}
+                      >
                         <FontAwesomeIcon icon={faChevronRight} className="w-3" />
-                      </Button>
+                      </button>
                     </div>
                   )}
                   {skipped > 0 && (
-                    <p className="flex items-center gap-2 text-sm text-alarm">
-                      <span className="led led-alarm" aria-hidden />
-                      有 <span className="font-mono">{skipped}</span> 筆不是 30 秒週期，Google Authenticator 不支援，請改用文字備份。
+                    <p className="text-center text-[13px] text-alarm">
+                      有 {skipped} 筆不是 30 秒週期，Google Authenticator 不支援，請改用文字備份
                     </p>
                   )}
                 </div>
               )}
             </Tab>
             <Tab key="text" title="文字備份">
-              <div className="flex flex-col gap-3">
-                <p className="text-sm text-ink-muted">
-                  每行一個 otpauth:// 連結（含類別），之後可以在「新增驗證碼 → 上傳圖片或備份檔」整批匯入，也可以給其他支援 otpauth 連結的 App 使用。
+              <div className="flex flex-col gap-4">
+                <p className="text-[15px] text-ink-muted">
+                  每行一個 otpauth 連結（含類別），之後可以在「新增驗證碼 → 上傳圖片或備份檔」整批匯入，也可以給其他支援 otpauth 連結的 App 使用
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button color="primary" startContent={<FontAwesomeIcon icon={faDownload} className="w-3.5" />} onPress={download}>
+                <div className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
+                  <button type="button" onClick={download} className={actionRowClass}>
+                    <FontAwesomeIcon icon={faDownload} className="w-4 shrink-0" />
                     下載備份檔
-                  </Button>
-                  <Button variant="bordered" startContent={<FontAwesomeIcon icon={faCopy} className="w-3.5" />} onPress={copy}>
-                    複製全部
-                  </Button>
+                  </button>
+                  <button type="button" onClick={copy} className={actionRowClass}>
+                    <FontAwesomeIcon icon={faCopy} className="w-4 shrink-0" />
+                    複製全部連結
+                  </button>
                 </div>
               </div>
             </Tab>
           </Tabs>
         </ModalBody>
-        <ModalFooter className="border-t border-line">
+        <ModalFooter>
           <Button color="primary" onPress={props.onClose}>
             完成
           </Button>

@@ -16,28 +16,25 @@ const ExportItemModal = (props: ExportItemModalProps) => {
   const copyUri = async () => {
     try {
       await navigator.clipboard.writeText(uri);
-      toast.success("已複製連結！", { position: "top-right" });
+      toast.success("已複製連結", { position: "top-right" });
     } catch {
       showError("無法複製", "瀏覽器不允許存取剪貼簿。");
     }
   };
 
   return (
-    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} className="border border-line bg-surface-1 text-ink">
+    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} className="bg-surface text-ink">
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-1 border-b border-line font-display tracking-wide">
-          <span className="tech-label">EXPORT // QR</span>
-          匯出「{props.item.name}」
-        </ModalHeader>
-        <ModalBody className="items-center py-5">
+        <ModalHeader className="truncate">匯出「{props.item.name}」</ModalHeader>
+        <ModalBody className="items-center gap-4">
           <QrCode value={uri} alt={`${props.item.name} 的 QR Code`} />
-          <p className="text-center text-sm text-ink-muted">
-            用 Google Authenticator、Microsoft Authenticator 等 App 掃描，就能加到手機上。
+          <p className="text-center text-[15px] text-ink-muted">
+            用 Google Authenticator、Microsoft Authenticator 等 App 掃描，就能加到手機上
           </p>
           <ExportWarning />
         </ModalBody>
-        <ModalFooter className="border-t border-line">
-          <Button variant="bordered" onPress={copyUri}>
+        <ModalFooter>
+          <Button variant="light" onPress={copyUri}>
             複製連結
           </Button>
           <Button color="primary" onPress={props.onClose}>

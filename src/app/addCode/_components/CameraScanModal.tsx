@@ -75,29 +75,18 @@ const CameraScanModal = (props: CameraScanModalProps) => {
   }, []);
 
   return (
-    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} className="border border-line bg-surface-1 text-ink">
+    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} className="bg-surface text-ink">
       <ModalContent>
-        <ModalHeader className="flex items-center gap-3 border-b border-line font-display tracking-wide">
-          <span className={error ? "led led-alarm" : ready ? "led" : "led led-off"} aria-hidden />
-          掃描 QR Code
-        </ModalHeader>
-        <ModalBody className="py-5">
+        <ModalHeader>掃描 QR Code</ModalHeader>
+        <ModalBody>
           {error ? (
-            <div className="flex gap-3 border border-alarm/50 bg-alarm/10 p-3 text-sm text-ink">
-              <span className="led led-alarm mt-1.5" aria-hidden />
-              <p>{error}</p>
-            </div>
+            <p className="text-[15px] text-alarm">{error}</p>
           ) : (
-            <div className="relative overflow-hidden border border-line bg-black">
+            <div className="relative overflow-hidden rounded-[18px] bg-black">
               <video ref={videoRef} muted playsInline className="aspect-square w-full object-cover" />
               {ready ? (
-                // 對準框：四個磷光角標
-                <div className="pointer-events-none absolute inset-[15%] border border-phos/40">
-                  <span className="absolute -left-px -top-px h-4 w-4 border-l-2 border-t-2 border-phos" />
-                  <span className="absolute -right-px -top-px h-4 w-4 border-r-2 border-t-2 border-phos" />
-                  <span className="absolute -bottom-px -left-px h-4 w-4 border-b-2 border-l-2 border-phos" />
-                  <span className="absolute -bottom-px -right-px h-4 w-4 border-b-2 border-r-2 border-phos" />
-                </div>
+                // 對準框
+                <div className="pointer-events-none absolute inset-[15%] rounded-[16px] border-2 border-white/80" />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Spinner label="開啟相機…" />
@@ -105,13 +94,13 @@ const CameraScanModal = (props: CameraScanModalProps) => {
               )}
             </div>
           )}
-          <p className="text-sm text-ink-muted">
-            將服務提供的綁定 QR Code 對準框內，辨識成功會自動帶入。
+          <p className="text-[13px] text-ink-muted">
+            將服務提供的綁定 QR Code 對準框內，辨識成功會自動帶入
           </p>
         </ModalBody>
-        <ModalFooter className="border-t border-line">
-          <Button variant="bordered" onPress={props.onClose}>
-            關閉
+        <ModalFooter>
+          <Button variant="light" onPress={props.onClose}>
+            取消
           </Button>
         </ModalFooter>
       </ModalContent>

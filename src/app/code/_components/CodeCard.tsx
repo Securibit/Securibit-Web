@@ -5,7 +5,7 @@ import { useInterval } from 'react-use';
 import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/react";
 import { toast } from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowDown, faArrowUp, faEllipsis, faPen, faQrcode, faShareFromSquare, faThumbtack, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faChevronDown, faChevronUp, faEllipsis, faPen, faQrcode, faShareFromSquare, faThumbtack, faTrash } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import { cn } from "@/lib/utils";
 import { generateOtp } from "@/lib/totp/otp";
@@ -19,10 +19,13 @@ import { showError } from "@/lib/errorDialog";
 const formatOtp = (otp: string) =>
   otp.length === 6 ? `${otp.slice(0, 3)} ${otp.slice(3)}` : otp.replace(/(.{4})(?=.)/g, '$1 ');
 
-// 方形圖示按鈕
-const ICON_BUTTON =
-  "flex h-8 w-8 flex-shrink-0 items-center justify-center border border-line text-ink-muted transition-colors hover:border-phos hover:text-phos disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-line disabled:hover:text-ink-muted";
+const RING = 2 * Math.PI * 16;
 
+// 排序模式的上下移小圓鈕
+const moveButtonClass =
+  "flex h-8 w-8 items-center justify-center rounded-full bg-surface-1 text-ink-muted transition-colors hover:text-ink disabled:opacity-30 disabled:hover:text-ink-muted";
+
+// 驗證碼列表的一列：和首頁示範的長得一樣
 const CodeCard = (props: CodeCardProps) => {
   const { item } = props;
   const period = item.period ?? TOTP_DEFAULTS.period;
@@ -60,7 +63,7 @@ const CodeCard = (props: CodeCardProps) => {
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      toast.success("已複製驗證碼！", { position: "top-right" });
+      toast.success("已複製", { position: "top-right" });
     } catch {
       showError("無法複製", "瀏覽器不允許存取剪貼簿，請手動複製驗證碼。");
     }
@@ -76,131 +79,100 @@ const CodeCard = (props: CodeCardProps) => {
   const revealed = !props.hidden || revealedCounter === counter;
 
   return (
-    <li className="group relative border-b border-line py-4 transition-colors hover:bg-ink/5">
-      <div className="flex items-center gap-3 sm:gap-4">
-        {/* 排序模式：上下移動按鈕 */}
-        {props.sort && (
-          <div className="flex flex-shrink-0 gap-1.5">
-            <button onClick={props.sort.onUp} disabled={!props.sort.canUp} aria-label="往上移" className={ICON_BUTTON}>
-              <FontAwesomeIcon icon={faArrowUp} className="w-3.5" />
-            </button>
-            <button onClick={props.sort.onDown} disabled={!props.sort.canDown} aria-label="往下移" className={ICON_BUTTON}>
-              <FontAwesomeIcon icon={faArrowDown} className="w-3.5" />
-            </button>
-          </div>
+    <li className="flex items-center gap-4 px-5 py-4">
+      {/* 排序模式：上下移 */}
+      {props.sort && (
+        <div className="flex shrink-0 flex-col gap-1">
+          <button onClick={props.sort.onUp} disabled={!props.sort.canUp} aria-label="往上移" className={moveButtonClass}>
+            <FontAwesomeIcon icon={faChevronUp} className="w-3" />
+          </button>
+          <button onClick={props.sort.onDown} disabled={!props.sort.canDown} aria-label="往下移" className={moveButtonClass}>
+            <FontAwesomeIcon icon={faChevronDown} className="w-3" />
+          </button>
+        </div>
+      )}
+
+      {/* 名稱、類別 */}
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-1.5 text-[17px] font-semibold text-ink">
+          {item.pinned && <FontAwesomeIcon icon={faThumbtack} className="w-3 shrink-0 text-ink-muted" aria-label="已釘選" />}
+          <span className="truncate">{item.name}</span>
+        </p>
+        {item.category && <p className="truncate text-[15px] text-ink-muted">{item.category}</p>}
+      </div>
+
+      {/* 驗證碼：點一下複製 */}
+      <div className="flex shrink-0 flex-col items-end">
+        {otp === undefined ? (
+          <p className="readout text-[30px] text-ink-muted sm:text-[40px]">--- ---</p>
+        ) : otp.value && !revealed ? (
+          <button onClick={() => setRevealedCounter(counter)} aria-label="顯示驗證碼" className="readout text-[30px] text-ink-muted sm:text-[40px]">
+            {formatOtp('•'.repeat(otp.value.length))}
+          </button>
+        ) : otp.value ? (
+          <button onClick={() => otp.value && copyToClipboard(otp.value)} title="點一下複製" className="readout text-[30px] text-ink transition-opacity hover:opacity-60 sm:text-[40px]">
+            {formatOtp(otp.value)}
+          </button>
+        ) : (
+          <p className="text-[15px] text-alarm">金鑰錯誤</p>
         )}
-
-        {/* 左：名稱 + 類別 */}
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-base font-semibold text-ink">
-            {item.pinned && (
-              <FontAwesomeIcon icon={faThumbtack} className="mr-1.5 w-3 text-phos" aria-label="已釘選" />
-            )}
-            {item.name}
-          </p>
-          {item.category && (
-            <span className="tech-label mt-1 inline-block border border-line px-1.5 py-0.5">{item.category}</span>
-          )}
-        </div>
-
-        {/* 右：讀數（點一下複製）+ 秒數 */}
-        <div className="flex flex-shrink-0 flex-col items-end">
-          {otp === undefined ? (
-            <p className="readout text-2xl text-ink-dim sm:text-3xl">{formatOtp('-'.repeat(item.digits ?? TOTP_DEFAULTS.digits))}</p>
-          ) : otp.value && !revealed ? (
-            <button
-              onClick={() => setRevealedCounter(counter)}
-              title="點擊顯示"
-              aria-label="顯示驗證碼"
-              className="readout text-2xl text-ink-dim transition-colors hover:text-ink sm:text-3xl"
-            >
-              {formatOtp('•'.repeat(otp.value.length))}
-            </button>
-          ) : otp.value ? (
-            <button
-              key={counter}
-              onClick={() => otp.value && copyToClipboard(otp.value)}
-              title="點擊複製"
-              className="readout settle glow text-2xl text-phos transition-colors hover:text-ink sm:text-3xl"
-            >
-              {formatOtp(otp.value)}
-            </button>
-          ) : (
-            <p className="font-mono text-sm text-alarm sm:text-base">金鑰錯誤</p>
-          )}
-
-          <div className="flex items-center gap-3">
-            {otp?.value && revealed && danger && otp.next && (
-              <button
-                onClick={() => otp.next && copyToClipboard(otp.next)}
-                title="點擊複製下一組"
-                className="font-mono text-[11px] tabular-nums text-ink-dim transition-colors hover:text-phos"
-              >
-                下一組 {formatOtp(otp.next)}
-              </button>
-            )}
-            <span className={cn("font-mono text-[11px] tracking-[0.08em] text-ink-dim tabular-nums", danger && "text-alarm")}>
-              {timeLeft} s
-            </span>
-          </div>
-        </div>
-
-        {/* 操作：方形圖示按鈕 + 更多選單 */}
-        {!props.sort && (
-          <div className="flex flex-shrink-0 gap-1.5">
-            <button onClick={props.onEdit} aria-label="編輯驗證碼" title="編輯" className={ICON_BUTTON}>
-              <FontAwesomeIcon icon={faPen} className="w-3.5" />
-            </button>
-            <Dropdown className="border border-line bg-surface-1">
-              <DropdownTrigger>
-                <button aria-label="更多操作" title="更多操作" className={ICON_BUTTON}>
-                  <FontAwesomeIcon icon={faEllipsis} className="w-3.5" />
-                </button>
-              </DropdownTrigger>
-              <DropdownMenu
-                aria-label="驗證碼操作"
-                className="font-display"
-                // 金鑰錯誤時匯出的 QR Code 也不能用
-                disabledKeys={secretInvalid ? ["export", "share"] : []}
-                onAction={(key) => {
-                  if (key === "pin") props.onTogglePin();
-                  if (key === "export") setExportOpen(true);
-                  if (key === "share") props.onShare?.();
-                  if (key === "delete") setConfirmOpen(true);
-                }}
-              >
-                <DropdownItem key="pin" startContent={<FontAwesomeIcon icon={faThumbtack} className="w-3.5" />}>
-                  {item.pinned ? "取消釘選" : "釘選到最上面"}
-                </DropdownItem>
-                <DropdownItem key="export" startContent={<FontAwesomeIcon icon={faQrcode} className="w-3.5" />}>
-                  匯出 QR Code
-                </DropdownItem>
-                {props.onShare ? (
-                  <DropdownItem key="share" startContent={<FontAwesomeIcon icon={faShareFromSquare} className="w-3.5" />}>
-                    分享到群組
-                  </DropdownItem>
-                ) : null}
-                <DropdownItem
-                  key="delete"
-                  className="text-danger"
-                  color="danger"
-                  startContent={<FontAwesomeIcon icon={faTrash} className="w-3.5" />}
-                >
-                  刪除
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-          </div>
+        {otp?.value && revealed && danger && otp.next && (
+          <button onClick={() => otp.next && copyToClipboard(otp.next)} className="text-[13px] tabular-nums text-ink-muted hover:text-ink">
+            下一組 {formatOtp(otp.next)}
+          </button>
         )}
       </div>
 
-      {/* 倒數條：貼在列底部 */}
-      <div className="absolute inset-x-0 bottom-0 h-px bg-line" aria-hidden>
-        <div
-          className={cn("h-full transition-[width] duration-1000 ease-linear", danger ? "bg-alarm" : "bg-phos")}
-          style={{ width: `${(timeLeft / period) * 100}%` }}
-        />
+      {/* 圓形倒數 */}
+      <div className="relative h-9 w-9 shrink-0" aria-label={`剩餘 ${timeLeft} 秒`}>
+        <svg viewBox="0 0 36 36" className="h-9 w-9 -rotate-90">
+          <circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-line/70" />
+          <circle
+            cx="18" cy="18" r="16" fill="none" strokeWidth="2.5" strokeLinecap="round" stroke="currentColor"
+            strokeDasharray={RING}
+            strokeDashoffset={RING * (1 - timeLeft / period)}
+            className={cn("transition-[stroke-dashoffset] duration-1000 ease-linear", danger ? "text-alarm" : "text-accent")}
+          />
+        </svg>
+        <span className={cn("absolute inset-0 flex items-center justify-center text-[11px] tabular-nums", danger ? "text-alarm" : "text-ink-muted")}>
+          {timeLeft}
+        </span>
       </div>
+
+      {/* 更多 */}
+      {!props.sort && (
+        <Dropdown placement="bottom-end" className="bg-surface text-ink">
+          <DropdownTrigger>
+            <button aria-label="更多" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-1 hover:text-ink">
+              <FontAwesomeIcon icon={faEllipsis} className="w-4" />
+            </button>
+          </DropdownTrigger>
+          <DropdownMenu
+            aria-label="驗證碼操作"
+            // 金鑰錯誤時匯出的 QR Code 也不能用
+            disabledKeys={secretInvalid ? ["export", "share"] : []}
+            onAction={(key) => {
+              if (key === "edit") props.onEdit();
+              if (key === "pin") props.onTogglePin();
+              if (key === "export") setExportOpen(true);
+              if (key === "share") props.onShare?.();
+              if (key === "delete") setConfirmOpen(true);
+            }}
+          >
+            <DropdownItem key="edit" startContent={<FontAwesomeIcon icon={faPen} className="w-3.5" />}>編輯</DropdownItem>
+            <DropdownItem key="pin" startContent={<FontAwesomeIcon icon={faThumbtack} className="w-3.5" />}>
+              {item.pinned ? "取消釘選" : "釘選到最上面"}
+            </DropdownItem>
+            <DropdownItem key="export" startContent={<FontAwesomeIcon icon={faQrcode} className="w-3.5" />}>匯出 QR Code</DropdownItem>
+            {props.onShare ? (
+              <DropdownItem key="share" startContent={<FontAwesomeIcon icon={faShareFromSquare} className="w-3.5" />}>分享到群組</DropdownItem>
+            ) : null}
+            <DropdownItem key="delete" className="text-danger" color="danger" startContent={<FontAwesomeIcon icon={faTrash} className="w-3.5" />}>
+              刪除
+            </DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
+      )}
 
       {exportOpen && <ExportItemModal item={item} onClose={() => setExportOpen(false)} />}
 

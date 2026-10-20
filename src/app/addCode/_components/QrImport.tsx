@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Button, Input } from "@heroui/react";
 import toast from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCamera, faImage, faLink } from "@fortawesome/free-solid-svg-icons";
@@ -10,6 +9,10 @@ import { parseImportText } from "@/lib/totp/importText";
 import { QrImportProps } from "@/types/AddCode/QrImport";
 import CameraScanModal from "./CameraScanModal";
 import { showError } from "@/lib/errorDialog";
+
+// 分組列表裡的一列動作：藍字、左邊一個圖示
+const rowClass =
+  "flex w-full items-center gap-3 px-5 py-3 text-left text-[17px] text-accent transition-colors hover:bg-surface-1 disabled:opacity-40 disabled:hover:bg-transparent";
 
 // 從 otpauth:// 連結、QR Code 圖片或相機匯入，解析後交給表單
 const QrImport = (props: QrImportProps) => {
@@ -62,59 +65,53 @@ const QrImport = (props: QrImportProps) => {
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      <p className="tech-label">OTPAUTH URI</p>
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (importText(uri)) setUri("");
-        }}
-      >
-        <Input
-          aria-label="otpauth 連結"
-          placeholder="貼上 otpauth://totp/... 連結"
-          variant="bordered"
-          value={uri}
-          onValueChange={setUri}
-          classNames={{ input: "font-mono text-sm" }}
-          startContent={<FontAwesomeIcon icon={faLink} className="w-3.5 text-ink-dim" />}
-          // 貼上完整連結時直接帶入，不用再按按鈕
-          onPaste={(e) => {
-            const text = e.clipboardData.getData("text");
-            if (text.trim().startsWith("otpauth")) {
-              e.preventDefault();
-              importText(text);
-            }
+    <>
+      <div className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
+        {/* 貼上 otpauth 連結 */}
+        <form
+          className="flex items-center gap-3 px-5 py-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (importText(uri)) setUri("");
           }}
-        />
-        <Button type="submit" variant="bordered" color="primary" className="font-display tracking-[0.08em]" isDisabled={!uri.trim()}>
-          帶入
-        </Button>
-      </form>
-
-      <div className="rule" />
-
-      <p className="tech-label">IMAGE / CAMERA</p>
-      <div className="grid grid-cols-2 gap-2">
-        <Button
-          variant="bordered"
-          className="font-display tracking-[0.08em]"
-          startContent={<FontAwesomeIcon icon={faImage} className="w-4" />}
-          isLoading={decoding}
-          onPress={() => fileRef.current?.click()}
         >
-          上傳圖片或備份檔
-        </Button>
-        <Button
-          variant="bordered"
-          className="font-display tracking-[0.08em]"
-          startContent={<FontAwesomeIcon icon={faCamera} className="w-4" />}
-          onPress={() => setScanning(true)}
-        >
-          相機掃描
-        </Button>
+          <FontAwesomeIcon icon={faLink} className="w-4 shrink-0 text-ink-muted" />
+          <input
+            aria-label="otpauth 連結"
+            placeholder="貼上 otpauth 連結"
+            autoComplete="off"
+            spellCheck="false"
+            value={uri}
+            onChange={(e) => setUri(e.target.value)}
+            className="min-w-0 flex-1 bg-transparent text-[17px] text-ink outline-none placeholder:text-ink-muted"
+            // 貼上完整連結時直接帶入，不用再按按鈕
+            onPaste={(e) => {
+              const text = e.clipboardData.getData("text");
+              if (text.trim().startsWith("otpauth")) {
+                e.preventDefault();
+                importText(text);
+              }
+            }}
+          />
+          <button type="submit" disabled={!uri.trim()} className="shrink-0 text-[17px] text-accent disabled:opacity-40">
+            帶入
+          </button>
+        </form>
+
+        <button type="button" className={rowClass} disabled={decoding} onClick={() => fileRef.current?.click()}>
+          <FontAwesomeIcon icon={faImage} className="w-4 shrink-0" />
+          {decoding ? "讀取中…" : "上傳圖片或備份檔"}
+        </button>
+
+        <button type="button" className={rowClass} onClick={() => setScanning(true)}>
+          <FontAwesomeIcon icon={faCamera} className="w-4 shrink-0" />
+          用相機掃描
+        </button>
       </div>
+      <p className="mt-2 px-5 text-[13px] text-ink-muted">
+        貼上服務給的 otpauth 連結，或用綁定畫面的 QR Code；Google Authenticator 的匯出 QR Code 和本站的備份檔可以一次匯入多筆
+      </p>
+
       <input
         ref={fileRef}
         type="file"
@@ -132,7 +129,7 @@ const QrImport = (props: QrImportProps) => {
           }}
         />
       )}
-    </div>
+    </>
   );
 };
 

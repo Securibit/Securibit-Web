@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { useRouter } from 'nextjs-toploader/app';
-import { Button, Input } from '@heroui/react';
+import Link from 'next/link';
+import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from '@heroui/react';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowsUpDown, faCheck, faEye, faEyeSlash, faFileExport, faMagnifyingGlass, faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
+import { faArrowsUpDown, faEllipsis, faEye, faEyeSlash, faFileExport, faMagnifyingGlass, faPlus, faTrashCan, faXmark } from '@fortawesome/free-solid-svg-icons';
 import CodeCard from './_components/CodeCard';
 import TotpEditModal from './_components/TotpEditModal';
 import ExportModal from './_components/ExportModal';
@@ -31,18 +31,17 @@ const readHidePref = () => {
   }
 };
 
-// 類別篩選用的方形標籤
-const filterLabelClass = (active: boolean) =>
+// 類別篩選：藥丸
+const pillClass = (active: boolean) =>
   cn(
-    "tech-label border px-1.5 py-0.5 transition-colors",
-    active ? "border-phos bg-phos/10 text-phos" : "border-line hover:border-line-strong hover:text-ink"
+    "shrink-0 rounded-full px-3.5 py-1.5 text-[15px] transition-colors",
+    active ? "bg-ink text-surface" : "bg-surface-1 text-ink hover:bg-line/60"
   );
 
 const CodeClient = () => {
   const { user } = useAuth();
   // 有啟用加密時的金鑰（VaultGate 確認解鎖後才會掛上這個元件）
   const { key } = useVault();
-  const router = useRouter();
   const [items, setItems] = useState<TotpItem[]>();
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [editing, setEditing] = useState<TotpItem>();
@@ -120,12 +119,12 @@ const CodeClient = () => {
 
   const handleUpdate = async (id: string, input: TotpInput) => {
     if (!user) return false;
-    return applyResult(await updateTotp(user.uid, id, input, key), '已儲存驗證碼！', '儲存驗證碼失敗');
+    return applyResult(await updateTotp(user.uid, id, input, key), '已儲存', '儲存驗證碼失敗');
   };
 
   const handleDelete = async (id: string) => {
     if (!user) return;
-    applyResult(await deleteTotp(user.uid, id, key), '已成功刪除驗證碼！', '刪除驗證碼失敗');
+    applyResult(await deleteTotp(user.uid, id, key), '已刪除', '刪除驗證碼失敗');
   };
 
   const handleTogglePin = async (item: TotpItem) => {
@@ -165,148 +164,113 @@ const CodeClient = () => {
 
   const handleClear = async () => {
     if (!user) return;
-    applyResult(await clearTotp(user.uid), '已成功清空驗證碼！', '清空驗證碼失敗');
+    applyResult(await clearTotp(user.uid), '已清空', '清空驗證碼失敗');
   };
 
   return (
-    <PageContent>
+    <PageContent className="max-w-3xl">
       <PageHeader
-        index="01 // CODES"
         title="驗證碼"
-        subtitle="點擊驗證碼即可複製"
         right={
-          <Button
-            color="primary"
-            className="font-display tracking-[0.08em]"
-            startContent={<FontAwesomeIcon icon={faPlus} className="w-3.5" />}
-            onPress={() => router.push('/addCode')}
-          >
-            新增驗證碼
-          </Button>
+          sorting ? (
+            <button onClick={() => setSorting(false)} className="text-[17px] font-semibold text-accent">完成</button>
+          ) : (
+            <>
+              <Link href="/addCode" className="flex items-center gap-1.5 text-[17px] text-accent hover:underline">
+                <FontAwesomeIcon icon={faPlus} className="w-3.5" />
+                新增
+              </Link>
+              {items && items.length > 0 && (
+                <Dropdown placement="bottom-end" className="bg-surface text-ink">
+                  <DropdownTrigger>
+                    <button aria-label="更多" className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-1 text-accent transition-colors hover:bg-line/60">
+                      <FontAwesomeIcon icon={faEllipsis} className="w-4" />
+                    </button>
+                  </DropdownTrigger>
+                  <DropdownMenu
+                    aria-label="列表操作"
+                    disabledKeys={items.length < 2 ? ['sort'] : []}
+                    onAction={(key) => {
+                      if (key === 'hide') toggleHideCodes(!hideCodes);
+                      if (key === 'sort') setSorting(true);
+                      if (key === 'export') setExportOpen(true);
+                      if (key === 'clear') setConfirmClearOpen(true);
+                    }}
+                  >
+                    <DropdownItem key="hide" startContent={<FontAwesomeIcon icon={hideCodes ? faEye : faEyeSlash} className="w-3.5" />}>
+                      {hideCodes ? '顯示驗證碼' : '隱藏驗證碼'}
+                    </DropdownItem>
+                    <DropdownItem key="sort" startContent={<FontAwesomeIcon icon={faArrowsUpDown} className="w-3.5" />}>調整順序</DropdownItem>
+                    <DropdownItem key="export" startContent={<FontAwesomeIcon icon={faFileExport} className="w-3.5" />}>匯出</DropdownItem>
+                    <DropdownItem key="clear" className="text-danger" color="danger" startContent={<FontAwesomeIcon icon={faTrashCan} className="w-3.5" />}>
+                      清空全部
+                    </DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
+              )}
+            </>
+          )
         }
       />
 
       {items === undefined ? (
         <Spinner block label="載入驗證碼…" />
       ) : items.length === 0 ? (
-        <div className="hatch border border-line p-10 text-center">
-          <p className="tech-label">NO DATA</p>
-          <p className="mt-2 text-ink-muted">還沒有任何驗證碼。</p>
-          <Button
-            color="primary"
-            variant="bordered"
-            className="mt-4 font-display tracking-[0.08em]"
-            startContent={<FontAwesomeIcon icon={faPlus} className="w-3.5" />}
-            onPress={() => router.push('/addCode')}
-          >
-            立刻去新增驗證碼
-          </Button>
+        <div className="rounded-[18px] bg-surface-1 px-6 py-16 text-center">
+          <p className="text-[19px] font-semibold">還沒有驗證碼</p>
+          <p className="mt-1 text-ink-muted">到各服務的兩步驟驗證設定拿 QR Code，掃一下就加進來</p>
+          <Link href="/addCode" className="link-arrow mt-4 inline-block">新增第一筆</Link>
         </div>
       ) : (
-        <div className="boot">
-          {/* 工具列：搜尋、類別篩選、隱藏／排序切換、匯出、清空 */}
-          <div className="border-b border-line">
-            <div className="flex flex-wrap items-center gap-2 py-3">
-              {sorting ? (
-                <p className="flex flex-1 items-center gap-2 text-sm text-ink-muted">
-                  <span className="led" aria-hidden />
-                  用箭頭調整順序，釘選的項目固定排在最上面。調整完按「完成排序」。
-                </p>
-              ) : (
-                <>
-                  <Input
-                    aria-label="搜尋驗證碼"
-                    placeholder="搜尋名稱或類別"
-                    size="sm"
-                    variant="bordered"
-                    value={keyword}
-                    onValueChange={setKeyword}
-                    isClearable
-                    onClear={() => setKeyword('')}
-                    startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="w-3.5 text-ink-dim" />}
-                    className="w-full sm:max-w-xs"
-                  />
-                  <Button
-                    size="sm"
-                    variant="bordered"
-                    color={hideCodes ? 'primary' : 'default'}
-                    aria-pressed={hideCodes}
-                    className="font-display tracking-[0.08em]"
-                    startContent={<FontAwesomeIcon icon={hideCodes ? faEyeSlash : faEye} className="w-3.5" />}
-                    onPress={() => toggleHideCodes(!hideCodes)}
-                  >
-                    {hideCodes ? '已隱藏驗證碼' : '隱藏驗證碼'}
-                  </Button>
-                </>
-              )}
-
-              <div className="ml-auto flex flex-wrap items-center gap-2">
-                {(sorting || items.length > 1) && (
-                  <Button
-                    size="sm"
-                    variant={sorting ? 'solid' : 'bordered'}
-                    color="primary"
-                    className="font-display tracking-[0.08em]"
-                    startContent={<FontAwesomeIcon icon={sorting ? faCheck : faArrowsUpDown} className="w-3.5" />}
-                    onPress={() => setSorting(!sorting)}
-                  >
-                    {sorting ? '完成排序' : '排序'}
-                  </Button>
-                )}
-                {!sorting && (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="bordered"
-                      className="font-display tracking-[0.08em]"
-                      startContent={<FontAwesomeIcon icon={faFileExport} className="w-3.5" />}
-                      onPress={() => setExportOpen(true)}
-                    >
-                      匯出
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="bordered"
-                      color="danger"
-                      className="font-display tracking-[0.08em]"
-                      startContent={<FontAwesomeIcon icon={faTrashCan} className="w-3.5" />}
-                      onPress={() => setConfirmClearOpen(true)}
-                    >
-                      清空全部
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {!sorting && categories.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 pb-3">
-                <span className="tech-label mr-1 text-ink-dim">FILTER</span>
-                <button type="button" aria-pressed={!activeCategory} className={filterLabelClass(!activeCategory)} onClick={() => setCategory(undefined)}>
-                  全部 <span className="font-mono">{items.length}</span>
-                </button>
-                {categories.map((name) => (
-                  <button
-                    key={name}
-                    type="button"
-                    aria-pressed={activeCategory === name}
-                    className={filterLabelClass(activeCategory === name)}
-                    onClick={() => setCategory(activeCategory === name ? undefined : name)}
-                  >
-                    {name} <span className="font-mono">{items.filter((item) => item.category === name).length}</span>
+        <>
+          {sorting ? (
+            <p className="mb-3 text-[15px] text-ink-muted">用箭頭調整順序，釘選的固定排在最上面</p>
+          ) : (
+            <div className="mb-3 flex flex-col gap-3">
+              {/* 搜尋 */}
+              <label className="flex items-center gap-2 rounded-[12px] bg-surface-1 px-3.5 py-2 text-[17px] text-ink-muted focus-within:ring-2 focus-within:ring-accent/40">
+                <FontAwesomeIcon icon={faMagnifyingGlass} className="w-4 shrink-0" />
+                <input
+                  type="search"
+                  aria-label="搜尋驗證碼"
+                  placeholder="搜尋"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-muted"
+                />
+                {keyword && (
+                  <button type="button" onClick={() => setKeyword('')} aria-label="清除" className="hover:text-ink">
+                    <FontAwesomeIcon icon={faXmark} className="w-3.5" />
                   </button>
-                ))}
-              </div>
-            )}
-          </div>
+                )}
+              </label>
+
+              {/* 類別 */}
+              {categories.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+                  <button type="button" aria-pressed={!activeCategory} className={pillClass(!activeCategory)} onClick={() => setCategory(undefined)}>
+                    全部
+                  </button>
+                  {categories.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      aria-pressed={activeCategory === name}
+                      className={pillClass(activeCategory === name)}
+                      onClick={() => setCategory(activeCategory === name ? undefined : name)}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {filtered.length === 0 ? (
-            <div className="hatch border-x border-b border-line p-10 text-center">
-              <p className="tech-label">NO MATCH</p>
-              <p className="mt-2 text-ink-muted">沒有符合條件的驗證碼</p>
-            </div>
+            <div className="rounded-[18px] bg-surface-1 px-6 py-12 text-center text-ink-muted">沒有符合的驗證碼</div>
           ) : (
-            <ul role="list">
+            <ul role="list" className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
               {filtered.map((item, index) => (
                 <CodeCard
                   key={item.id}
@@ -331,10 +295,11 @@ const CodeClient = () => {
             </ul>
           )}
 
-          <p className="mt-3 font-mono text-[11px] tracking-[0.08em] text-ink-dim">
-            {filtered.length} / {items.length} ITEMS
+          <p className="mt-3 px-1 text-[13px] text-ink-muted">
+            {filtered.length === items.length ? `共 ${items.length} 筆` : `顯示 ${filtered.length} 筆，共 ${items.length} 筆`}
+            {hideCodes && '，驗證碼已隱藏，點一下才會顯示'}
           </p>
-        </div>
+        </>
       )}
 
       {editing && (

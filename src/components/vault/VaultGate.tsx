@@ -13,7 +13,7 @@ const VaultGate = (props: VaultGateProps) => {
   if (status === "loading") return <Spinner block label="確認加密狀態…" />;
   if (status === "locked") {
     return (
-      <PageContent>
+      <PageContent className="max-w-2xl">
         <VaultUnlock />
       </PageContent>
     );

@@ -5,8 +5,6 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { useRouter } from "nextjs-toploader/app";
 import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Radio, RadioGroup } from "@heroui/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUserGroup } from "@fortawesome/free-solid-svg-icons";
 import Spinner from "@/components/ui/Loading/Spinner";
 import { addGroupAccounts, loadMyGroups } from "@/lib/groups/groups";
 import { GROUP, has } from "@/lib/permissions/bits";
@@ -69,7 +67,7 @@ const ShareToGroupModal = (props: ShareToGroupModalProps) => {
         <span className="flex flex-wrap items-center gap-2">
           已分享到「{group.name}」
           <button
-            className="font-display font-semibold text-phos underline underline-offset-4"
+            className="text-accent hover:underline"
             onClick={() => {
               toast.dismiss(t.id);
               router.push(`/groups/${group.id}`);
@@ -84,32 +82,23 @@ const ShareToGroupModal = (props: ShareToGroupModalProps) => {
   };
 
   return (
-    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} className="border border-line bg-surface-1 text-ink">
+    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} className="bg-surface text-ink">
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-1 border-b border-line font-display tracking-wide">
-          <span className="tech-label">SHARE // GROUP</span>
-          分享「{item.name}」到群組
-        </ModalHeader>
-        <ModalBody className="py-5">
-          <p className="text-sm text-ink-muted">
-            會複製一份到群組，之後兩邊各自獨立；群組的驗證碼不會套用你的個人加密。
+        <ModalHeader className="truncate">分享「{item.name}」到群組</ModalHeader>
+        <ModalBody className="gap-4">
+          <p className="text-[15px] text-ink-muted">
+            會複製一份到群組，之後兩邊各自獨立；群組的驗證碼不會套用你的個人加密
           </p>
 
           {groups === undefined ? (
             <Spinner label="載入群組…" />
           ) : groups.length === 0 ? (
-            <div className="hatch border border-line p-4 text-sm">
-              <p className="tech-label">NO GROUP</p>
-              <p className="mt-2">你目前沒有可以新增驗證碼的群組。</p>
-              <p className="mt-1 text-ink-muted">
-                需要在群組裡有「管理驗證碼」權限，可以自己建立群組，或請群組管理員開給你。
+            <div className="rounded-[18px] bg-surface-1 px-6 py-10 text-center">
+              <p className="text-ink">你目前沒有可以新增驗證碼的群組</p>
+              <p className="mt-1 text-[13px] text-ink-muted">
+                需要在群組裡有「管理驗證碼」權限，可以自己建立群組，或請群組管理員開給你
               </p>
-              <Link
-                href="/groups"
-                onClick={props.onClose}
-                className="mt-3 inline-flex items-center gap-1.5 font-display font-medium text-phos underline underline-offset-4"
-              >
-                <FontAwesomeIcon icon={faUserGroup} className="w-3.5" />
+              <Link href="/groups" onClick={props.onClose} className="link-arrow mt-4 inline-block">
                 前往群組
               </Link>
             </div>
@@ -118,7 +107,7 @@ const ShareToGroupModal = (props: ShareToGroupModalProps) => {
               label="選擇群組"
               value={selected}
               onValueChange={setSelected}
-              classNames={{ label: "tech-label" }}
+              classNames={{ label: "text-[13px] text-ink-muted" }}
             >
               {groups.map((group) => (
                 <Radio key={group.id} value={group.id} description={group.description || undefined}>
@@ -128,8 +117,8 @@ const ShareToGroupModal = (props: ShareToGroupModalProps) => {
             </RadioGroup>
           )}
         </ModalBody>
-        <ModalFooter className="border-t border-line">
-          <Button variant="bordered" onPress={props.onClose}>
+        <ModalFooter>
+          <Button variant="light" onPress={props.onClose}>
             取消
           </Button>
           {groups && groups.length > 0 && (

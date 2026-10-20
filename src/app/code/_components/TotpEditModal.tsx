@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import TotpForm from "@/components/totp/TotpForm";
 import { normalizeSecret } from "@/lib/totp/crud";
 import { TotpErrors, validateTotpInput } from "@/lib/totp/validate";
@@ -47,14 +45,11 @@ const TotpEditModal = (props: TotpEditModalProps) => {
       onOpenChange={(open) => !open && props.onClose()}
       size="lg"
       scrollBehavior="inside"
-      className="border border-line bg-surface-1 text-ink"
+      className="bg-surface text-ink"
     >
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-1 border-b border-line font-display tracking-wide">
-          <span className="tech-label">EDIT // CODE</span>
-          編輯驗證碼
-        </ModalHeader>
-        <ModalBody className="py-5">
+        <ModalHeader>編輯驗證碼</ModalHeader>
+        <ModalBody>
           <form
             id="totp-edit-form"
             onSubmit={(e) => {
@@ -75,14 +70,13 @@ const TotpEditModal = (props: TotpEditModalProps) => {
             />
           </form>
           {secretChanged && (
-            <div className="flex gap-3 border border-alarm/50 bg-alarm/10 p-3 text-sm text-ink">
-              <FontAwesomeIcon icon={faTriangleExclamation} className="mt-1 w-4 flex-shrink-0 text-alarm" />
-              <p>更換金鑰後會產生完全不同的驗證碼，請確認新金鑰來自該服務重新綁定的設定。</p>
-            </div>
+            <p className="text-[13px] text-alarm">
+              更換金鑰後會產生完全不同的驗證碼，請確認新金鑰來自該服務重新綁定的設定
+            </p>
           )}
         </ModalBody>
-        <ModalFooter className="border-t border-line">
-          <Button variant="bordered" onPress={props.onClose} isDisabled={saving}>
+        <ModalFooter>
+          <Button variant="light" onPress={props.onClose} isDisabled={saving}>
             取消
           </Button>
           <Button color="primary" type="submit" form="totp-edit-form" isLoading={saving}>

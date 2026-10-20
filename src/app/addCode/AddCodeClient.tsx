@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "nextjs-toploader/app";
+import Link from "next/link";
 import toast from "react-hot-toast";
 import { Button } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
+import { faCircleCheck } from "@fortawesome/free-solid-svg-icons";
 import useAuth from "@/components/auth/useAuth";
 import useVault from "@/components/vault/useVault";
 import PageContent from "@/components/layout/PageContent";
@@ -30,7 +30,6 @@ const isDefaultAdvanced = (input: TotpInput) =>
 const AddCodeClient = () => {
   const { user } = useAuth();
   const { key } = useVault();
-  const router = useRouter();
   const [totp, setTotp] = useState<TotpInput>(EMPTY_FORM);
   const [errors, setErrors] = useState<TotpErrors>({});
   const [saving, setSaving] = useState(false);
@@ -70,7 +69,7 @@ const AddCodeClient = () => {
       showError('匯入驗證碼失敗', result.message);
       return false;
     }
-    toast.success(`已匯入 ${inputs.length} 筆驗證碼！`, { position: 'top-right' });
+    toast.success(`已匯入 ${inputs.length} 筆驗證碼`, { position: 'top-right' });
     setItems(result.data);
     setLastAdded(inputs.length === 1 ? `「${inputs[0].name.trim()}」` : ` ${inputs.length} 筆驗證碼`);
     return true;
@@ -96,7 +95,7 @@ const AddCodeClient = () => {
     setSaving(false);
 
     if (result.success) {
-      toast.success('新增 TOTP 成功！', { position: 'top-right' });
+      toast.success('已新增', { position: 'top-right' });
       setItems(result.data);
       setLastAdded(`「${totp.name.trim()}」`);
       // 清空表單，類別保留方便連續新增同類
@@ -108,80 +107,58 @@ const AddCodeClient = () => {
   };
 
   return (
-    <PageContent className="max-w-5xl">
+    <PageContent className="max-w-2xl">
       <PageHeader
-        index="02 // ADD CODE"
         title="新增驗證碼"
-        subtitle="掃描 QR Code、匯入 Google Authenticator 或備份檔，或手動輸入金鑰"
         right={
-          <Button
-            variant="bordered"
-            className="font-display tracking-[0.08em]"
-            startContent={<FontAwesomeIcon icon={faArrowLeft} className="w-3.5" />}
-            onPress={() => router.push('/code')}
-          >
-            回到驗證碼列表
-          </Button>
+          <Link href="/code" className="text-[17px] text-accent hover:underline">
+            回到列表
+          </Link>
         }
       />
 
-      <div className="boot">
+      <div className="flex flex-col gap-8">
         {lastAdded && (
-          <div className="mb-6 flex flex-wrap items-center gap-3 border border-phos/50 bg-phos/10 p-3 text-sm text-ink">
-            <span className="led" aria-hidden />
-            <span className="flex-1">已新增{lastAdded}，可以繼續新增下一筆。</span>
-            <Button size="sm" color="primary" variant="bordered" className="font-display tracking-[0.08em]" onPress={() => router.push('/code')}>
-              查看驗證碼
-            </Button>
-          </div>
+          <p className="flex flex-wrap items-center gap-3 px-5 text-[15px]">
+            <FontAwesomeIcon icon={faCircleCheck} className="w-4 shrink-0 text-success" />
+            <span className="flex-1">已新增{lastAdded}，可以繼續新增下一筆</span>
+            <Link href="/code" className="link-arrow shrink-0">查看驗證碼</Link>
+          </p>
         )}
 
-        <div className="grid grid-cols-12 gap-6">
-          {/* 左：說明 + 快速匯入 */}
-          <div className="col-span-12 lg:col-span-5">
-            <p className="tech-label">A // IMPORT</p>
-            <h2 className="mt-1 font-display text-xl font-bold text-ink">快速匯入</h2>
-            <p className="mt-2 text-sm text-ink-muted">
-              貼上服務給的 otpauth 連結，或上傳綁定畫面的 QR Code 截圖；Google Authenticator 的匯出 QR Code 和本站的備份檔可以一次匯入多筆。
-            </p>
-            <div className="mt-4 border border-line bg-surface-1 p-4">
-              <QrImport onImport={handleImport} onImportMany={setBulk} />
-            </div>
-            <p className="mt-3 font-mono text-[11px] tracking-[0.08em] text-ink-dim">
-              解析成功後會自動帶入右邊的表單，確認後再按新增。
-            </p>
-          </div>
+        {/* 匯入：貼連結、上傳圖片、開相機 */}
+        <section>
+          <h2 className="mb-2 px-5 text-[13px] font-normal text-ink-muted">匯入</h2>
+          <QrImport onImport={handleImport} onImportMany={setBulk} />
+        </section>
 
-          {/* 右：手動輸入表單 */}
-          <div className="col-span-12 lg:col-span-7">
-            <div className="panel p-5 sm:p-6">
-              <p className="tech-label">B // MANUAL</p>
-              <h2 className="mt-1 font-display text-xl font-bold text-ink">手動輸入</h2>
-              <div className="rule mt-4 mb-5" />
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleAddTotp();
+        {/* 手動輸入 */}
+        <section>
+          <h2 className="mb-2 px-5 text-[13px] font-normal text-ink-muted">手動輸入</h2>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleAddTotp();
+            }}
+          >
+            <div className="rounded-[18px] border border-line/70 bg-surface p-5">
+              <TotpForm
+                key={formKey}
+                value={totp}
+                onChange={(value) => {
+                  setTotp(value);
+                  setErrors({});
                 }}
-              >
-                <TotpForm
-                  key={formKey}
-                  value={totp}
-                  onChange={(value) => {
-                    setTotp(value);
-                    setErrors({});
-                  }}
-                  categories={categories}
-                  errors={errors}
-                  advancedOpen={!isDefaultAdvanced(totp)}
-                />
-                <Button type="submit" color="primary" className="mt-6 w-full font-display tracking-[0.08em] sm:w-auto" isLoading={saving}>
-                  新增驗證碼
-                </Button>
-              </form>
+                categories={categories}
+                errors={errors}
+                advancedOpen={!isDefaultAdvanced(totp)}
+              />
             </div>
-          </div>
-        </div>
+            <Button type="submit" color="primary" radius="full" size="lg" className="mt-6 w-full" isLoading={saving}>
+              新增
+            </Button>
+          </form>
+        </section>
       </div>
 
       {bulk && (

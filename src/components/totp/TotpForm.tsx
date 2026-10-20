@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Accordion, AccordionItem, Autocomplete, AutocompleteItem, Input, Select, SelectItem } from "@heroui/react";
+import { Autocomplete, AutocompleteItem, Input, Select, SelectItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import { faChevronDown, faChevronUp, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import {
   TOTP_ALGORITHMS,
   TOTP_DEFAULTS,
@@ -17,6 +17,7 @@ import { TotpFormProps } from "@/types/Totp/TotpForm";
 const TotpForm = (props: TotpFormProps) => {
   const { value, errors = {} } = props;
   const [showSecret, setShowSecret] = useState(false);
+  const [advanced, setAdvanced] = useState(!!props.advancedOpen);
 
   const set = (patch: Partial<typeof value>) => props.onChange({ ...value, ...patch });
 
@@ -25,11 +26,13 @@ const TotpForm = (props: TotpFormProps) => {
   const algorithm = value.algorithm ?? TOTP_DEFAULTS.algorithm;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <Input
         label="名稱"
         placeholder="例如：Google - me@example.com"
-        variant="bordered"
+        variant="flat"
+        labelPlacement="outside"
+        size="lg"
         isRequired
         value={value.name}
         onValueChange={(name) => set({ name })}
@@ -40,7 +43,9 @@ const TotpForm = (props: TotpFormProps) => {
       <Autocomplete
         label="類別"
         placeholder="例如：工作、個人、遊戲"
-        variant="bordered"
+        variant="flat"
+        labelPlacement="outside"
+        size="lg"
         allowsCustomValue
         inputValue={value.category}
         onInputChange={(category) => set({ category })}
@@ -50,9 +55,11 @@ const TotpForm = (props: TotpFormProps) => {
       </Autocomplete>
 
       <Input
-        label="金鑰（Secret）"
+        label="金鑰"
         placeholder="JBSWY3DPEHPK3PXP"
-        variant="bordered"
+        variant="flat"
+        labelPlacement="outside"
+        size="lg"
         isRequired
         type={showSecret ? "text" : "password"}
         autoComplete="off"
@@ -61,68 +68,78 @@ const TotpForm = (props: TotpFormProps) => {
         onValueChange={(secret) => set({ secret })}
         isInvalid={!!errors.secret}
         errorMessage={errors.secret}
-        description="Base32 格式（A-Z、2-7），空白與小寫會自動轉換"
-        classNames={{ input: "font-mono tracking-[0.08em]" }}
+        description="Base32 格式（A–Z、2–7），空白與小寫會自動轉換"
+        classNames={{ description: "text-[13px] text-ink-muted" }}
         endContent={
           <button
             type="button"
             onClick={() => setShowSecret((prev) => !prev)}
             aria-label={showSecret ? "隱藏金鑰" : "顯示金鑰"}
-            className="text-ink-dim transition-colors hover:text-phos"
+            className="text-ink-muted transition-colors hover:text-ink"
           >
             <FontAwesomeIcon icon={showSecret ? faEyeSlash : faEye} className="w-4" />
           </button>
         }
       />
 
-      <Accordion
-        variant="bordered"
-        defaultExpandedKeys={props.advancedOpen ? ["advanced"] : []}
-        className="border-line px-3"
-      >
-        <AccordionItem
-          key="advanced"
-          title="進階設定"
-          subtitle={`${digits} DIGITS · ${period} S · ${algorithm}`}
-          classNames={{
-            title: "font-display text-sm font-semibold tracking-[0.08em] text-ink",
-            subtitle: "font-mono text-[11px] tracking-[0.08em] text-ink-dim",
-          }}
+      {/* 進階設定：預設收合，點藍字展開 */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setAdvanced((prev) => !prev)}
+          aria-expanded={advanced}
+          className="flex w-full items-center justify-between gap-3 text-[17px]"
         >
-          <p className="mb-3 text-sm text-ink-muted">
-            大多數服務使用預設值（6 位數、30 秒、SHA-1），除非服務另有說明否則不需更改。
-          </p>
-          <div className="grid gap-3 pb-2 sm:grid-cols-3">
-            <Select
-              label="位數"
-              variant="bordered"
-              selectedKeys={[String(digits)]}
-              disallowEmptySelection
-              onChange={(e) => e.target.value && set({ digits: Number(e.target.value) })}
-            >
-              {TOTP_DIGITS.map((d) => <SelectItem key={String(d)}>{`${d} 位數`}</SelectItem>)}
-            </Select>
-            <Select
-              label="週期"
-              variant="bordered"
-              selectedKeys={[String(period)]}
-              disallowEmptySelection
-              onChange={(e) => e.target.value && set({ period: Number(e.target.value) })}
-            >
-              {TOTP_PERIODS.map((p) => <SelectItem key={String(p)}>{`${p} 秒`}</SelectItem>)}
-            </Select>
-            <Select
-              label="演算法"
-              variant="bordered"
-              selectedKeys={[algorithm]}
-              disallowEmptySelection
-              onChange={(e) => e.target.value && set({ algorithm: e.target.value as TotpAlgorithm })}
-            >
-              {TOTP_ALGORITHMS.map((a) => <SelectItem key={a}>{a}</SelectItem>)}
-            </Select>
+          <span className="text-accent">進階設定</span>
+          <span className="flex items-center gap-2 text-[15px] text-ink-muted">
+            <span className="tabular-nums">{digits} 位數 · {period} 秒 · {algorithm}</span>
+            <FontAwesomeIcon icon={advanced ? faChevronUp : faChevronDown} className="w-3" />
+          </span>
+        </button>
+
+        {advanced && (
+          <div className="mt-4 flex flex-col gap-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Select
+                label="位數"
+                variant="flat"
+                labelPlacement="outside"
+                size="lg"
+                selectedKeys={[String(digits)]}
+                disallowEmptySelection
+                onChange={(e) => e.target.value && set({ digits: Number(e.target.value) })}
+              >
+                {TOTP_DIGITS.map((d) => <SelectItem key={String(d)}>{`${d} 位數`}</SelectItem>)}
+              </Select>
+              <Select
+                label="週期"
+                variant="flat"
+                labelPlacement="outside"
+                size="lg"
+                selectedKeys={[String(period)]}
+                disallowEmptySelection
+                onChange={(e) => e.target.value && set({ period: Number(e.target.value) })}
+              >
+                {TOTP_PERIODS.map((p) => <SelectItem key={String(p)}>{`${p} 秒`}</SelectItem>)}
+              </Select>
+              <Select
+                label="演算法"
+                variant="flat"
+                labelPlacement="outside"
+                size="lg"
+                selectedKeys={[algorithm]}
+                disallowEmptySelection
+                onChange={(e) => e.target.value && set({ algorithm: e.target.value as TotpAlgorithm })}
+              >
+                {TOTP_ALGORITHMS.map((a) => <SelectItem key={a}>{a}</SelectItem>)}
+              </Select>
+            </div>
+            <p className="text-[13px] text-ink-muted">
+              大多數服務使用預設值（6 位數、30 秒、SHA-1），除非服務另有說明否則不需更改
+            </p>
           </div>
-        </AccordionItem>
-      </Accordion>
+        )}
+      </div>
     </div>
   );
 };
