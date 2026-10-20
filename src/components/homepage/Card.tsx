@@ -1,13 +1,14 @@
 import { CardProps } from "@/types/HomePage/Card";
 
-// 規格表的一列：編號、項目、說明
+// 一區一個想法：小字主題、大標題、一段說明、（可選）一個畫面
 const HomePageCard = (props: CardProps) => {
   return (
-    <li className="grid grid-cols-[3rem_1fr] gap-x-4 gap-y-1 border-b border-line py-5 sm:grid-cols-[4rem_13rem_1fr]">
-      <span className="readout pt-1 text-sm text-ink-dim">{props.index}</span>
-      <h3 className="font-display text-lg font-semibold text-ink">{props.title}</h3>
-      <p className="col-start-2 text-ink-muted sm:col-start-3">{props.description}</p>
-    </li>
+    <section className="border-t border-line/70 px-5 py-20 text-center sm:py-28">
+      <p className="text-[15px] font-semibold text-ink-muted">{props.eyebrow}</p>
+      <h2 className="mx-auto mt-2 max-w-3xl text-[36px] font-semibold tracking-tight sm:text-[48px]">{props.title}</h2>
+      <p className="mx-auto mt-5 max-w-xl text-[19px] text-ink-muted sm:text-[21px]">{props.description}</p>
+      {props.children && <div className="mt-12">{props.children}</div>}
+    </section>
   )
 }
 

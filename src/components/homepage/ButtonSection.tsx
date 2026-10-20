@@ -1,36 +1,23 @@
 "use client";
 
-import { faArrowRight, faKey } from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { Button } from "@heroui/react";
+import Link from "next/link";
 import { useRouter } from "nextjs-toploader/app";
 import useAuth from "../auth/useAuth";
 
+// Apple 的主視覺不放大按鈕，只放藍色文字連結
 const ButtonSection = () => {
   const router = useRouter();
   const { user, login } = useAuth();
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row">
-      <Button
-        // 未登入時直接帶去 Google 登入，不要先跳到驗證碼頁再被擋回來
-        onPress={() => (user ? router.push('/code') : login())}
-        color="primary"
-        size="lg"
-        className="font-display tracking-[0.12em]"
-        startContent={<FontAwesomeIcon icon={faKey} className="w-4" />}
-      >
+    <div className="flex items-center justify-center gap-8 text-[19px]">
+      {/* 未登入時直接帶去 Google 登入，不要先跳到驗證碼頁再被擋回來 */}
+      <button onClick={() => (user ? router.push('/code') : login())} className="link-arrow">
         {user ? '前往驗證碼' : '開始使用'}
-      </Button>
-      <Button
-        onPress={() => router.push('/about')}
-        variant="bordered"
-        size="lg"
-        className="border-line-strong font-display tracking-[0.12em] text-ink"
-        endContent={<FontAwesomeIcon icon={faArrowRight} className="w-3.5" />}
-      >
-        怎麼運作
-      </Button>
+      </button>
+      <Link href="/about" className="link-arrow">
+        進一步了解
+      </Link>
     </div>
   )
 }

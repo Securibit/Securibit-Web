@@ -1,7 +1,8 @@
-// 首頁規格表的一列
 export interface CardProps {
-  // 兩位數編號，例如 "01"
-  index: string;
+  // 小字的主題名，例如「加密」
+  eyebrow: string;
   title: string;
   description: string;
+  // 區塊下方的示意畫面（可選）
+  children?: React.ReactNode;
 }
