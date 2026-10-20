@@ -15,10 +15,10 @@ const Themes = (props: ThemesProps) => {
   const mounted = useSyncExternalStore(subscribe, () => true, () => false);
 
   // 佔位，避免掛載後版面跳動
-  if (!mounted) return <span className={cn("inline-block h-8", props.showLabel ? "w-24" : "w-8")} />;
+  if (!mounted) return <span className={cn("inline-block h-6", props.showLabel ? "w-24" : "w-6")} />;
 
   const dark = resolvedTheme === 'dark';
-  const label = dark ? '亮色模式' : '暗色模式';
+  const label = dark ? '切換成亮色' : '切換成暗色';
 
   return (
     <button
@@ -26,13 +26,10 @@ const Themes = (props: ThemesProps) => {
       onClick={() => setTheme(dark ? 'light' : 'dark')}
       aria-label={label}
       title={label}
-      className={cn(
-        "flex h-8 items-center gap-2 border border-line text-ink-muted transition-colors hover:border-line-strong hover:text-phos",
-        props.showLabel ? "px-3" : "w-8 justify-center"
-      )}
+      className={cn("flex items-center gap-2 text-ink/70 transition-colors hover:text-ink", props.showLabel && "text-[17px]")}
     >
-      <FontAwesomeIcon icon={dark ? faSun : faMoon} className="w-3.5" />
-      {props.showLabel && <span className="font-display text-xs tracking-[0.12em]">{label}</span>}
+      <FontAwesomeIcon icon={dark ? faSun : faMoon} className="w-4" />
+      {props.showLabel && <span>{dark ? '亮色模式' : '暗色模式'}</span>}
     </button>
   );
 };

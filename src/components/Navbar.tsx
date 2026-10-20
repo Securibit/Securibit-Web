@@ -5,10 +5,8 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { faKey, faPlus, faRightFromBracket, faShieldHalved, faUserGroup } from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Button } from "@heroui/react";
-import { Bars3Icon } from "@heroicons/react/24/solid";
+import { Bars3Icon } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
 import { SITE } from "@/lib/permissions/bits";
 import Themes from "./Themes";
@@ -17,13 +15,13 @@ import useAuth from "./auth/useAuth";
 
 // 登入後才出現的主選單；perm 有值的還要有對應權限
 const NAV_ITEMS = [
-  { href: '/code', label: '驗證碼', icon: faKey },
-  { href: '/addCode', label: '新增', icon: faPlus },
-  { href: '/groups', label: '群組', icon: faUserGroup },
-  { href: '/admin', label: '後台', icon: faShieldHalved, perm: SITE.VIEW_ADMIN },
+  { href: '/code', label: '驗證碼' },
+  { href: '/addCode', label: '新增' },
+  { href: '/groups', label: '群組' },
+  { href: '/admin', label: '後台', perm: SITE.VIEW_ADMIN },
 ];
 
-// 頂部儀表列：左邊字標與狀態燈，中間主選單，右邊主題切換與使用者
+// 像 Apple 官網那條窄窄的導覽列：小字、很淡的分隔線
 const Navbar = () => {
   const pathname = usePathname();
   const { user, profile, can, login, logout } = useAuth();
@@ -37,101 +35,59 @@ const Navbar = () => {
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-surface/85 backdrop-blur">
-      <div className="flex h-14 items-center gap-4 px-4 sm:px-6">
-        {/* 字標 */}
-        <Link href="/" className="flex items-center gap-2.5 text-ink transition-colors hover:text-phos">
-          <Image
-            src="/imgs/bityo_bg_circle.png"
-            alt="Securibit"
-            width={1920}
-            height={1920}
-            className="h-6 w-auto"
-          />
-          <span className="font-display text-sm font-semibold tracking-[0.22em]">SECURIBIT</span>
-          <span className="tech-label hidden sm:inline">TOTP 2FA</span>
+    <header className="sticky top-0 z-40 border-b border-line/60 bg-surface/80 backdrop-blur-xl">
+      <div className="flex h-16 items-center gap-10 px-6 text-[16px] sm:px-8">
+        <Link href="/" className="flex items-center gap-2.5 text-[19px] font-semibold text-ink">
+          <Image src="/imgs/bityo_bg_circle.png" alt="" width={1920} height={1920} className="h-7 w-auto" />
+          Securibit
         </Link>
 
-        {/* 主選單（桌機） */}
         {user && (
-          <nav className="ml-4 hidden h-full items-center md:flex">
+          <nav className="hidden items-center gap-8 md:flex">
             {NAV_ITEMS.filter((item) => !item.perm || can(item.perm)).map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={cn(
-                  "relative flex h-14 items-center gap-2 px-3 font-display text-[13px] tracking-[0.12em] transition-colors",
-                  isActive(item.href)
-                    ? "text-phos after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-phos"
-                    : "text-ink-muted hover:text-ink"
-                )}
+                className={cn("transition-opacity hover:opacity-100", isActive(item.href) ? "text-ink" : "text-ink/70")}
               >
-                <FontAwesomeIcon icon={item.icon} className="w-3.5" />
                 {item.label}
               </Link>
             ))}
           </nav>
         )}
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-6">
           <div className="hidden md:flex">
             <Themes />
           </div>
 
           {user ? (
             <>
-              {/* 個人檔案 */}
-              <Link
-                href="/me/MyPage"
-                className={cn(
-                  "hidden h-8 items-center gap-2 border pl-1 pr-3 transition-colors md:flex",
-                  isActive('/me') ? "border-phos text-phos" : "border-line text-ink hover:border-line-strong"
-                )}
-              >
+              <Link href="/me/MyPage" className={cn("hidden items-center gap-2 md:flex", isActive('/me') ? "text-ink" : "text-ink/70 hover:text-ink")}>
                 {photoURL ? (
-                  <img src={photoURL} alt="大頭照" referrerPolicy="no-referrer" className="h-6 w-6 object-cover" />
+                  <img src={photoURL} alt="" referrerPolicy="no-referrer" className="h-8 w-8 rounded-full object-cover" />
                 ) : (
                   // 沒有大頭照時顯示名字的第一個字
-                  <span className="flex h-6 w-6 items-center justify-center bg-phos font-display text-xs font-bold text-phos-ink">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-1 text-[13px] font-semibold">
                     {displayName?.slice(0, 1) || '?'}
                   </span>
                 )}
-                <span className="max-w-[10rem] truncate font-display text-[13px] tracking-wide">{displayName}</span>
-                <span className="led" aria-label="已登入" />
+                <span className="max-w-[10rem] truncate">{displayName}</span>
               </Link>
-
-              {/* 登出 */}
-              <button
-                onClick={logout}
-                aria-label="登出"
-                title="登出"
-                className="hidden h-8 w-8 items-center justify-center border border-line text-ink-muted transition-colors hover:border-alarm hover:text-alarm md:flex"
-              >
-                <FontAwesomeIcon icon={faRightFromBracket} className="w-3.5" />
+              <button onClick={logout} className="hidden text-ink/70 hover:text-ink md:block">
+                登出
               </button>
             </>
           ) : (
-            <Button
-              onPress={login}
-              color="primary"
-              variant="bordered"
-              size="sm"
-              className="hidden font-display tracking-[0.12em] md:flex"
-            >
+            <Button onPress={login} color="primary" radius="full" className="hidden h-9 px-5 text-[15px] font-medium md:flex">
               登入
             </Button>
           )}
 
           {/* 手機：開側欄 */}
-          <Button
-            isIconOnly
-            variant="light"
-            aria-label="開啟選單"
-            onPress={() => setIsDrawerOpen(true)}
-            className="text-ink md:hidden"
-          >
+          <button aria-label="開啟選單" onClick={() => setIsDrawerOpen(true)} className="text-ink md:hidden">
             <Bars3Icon className="h-6 w-6" />
-          </Button>
+          </button>
         </div>
       </div>
 

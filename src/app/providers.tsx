@@ -10,7 +10,8 @@ config.autoAddCss = false
 export const Providers = ({ children }: { children: React.ReactNode }) => {
   return (
     <HeroUIProvider>
-      <ThemeProvider attribute="class" defaultTheme="dark">
+      {/* 跟著系統的亮暗設定，使用者可以在導覽列手動切 */}
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <Layout>{children}</Layout>
       </ThemeProvider>
     </HeroUIProvider>

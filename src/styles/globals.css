@@ -3,72 +3,53 @@
 @plugin "./hero.ts";
 @source "../../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}";
 
-/* ============================================================
-   儀表／終端機工業風
-   - 一個主色：磷光綠 phos；一個銳利的強調色：警示橘紅 alarm；其餘全是灰階
-   - 字體：標題 Chakra Petch（中文落到 Noto Sans TC 粗體）、內文 霞鶩文楷、數字 IBM Plex Mono
-   - 顏色在 :root（淺色）與 .dark 切換，Tailwind 透過 @theme inline 對應成工具類別：
-       bg-surface / bg-surface-1 / bg-surface-2   底色、面板、更亮一層
-       text-ink / text-ink-muted / text-ink-dim     文字三階
-       border-line / border-line-strong             格線
-       text-phos / bg-phos / text-phos-ink          主色與主色上的字
-       text-alarm / bg-alarm                        強調色
-       font-display / font-body / font-mono         三種字體
-   ============================================================ */
+/*
+ * 配方：Apple 官網 / iOS 設定
+ * 純白底（深色 #1C1C1E）、#F5F5F7 軟底、墨色 #1D1D1F、灰字、髮絲線，藍色 #0071E3 只給動作文字與主要按鈕。
+ * 字：SF Pro（Apple 裝置上就是系統字）＋ 蘋方；拿不到時落到 Inter Tight ＋ Noto Sans TC。
+ * 圓角 12 / 18 / 22，幾乎沒有陰影，留白當層次。
+ * Tailwind 類別：
+ *   bg-surface / bg-surface-1          底色 / 軟底（灰底輸入框、藥丸、群組標題列）
+ *   text-ink / text-ink-muted          文字 / 灰字
+ *   border-line                        髮絲線（通常加 /70 或 /60）
+ *   text-accent / bg-accent            藍：動作文字、唯一的主要按鈕
+ *   text-alarm                         紅：只給危險操作
+ *   .link-arrow                        藍字＋右箭頭的文字連結
+ *   .readout                           驗證碼數字（等寬數字、細字重）
+ */
 :root {
-  --bg: #E8ECEA;
-  --bg-1: #F4F6F5;
-  --bg-2: #FFFFFF;
-  --fg: #0E1412;
-  --fg-muted: #4F5E58;
-  --fg-dim: #7B8A84;
-  --line: #C9D1CD;
-  --line-strong: #A9B4AE;
-  --grid: rgba(14, 20, 18, 0.07);
-  --halo: rgba(10, 140, 95, 0.10);
-  --phos: #0A8C5F;
-  --phos-ink: #FFFFFF;
-  --phos-glow: rgba(10, 140, 95, 0.25);
-  --alarm: #D63A1B;
-  /* 掃描線只在深色模式出現 */
-  --scan: 0;
+  --bg: #FFFFFF;
+  --bg-1: #F5F5F7;
+  --fg: #1D1D1F;
+  --fg-muted: #6E6E73;
+  --line: #D2D2D7;
+  --accent: #0071E3;
+  --accent-ink: #FFFFFF;
+  --alarm: #E30000;
 }
 
 .dark {
-  --bg: #0B0E11;
-  --bg-1: #11161B;
-  --bg-2: #171D23;
-  --fg: #E6EDEA;
-  --fg-muted: #8A9BA5;
-  --fg-dim: #5C6B74;
-  --line: #263038;
-  --line-strong: #3A4751;
-  --grid: rgba(230, 237, 234, 0.045);
-  --halo: rgba(23, 255, 173, 0.08);
-  --phos: #17FFAD;
-  --phos-ink: #06100C;
-  --phos-glow: rgba(23, 255, 173, 0.35);
-  --alarm: #FF5A36;
-  --scan: 1;
+  --bg: #1C1C1E;
+  --bg-1: #2A2A2D;
+  --fg: #F5F5F7;
+  --fg-muted: #A8A8AE;
+  --line: #424246;
+  --accent: #2997FF;
+  --accent-ink: #FFFFFF;
+  --alarm: #FF453A;
 }
 
 @theme inline {
   --color-surface: var(--bg);
   --color-surface-1: var(--bg-1);
-  --color-surface-2: var(--bg-2);
   --color-ink: var(--fg);
   --color-ink-muted: var(--fg-muted);
-  --color-ink-dim: var(--fg-dim);
   --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
-  --color-phos: var(--phos);
-  --color-phos-ink: var(--phos-ink);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
   --color-alarm: var(--alarm);
 
-  --font-sans: var(--font-wenkai), var(--font-noto-tc), system-ui, sans-serif;
-  --font-body: var(--font-wenkai), var(--font-noto-tc), system-ui, sans-serif;
-  --font-display: var(--font-chakra), var(--font-noto-tc), system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang TC", var(--font-inter-tight), var(--font-noto-tc), "Helvetica Neue", sans-serif;
 }
 
 @layer base {
@@ -82,169 +63,60 @@
   body {
     color: var(--fg);
     background-color: var(--bg);
-    /* 背景三層：頂部一抹磷光、細格線、掃描線（深色才有） */
-    background-image:
-      radial-gradient(70% 45% at 50% 0%, var(--halo) 0%, transparent 70%),
-      linear-gradient(var(--grid) 1px, transparent 1px),
-      linear-gradient(90deg, var(--grid) 1px, transparent 1px),
-      repeating-linear-gradient(0deg, rgba(0, 0, 0, calc(0.13 * var(--scan))) 0 1px, transparent 1px 3px);
-    background-size: 100% 70vh, 32px 32px, 32px 32px, auto 3px;
-    background-repeat: no-repeat, repeat, repeat, repeat;
-    line-height: 1.7;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    font-size: 17px;
+    line-height: 1.47;
+    -webkit-font-smoothing: antialiased;
+    text-wrap: pretty;
+  }
+  /* 深色底上 antialiased 會把字變細，改回預設的次像素渲染 */
+  html.dark body {
+    -webkit-font-smoothing: auto;
+  }
+
+  /* 切換亮暗模式時顏色淡入淡出 */
+  @media (prefers-reduced-motion: no-preference) {
+    body,
+    body * {
+      transition-property: background-color, border-color, color, fill, stroke;
+      transition-duration: 0.3s;
+      transition-timing-function: ease;
+    }
   }
 
   h1, h2, h3, h4 {
-    font-family: var(--font-display);
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    line-height: 1.15;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.1;
   }
 
   ::selection {
-    background: var(--phos);
-    color: var(--phos-ink);
+    background: color-mix(in oklab, var(--accent) 25%, transparent);
   }
 
   :focus-visible {
-    outline: 1px solid var(--phos);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
 }
 
 @layer components {
-  /* 小型技術標籤：全大寫、寬字距，用在區塊編號、欄位名、狀態 */
-  .tech-label {
-    font-family: var(--font-display);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--fg-muted);
+  /* Apple 式的文字連結：藍字 + 右箭頭 */
+  .link-arrow {
+    color: var(--accent);
+    font-weight: 400;
+  }
+  .link-arrow::after {
+    content: " ›";
+    font-weight: 500;
+  }
+  .link-arrow:hover {
+    text-decoration: underline;
   }
 
-  /* 儀表讀數：等寬、等寬數字 */
+  /* 驗證碼：SF 的等寬數字，細字重 */
   .readout {
-    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0.08em;
-  }
-
-  /* 面板：1px 邊框 + 左上、右下兩個磷光角標 */
-  .panel {
-    position: relative;
-    background: var(--bg-1);
-    border: 1px solid var(--line);
-  }
-  .panel::before,
-  .panel::after {
-    content: "";
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    border-color: var(--phos);
-    border-style: solid;
-    pointer-events: none;
-  }
-  .panel::before {
-    top: -1px;
-    left: -1px;
-    border-width: 2px 0 0 2px;
-  }
-  .panel::after {
-    bottom: -1px;
-    right: -1px;
-    border-width: 0 2px 2px 0;
-  }
-
-  /* 狀態燈 */
-  .led {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    flex-shrink: 0;
-    background: var(--phos);
-    box-shadow: 0 0 8px var(--phos-glow);
-  }
-  .led-off {
-    background: var(--fg-dim);
-    box-shadow: none;
-  }
-  .led-alarm {
-    background: var(--alarm);
-    box-shadow: 0 0 8px var(--alarm);
-  }
-
-  /* 分隔線；rule-accent 左邊先來一段磷光 */
-  .rule {
-    height: 1px;
-    background: var(--line);
-  }
-  .rule-accent {
-    height: 1px;
-    background: linear-gradient(90deg, var(--phos) 0 48px, var(--line) 48px);
-  }
-
-  /* 斜線填充，用在空狀態、停用區塊 */
-  .hatch {
-    background-image: repeating-linear-gradient(135deg, var(--line) 0 1px, transparent 1px 8px);
-  }
-
-  /* 磷光發光的文字（讀數用） */
-  .glow {
-    text-shadow: 0 0 18px var(--phos-glow);
-  }
-
-  /*
-   * 載入動畫：整頁只編排這一次。
-   * 把 .boot 加在容器上，直接子元素會依序淡入，之後就不再動。
-   */
-  .boot > * {
-    animation: boot-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  }
-  .boot > :nth-child(1) { animation-delay: 0ms; }
-  .boot > :nth-child(2) { animation-delay: 60ms; }
-  .boot > :nth-child(3) { animation-delay: 120ms; }
-  .boot > :nth-child(4) { animation-delay: 180ms; }
-  .boot > :nth-child(5) { animation-delay: 240ms; }
-  .boot > :nth-child(6) { animation-delay: 300ms; }
-  .boot > :nth-child(7) { animation-delay: 360ms; }
-  .boot > :nth-child(8) { animation-delay: 420ms; }
-  .boot > :nth-child(9) { animation-delay: 480ms; }
-  .boot > :nth-child(10) { animation-delay: 540ms; }
-  .boot > :nth-child(11) { animation-delay: 600ms; }
-  .boot > :nth-child(n + 12) { animation-delay: 660ms; }
-}
-
-@keyframes boot-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* 讀數換碼時閃一下 */
-@keyframes settle {
-  0% {
-    opacity: 0.2;
-    letter-spacing: 0.3em;
-  }
-  100% {
-    opacity: 1;
-    letter-spacing: 0.08em;
-  }
-}
-.settle {
-  animation: settle 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .boot > *,
-  .settle {
-    animation: none;
+    font-weight: 300;
+    letter-spacing: 0.02em;
   }
 }

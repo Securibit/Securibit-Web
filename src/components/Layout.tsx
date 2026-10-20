@@ -32,14 +32,8 @@ const Layout = ({ children }: LayoutData) => {
         {/* 成功訊息用 toast，錯誤一律用要按確定的對話框 */}
         <Toaster
           toastOptions={{
-            style: {
-              background: 'var(--bg-1)',
-              color: 'var(--fg)',
-              border: '1px solid var(--line)',
-              borderRadius: 2,
-              fontFamily: 'var(--font-body)',
-            },
-            success: { iconTheme: { primary: 'var(--phos)', secondary: 'var(--phos-ink)' } },
+            style: { background: 'var(--bg)', color: 'var(--fg)', border: '1px solid var(--line)', borderRadius: 8 },
+            success: { iconTheme: { primary: 'var(--accent)', secondary: 'var(--accent-ink)' } },
             error: { iconTheme: { primary: 'var(--alarm)', secondary: '#fff' } },
           }}
         />

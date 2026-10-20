@@ -31,10 +31,8 @@ const SidebarListItem = (props: SidebarListItemProps) => {
         if (props.link) router.push(props.link);
       }}
       className={cn(
-        "flex w-full items-center gap-3 border-l-2 px-3 py-2.5 text-left font-display text-sm tracking-[0.08em] transition-colors",
-        props.active
-          ? "border-phos bg-phos/10 text-phos"
-          : "border-transparent text-ink-muted hover:bg-ink/5 hover:text-ink"
+        "flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-left text-[17px] transition-colors",
+        props.active ? "bg-surface-1 text-ink" : "text-ink hover:bg-surface-1"
       )}
     >
       <props.icon className="h-5 w-5" />
@@ -75,35 +73,20 @@ const Sidebar = (props: SidebarProps) => {
       onOpenChange={(open) => props.setIsDrawerOpen(open)}
       placement="right"
       size="xs"
-      radius="none"
-      className="border-l border-line bg-surface-1 text-ink"
+      className="bg-surface text-ink"
     >
       <DrawerContent>
-        <DrawerHeader className="flex flex-col gap-1 border-b border-line">
-          <span className="font-display text-sm font-semibold tracking-[0.22em]">SECURIBIT</span>
-          {user ? (
-            <span className="flex items-center gap-2 text-sm font-normal text-ink-muted">
-              <span className="led" />
-              {profile?.name || user.displayName}
-            </span>
-          ) : (
-            <span className="tech-label">TOTP 2FA</span>
-          )}
+        <DrawerHeader className="flex flex-col gap-0.5">
+          <span className="text-[17px] font-semibold">Securibit</span>
+          {user && <span className="text-[15px] font-normal text-ink-muted">{profile?.name || user.displayName}</span>}
         </DrawerHeader>
-        <DrawerBody className="gap-0.5 px-2 py-3">
+        <DrawerBody className="gap-0.5 px-3">
           {links.map((item) => (
-            <SidebarListItem
-              key={item.link}
-              {...item}
-              active={isActive(item.link)}
-              onClick={closeDrawer}
-            />
+            <SidebarListItem key={item.link} {...item} active={isActive(item.link)} onClick={closeDrawer} />
           ))}
         </DrawerBody>
-        <DrawerFooter className="flex flex-col items-stretch gap-3 border-t border-line px-2">
-          <div className="px-3">
-            <Themes showLabel />
-          </div>
+        <DrawerFooter className="flex flex-col items-stretch gap-1 border-t border-line px-3">
+          <Themes showLabel />
           {user ? (
             <SidebarListItem
               icon={ArrowRightStartOnRectangleIcon}
