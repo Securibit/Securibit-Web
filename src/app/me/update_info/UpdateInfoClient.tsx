@@ -3,9 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "nextjs-toploader/app";
 import toast from "react-hot-toast";
-import { Button, Input } from "@heroui/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faRotate, faTrashCan } from "@fortawesome/free-solid-svg-icons";
+import { Input } from "@heroui/react";
 import useAuth from "@/components/auth/useAuth";
 import PageContent from "@/components/layout/PageContent";
 import PageHeader from "@/components/layout/PageHeader";
@@ -34,7 +32,7 @@ const isUrl = (value: string) => {
   }
 };
 
-// 管理帳戶：每個區塊左邊 5 欄說明、右邊 7 欄表單，手機堆疊
+// 帳戶設定：像 iOS 設定的分組列表，一列一個欄位，右上角「儲存」
 const UpdateInfoClient = () => {
   const { user, profile, refresh } = useAuth();
   const router = useRouter();
@@ -49,6 +47,7 @@ const UpdateInfoClient = () => {
   const nameInvalid = !form.name.trim();
   const photoInvalid = !isUrl(form.photoURL);
   const bgInvalid = !isUrl(form.bgPhotoURL);
+  const canSave = !saving && !nameInvalid && !photoInvalid && !bgInvalid;
 
   // 更新用戶資料
   const handleSubmit = async () => {
@@ -65,7 +64,7 @@ const UpdateInfoClient = () => {
 
     if (result.success) {
       await refresh();
-      toast.success('修改成功！', { position: 'top-right' });
+      toast.success('已儲存', { position: 'top-right' });
     } else {
       showError('修改失敗', result.message);
     }
@@ -79,7 +78,7 @@ const UpdateInfoClient = () => {
     try {
       await syncGoogleUserData(user);
       setForm(toForm(await refresh()));
-      toast.success('同步 Google 資料成功！', { position: 'top-right' });
+      toast.success('已同步 Google 資料', { position: 'top-right' });
     } catch (error) {
       showError('同步 Google 資料失敗', (error as Error).message);
     } finally {
@@ -92,144 +91,130 @@ const UpdateInfoClient = () => {
     try {
       await deleteAccount();
       router.push('/');
-      toast.success('刪除帳號成功！', { position: 'top-right' });
+      toast.success('已刪除帳戶', { position: 'top-right' });
     } catch (error) {
-      showError('刪除帳號失敗', (error as Error).message);
+      showError('刪除帳戶失敗', (error as Error).message);
     }
   };
 
   return (
-    <PageContent className="max-w-4xl">
+    <PageContent className="max-w-2xl">
       <PageHeader
-        index="00 // ACCOUNT"
-        title="管理帳戶"
-        subtitle="修改顯示在個人頁面的資料"
+        title="帳戶設定"
         right={
-          <Button
-            variant="bordered"
-            className="font-display tracking-[0.08em]"
-            startContent={<FontAwesomeIcon icon={faArrowLeft} className="w-3.5" />}
-            onPress={() => router.push('/me/MyPage')}
+          <button
+            type="submit"
+            form="profile-form"
+            className="text-[17px] font-semibold text-accent hover:underline disabled:text-ink-muted disabled:no-underline"
+            disabled={!canSave}
           >
-            回到個人頁面
-          </Button>
+            {saving ? '儲存中…' : '儲存'}
+          </button>
         }
       />
 
-      <div className="boot">
-        {/* 01 基本資料 */}
-        <section className="grid grid-cols-12 gap-6 pb-10">
-          <div className="col-span-12 md:col-span-5">
-            <p className="tech-label">01 // PROFILE</p>
-            <h2 className="mt-2 font-display text-xl font-bold text-ink">基本資料</h2>
-            <p className="mt-2 max-w-xs text-sm text-ink-muted">
-              名稱與大頭照會顯示在導覽列、個人頁面與群組成員列表。Email 來自 Google 帳號，無法修改。
-            </p>
-          </div>
-
+      <div className="flex flex-col gap-8">
+        {/* 個人資料 */}
+        <section>
+          <h2 className="mb-2 px-5 text-[13px] font-normal text-ink-muted">個人資料</h2>
           <form
-            className="col-span-12 flex flex-col gap-4 border border-line bg-surface-1 p-4 sm:p-6 md:col-span-7"
+            id="profile-form"
+            className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface"
             onSubmit={(e) => {
               e.preventDefault();
               handleSubmit();
             }}
           >
-            <Input
-              variant="bordered"
-              label="電子郵件"
-              description="Email 來自 Google 帳號，無法修改"
-              value={profile?.email ?? ''}
-              classNames={{ input: 'font-mono' }}
-              isDisabled
-            />
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex items-center justify-between gap-6 px-5 py-3">
+              <span className="shrink-0 text-[17px]">電子郵件</span>
+              <span className="min-w-0 truncate text-right text-[17px] text-ink-muted">{profile?.email || '無'}</span>
+            </div>
+            <div className="px-5 py-4">
               <Input
-                variant="bordered"
-                label="姓名"
+                variant="flat"
+                labelPlacement="outside"
+                size="lg"
+                label="名稱"
                 isRequired
                 value={form.name}
                 onValueChange={(name) => set({ name })}
                 isInvalid={nameInvalid}
-                errorMessage="請輸入姓名"
+                errorMessage="請輸入名稱"
               />
+            </div>
+            <div className="px-5 py-4">
               <Input
-                variant="bordered"
-                label="電話號碼"
+                variant="flat"
+                labelPlacement="outside"
+                size="lg"
+                label="大頭照網址"
+                type="url"
+                placeholder="https://"
+                value={form.photoURL}
+                onValueChange={(photoURL) => set({ photoURL })}
+                isInvalid={photoInvalid}
+                errorMessage="請輸入 http(s):// 開頭的網址"
+              />
+            </div>
+            <div className="px-5 py-4">
+              <Input
+                variant="flat"
+                labelPlacement="outside"
+                size="lg"
+                label="背景圖網址"
+                type="url"
+                placeholder="https://"
+                value={form.bgPhotoURL}
+                onValueChange={(bgPhotoURL) => set({ bgPhotoURL })}
+                isInvalid={bgInvalid}
+                errorMessage="請輸入 http(s):// 開頭的網址"
+              />
+            </div>
+            <div className="px-5 py-4">
+              <Input
+                variant="flat"
+                labelPlacement="outside"
+                size="lg"
+                label="電話"
                 type="tel"
                 placeholder="0912-345-678"
                 value={form.phoneNumber}
                 onValueChange={(phoneNumber) => set({ phoneNumber })}
-                classNames={{ input: 'font-mono' }}
+                classNames={{ input: 'tabular-nums' }}
               />
             </div>
-            <Input
-              variant="bordered"
-              label="大頭照網址"
-              type="url"
-              placeholder="https://..."
-              value={form.photoURL}
-              onValueChange={(photoURL) => set({ photoURL })}
-              isInvalid={photoInvalid}
-              errorMessage="請輸入 http(s):// 開頭的網址"
-              classNames={{ input: 'font-mono' }}
-            />
-            <Input
-              variant="bordered"
-              label="背景圖片網址"
-              type="url"
-              placeholder="https://..."
-              value={form.bgPhotoURL}
-              onValueChange={(bgPhotoURL) => set({ bgPhotoURL })}
-              isInvalid={bgInvalid}
-              errorMessage="請輸入 http(s):// 開頭的網址"
-              classNames={{ input: 'font-mono' }}
-            />
-
-            <div className="flex flex-wrap gap-2 border-t border-line pt-4">
-              <Button type="submit" color="primary" className="font-display tracking-[0.08em]" isLoading={saving}>
-                儲存
-              </Button>
-              <Button
-                variant="bordered"
-                className="font-display tracking-[0.08em]"
-                startContent={!syncing && <FontAwesomeIcon icon={faRotate} className="w-3.5" />}
-                isLoading={syncing}
-                onPress={handleSync}
-              >
-                同步 Google 資料
-              </Button>
-            </div>
           </form>
+          <p className="mt-2 px-5 text-[13px] text-ink-muted">
+            名稱與大頭照會顯示在導覽列、個人頁面與群組成員列表。電子郵件來自 Google 帳號，無法修改
+          </p>
         </section>
 
         <UsernameSettings />
 
         <VaultSettings />
 
-        {/* 04 危險區 */}
-        <section className="grid grid-cols-12 gap-6 border-t border-line py-10">
-          <div className="col-span-12 md:col-span-5">
-            <p className="tech-label flex items-center gap-2 text-alarm">
-              <span className="led led-alarm" aria-hidden />
-              04 // DANGER ZONE
-            </p>
-            <h2 className="mt-2 font-display text-xl font-bold text-ink">刪除帳戶</h2>
-            <p className="mt-2 max-w-xs text-sm text-ink-muted">
-              帳戶與所有驗證碼金鑰會永久刪除。刪除前請確認已在各服務關閉兩步驟驗證或改用其他驗證器。
-            </p>
-          </div>
-
-          <div className="hatch col-span-12 flex items-center border border-alarm p-4 sm:p-6 md:col-span-7">
-            <Button
-              color="danger"
-              variant="bordered"
-              className="bg-surface-1 font-display tracking-[0.08em]"
-              startContent={<FontAwesomeIcon icon={faTrashCan} className="w-3.5" />}
-              onPress={() => setConfirmDeleteOpen(true)}
+        {/* 同步與刪除 */}
+        <section>
+          <div className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
+            <button
+              type="button"
+              className="w-full py-3 text-center text-[17px] text-accent hover:bg-surface-1 disabled:text-ink-muted"
+              disabled={syncing}
+              onClick={handleSync}
+            >
+              {syncing ? '同步中…' : '同步 Google 資料'}
+            </button>
+            <button
+              type="button"
+              className="w-full py-3 text-center text-[17px] text-alarm hover:bg-surface-1"
+              onClick={() => setConfirmDeleteOpen(true)}
             >
               刪除帳戶
-            </Button>
+            </button>
           </div>
+          <p className="mt-2 px-5 text-[13px] text-ink-muted">
+            同步會用 Google 帳號的名稱與大頭照蓋掉目前的資料，背景圖與電話保留。刪除帳戶會一併永久刪除所有驗證碼金鑰，刪除前請確認已在各服務關閉兩步驟驗證或改用其他驗證器
+          </p>
         </section>
       </div>
 

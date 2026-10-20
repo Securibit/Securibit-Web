@@ -31,35 +31,21 @@ const sections = [
   },
 ];
 
-// 條款：左邊標題欄，右邊一條一條的規格列，編號用方形等寬標籤
+// 免責聲明：條款是一個分組列表，每條一列，標題粗、內容灰
 const Disclaimer = () => {
   return (
-    <PageContent className="max-w-4xl">
-      <PageHeader index="LEGAL // DISCLAIMER" title="免責聲明" subtitle={SEO.Disclaimer.description} />
+    <PageContent className="max-w-2xl">
+      <PageHeader title="免責聲明" subtitle="繼續使用本網站，即表示您已閱讀並同意以下各條" />
 
-      <section className="boot grid grid-cols-12 gap-6">
-        <div className="col-span-12 md:col-span-4">
-          <p className="tech-label">01 // TERMS</p>
-          <h2 className="mt-2 font-display text-2xl font-bold text-ink">使用本服務前</h2>
-          <p className="mt-3 max-w-xs text-sm text-ink-muted">
-            繼續使用本網站，即表示您已閱讀並同意以下各條。
-          </p>
-        </div>
-
-        <ol className="col-span-12 border-t border-line md:col-span-8">
-          {sections.map((section, index) => (
-            <li
-              key={section.title}
-              className="grid grid-cols-[3rem_1fr] gap-x-4 gap-y-2 border-b border-line py-5"
-            >
-              <span className="inline-flex h-7 min-w-7 items-center justify-center justify-self-start self-start border border-line-strong px-1.5 font-mono text-xs tracking-[0.08em] text-ink">
-                {String(index + 1).padStart(2, '0')}
-              </span>
-              <h3 className="font-display text-lg font-semibold text-ink">{section.title}</h3>
-              <p className="col-start-2 leading-relaxed text-ink-muted">{section.text}</p>
-            </li>
+      <section>
+        <div className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
+          {sections.map((section) => (
+            <div key={section.title} className="px-5 py-4">
+              <h2 className="text-[17px] font-semibold">{section.title}</h2>
+              <p className="mt-1 text-[15px] text-ink-muted">{section.text}</p>
+            </div>
           ))}
-        </ol>
+        </div>
       </section>
     </PageContent>
   );

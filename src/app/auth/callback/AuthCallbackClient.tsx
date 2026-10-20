@@ -2,21 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 import Spinner from "@/components/ui/Loading/Spinner";
 import { supabase } from "@/config/supabase";
 import { AUTH_CHANNEL } from "@/lib/totp/account";
 import { AuthPopupMessage } from "@/types/Auth/AuthPopup";
 
 type Status = 'loading' | 'done' | 'cancelled' | 'error';
-
-// 面板頂列的狀態字
-const STATUS_LABEL: Record<Status, string> = {
-  loading: 'PENDING',
-  done: 'OK',
-  cancelled: 'CANCELLED',
-  error: 'ERROR',
-};
 
 // 讀網址上的 OAuth 錯誤（Google 取消或設定錯誤時會帶 error / error_description）
 const readUrlError = () => {
@@ -26,10 +17,6 @@ const readUrlError = () => {
   const description = query.get('error_description') ?? hash.get('error_description');
   return code ? { code, description: description ?? code } : null;
 };
-
-// 方形的連結按鈕（這頁沒有 HeroUI Provider 以外的外框，自己排）
-const linkClass =
-  "inline-flex items-center border border-line-strong px-4 py-2 font-display text-sm tracking-[0.12em] text-ink transition-colors hover:border-phos hover:text-phos";
 
 /**
  * 彈出視窗登入的落地頁：Supabase client 初始化時會自動處理網址上的登入資訊（detectSessionInUrl），
@@ -84,50 +71,33 @@ const AuthCallbackClient = () => {
     return () => channel.close();
   }, []);
 
+  // 這頁沒有導覽列，只有置中的一張卡：狀態文字加 Spinner 或連結
   return (
-    <div className="flex min-h-screen items-center justify-center p-6 text-ink">
-      <div className="panel boot w-full max-w-sm">
-        {/* 頂列：這頁是什麼、目前狀態 */}
-        <div className="flex items-center justify-between border-b border-line px-5 py-3">
-          <p className="tech-label">AUTH // CALLBACK</p>
-          <p className={cn("tech-label flex items-center gap-2", status === 'error' && "text-alarm")}>
-            <span
-              className={cn(
-                "led",
-                status === 'cancelled' && "led-off",
-                status === 'error' && "led-alarm"
-              )}
-              aria-hidden
-            />
-            {STATUS_LABEL[status]}
-          </p>
-        </div>
+    <div className="flex min-h-screen items-center justify-center bg-surface p-6 text-ink">
+      <div className="w-full max-w-sm rounded-[18px] border border-line/70 bg-surface px-6 py-8 text-center">
+        {status === 'loading' && <Spinner label="登入中…" />}
 
-        <div className="p-6 text-center">
-          {status === 'loading' && <Spinner label="登入中…" />}
+        {status === 'done' && (
+          <>
+            <p className="text-[22px] font-semibold">登入完成</p>
+            <p className="mt-2 text-[15px] text-ink-muted">可以關閉這個視窗，回到原本的頁面</p>
+            <Link href="/code" className="link-arrow mt-5 inline-block text-[17px]">前往驗證碼</Link>
+          </>
+        )}
 
-          {status === 'done' && (
-            <div>
-              <p className="font-display text-xl font-bold text-ink">登入完成</p>
-              <p className="mt-2 text-sm text-ink-muted">可以關閉這個視窗，回到原本的頁面。</p>
-              <Link href="/code" className={cn(linkClass, "mt-5")}>前往驗證碼</Link>
-            </div>
-          )}
+        {status === 'cancelled' && (
+          <p className="text-[17px] text-ink-muted">已取消登入，可以關閉這個視窗</p>
+        )}
 
-          {status === 'cancelled' && (
-            <p className="text-sm text-ink-muted">已取消登入，可以關閉這個視窗。</p>
-          )}
-
-          {status === 'error' && (
-            <div>
-              <p className="font-display text-xl font-bold text-alarm">登入失敗</p>
-              <p className="mt-3 break-words border border-line bg-surface px-3 py-2 text-left font-mono text-xs text-ink-muted">
-                {error}
-              </p>
-              <Link href="/" className={cn(linkClass, "mt-5")}>回到首頁</Link>
-            </div>
-          )}
-        </div>
+        {status === 'error' && (
+          <>
+            <p className="text-[22px] font-semibold text-alarm">登入失敗</p>
+            <p className="mt-3 break-words rounded-lg bg-surface-1 px-3 py-2 text-left text-[13px] text-ink-muted">
+              {error}
+            </p>
+            <Link href="/" className="link-arrow mt-5 inline-block text-[17px]">回到首頁</Link>
+          </>
+        )}
       </div>
     </div>
   );

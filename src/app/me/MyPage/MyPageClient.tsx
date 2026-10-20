@@ -10,15 +10,12 @@ const MyPageClient = () => {
   const { profile, siteRoles } = useAuth();
 
   return (
-    <PageContent className="max-w-3xl">
-      <PageHeader index="00 // PROFILE" title="個人頁面" subtitle="你的帳戶資料與登入紀錄" />
+    <PageContent className="max-w-2xl">
+      <PageHeader title="個人頁面" />
       {profile ? (
         <PersonalCard profile={profile} siteRoles={siteRoles} />
       ) : (
-        <div className="hatch border border-line p-10 text-center">
-          <p className="tech-label">NO PROFILE</p>
-          <p className="mt-2 text-ink-muted">找不到使用者資料，請重新登入。</p>
-        </div>
+        <div className="rounded-[18px] bg-surface-1 px-6 py-12 text-center text-ink-muted">找不到使用者資料，請重新登入</div>
       )}
     </PageContent>
   );

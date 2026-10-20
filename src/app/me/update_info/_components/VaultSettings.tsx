@@ -2,13 +2,10 @@
 
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { Button, Checkbox, Input } from "@heroui/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLock } from "@fortawesome/free-solid-svg-icons";
+import { Checkbox, Input } from "@heroui/react";
 import Spinner from "@/components/ui/Loading/Spinner";
 import useVault from "@/components/vault/useVault";
 import VaultUnlock from "@/components/vault/VaultUnlock";
-import { cn } from "@/lib/utils";
 import { showError } from "@/lib/errorDialog";
 import { VaultStatus } from "@/types/Vault/Vault";
 
@@ -16,15 +13,20 @@ const MIN_LENGTH = 8;
 
 type Mode = "idle" | "change" | "disable";
 
-// 左欄狀態燈旁的文字
+// 「加密」那一列右邊的狀態文字
 const STATUS_TEXT: Record<VaultStatus, string> = {
-  loading: "CHECKING",
-  off: "OFF",
-  locked: "LOCKED",
-  unlocked: "UNLOCKED",
+  loading: "檢查中…",
+  off: "未啟用",
+  locked: "已啟用",
+  unlocked: "已啟用",
 };
 
-// 管理帳戶頁的「金鑰加密」區塊：啟用、改密碼、停用、立即鎖定
+// 列裡的文字按鈕：藍字是動作、紅字是停用，停用時變灰
+const actionClass = "w-full py-3 text-center text-[17px] text-accent hover:bg-surface-1 disabled:text-ink-muted disabled:hover:bg-transparent";
+const dangerClass = "w-full py-3 text-center text-[17px] text-alarm hover:bg-surface-1 disabled:text-ink-muted disabled:hover:bg-transparent";
+const cancelClass = "w-full py-3 text-center text-[17px] text-ink-muted hover:bg-surface-1";
+
+// 帳戶設定頁的「金鑰加密」群組：啟用、改密碼、停用、立即鎖定
 const VaultSettings = () => {
   const vault = useVault();
   const [mode, setMode] = useState<Mode>("idle");
@@ -65,177 +67,144 @@ const VaultSettings = () => {
 
   const newPassphraseFields = (
     <>
-      <Input
-        variant="bordered"
-        label={mode === "change" ? "新密碼" : "加密密碼"}
-        type="password"
-        autoComplete="new-password"
-        value={passphrase}
-        onValueChange={setPassphrase}
-        isInvalid={tooShort}
-        errorMessage={`至少 ${MIN_LENGTH} 個字元`}
-        description="不是 Google 帳號密碼，是另外設定、只有你知道的密碼"
-      />
-      <Input
-        variant="bordered"
-        label="再輸入一次"
-        type="password"
-        autoComplete="new-password"
-        value={confirm}
-        onValueChange={setConfirm}
-        isInvalid={mismatch}
-        errorMessage="兩次輸入的密碼不一樣"
-      />
+      <div className="px-5 py-4">
+        <Input
+          variant="flat"
+          labelPlacement="outside"
+          size="lg"
+          label={mode === "change" ? "新密碼" : "加密密碼"}
+          type="password"
+          autoComplete="new-password"
+          value={passphrase}
+          onValueChange={setPassphrase}
+          isInvalid={tooShort}
+          errorMessage={`至少 ${MIN_LENGTH} 個字元`}
+          description="不是 Google 帳號密碼，是另外設定、只有你知道的密碼"
+        />
+      </div>
+      <div className="px-5 py-4">
+        <Input
+          variant="flat"
+          labelPlacement="outside"
+          size="lg"
+          label="再輸入一次"
+          type="password"
+          autoComplete="new-password"
+          value={confirm}
+          onValueChange={setConfirm}
+          isInvalid={mismatch}
+          errorMessage="兩次輸入的密碼不一樣"
+        />
+      </div>
     </>
   );
 
   return (
-    <section className="grid grid-cols-12 gap-6 border-t border-line py-10">
-      <div className="col-span-12 md:col-span-5">
-        <p className="tech-label">03 // VAULT</p>
-        <h2 className="mt-2 font-display text-xl font-bold text-ink">金鑰加密</h2>
-        <p className="mt-2 max-w-xs text-sm text-ink-muted">
-          啟用後，驗證碼的金鑰會先在你的瀏覽器用密碼加密才存到伺服器，資料庫裡只剩密文，連網站管理者也看不到。
-          名稱與類別不會加密。每次在新的裝置或登出後都要輸入密碼。
-          啟用後，網站管理員也無法查看你的金鑰；分享到群組的驗證碼不會加密。
-        </p>
-        <p className="tech-label mt-4 flex items-center gap-2">
-          <span
-            className={cn(
-              "led",
-              vault.status !== "unlocked" && "led-off"
-            )}
-            aria-hidden
-          />
-          VAULT // {STATUS_TEXT[vault.status]}
-        </p>
-      </div>
+    <section>
+      <h2 className="mb-2 px-5 text-[13px] font-normal text-ink-muted">金鑰加密</h2>
+      <div className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
+        {/* 狀態列 */}
+        <div className="flex items-center justify-between gap-6 px-5 py-3">
+          <span className="text-[17px]">加密</span>
+          <span className="text-[17px] text-ink-muted">{STATUS_TEXT[vault.status]}</span>
+        </div>
 
-      <div className="col-span-12 border border-line bg-surface-1 p-4 sm:p-6 md:col-span-7">
-        {vault.status === "loading" && <Spinner label="確認加密狀態…" />}
+        {vault.status === "loading" && (
+          <div className="flex justify-center px-5 py-4">
+            <Spinner />
+          </div>
+        )}
 
         {vault.status === "off" && (
           <form
-            className="flex flex-col gap-4"
+            className="divide-y divide-line/60"
             onSubmit={(e) => {
               e.preventDefault();
               if (!newPassphraseOk || !understood) return;
-              run(() => vault.enable(passphrase, remember), "已啟用金鑰加密！", "啟用加密失敗");
+              run(() => vault.enable(passphrase, remember), "已啟用金鑰加密", "啟用加密失敗");
             }}
           >
             {newPassphraseFields}
-            <Checkbox size="sm" isSelected={remember} onValueChange={setRemember}>
-              在這台裝置記住（登出或按「立即鎖定」就會忘記）
-            </Checkbox>
-            <Checkbox size="sm" color="danger" isSelected={understood} onValueChange={setUnderstood}>
-              我了解忘記密碼就無法救回金鑰，只能清空重新綁定
-            </Checkbox>
-            <div className="border-t border-line pt-4">
-              <Button
-                type="submit"
-                color="primary"
-                className="font-display tracking-[0.08em]"
-                isLoading={pending}
-                isDisabled={!newPassphraseOk || !understood}
-              >
-                啟用加密
-              </Button>
+            <div className="flex flex-col gap-3 px-5 py-4">
+              <Checkbox size="sm" isSelected={remember} onValueChange={setRemember} classNames={{ label: "text-[15px]" }}>
+                在這台裝置記住（登出或按「立即鎖定」就會忘記）
+              </Checkbox>
+              <Checkbox size="sm" color="danger" isSelected={understood} onValueChange={setUnderstood} classNames={{ label: "text-[15px]" }}>
+                我了解忘記密碼就無法救回金鑰，只能清空重新綁定
+              </Checkbox>
             </div>
+            <button type="submit" className={actionClass} disabled={pending || !newPassphraseOk || !understood}>
+              {pending ? "啟用中…" : "啟用加密"}
+            </button>
           </form>
         )}
 
         {vault.status === "locked" && (
-          <>
-            <p className="mb-4 flex items-center gap-2 text-sm text-ink">
-              <span className="led led-off" aria-hidden />
-              已啟用加密，目前是鎖定狀態。解鎖後才能修改設定。
-            </p>
+          <div className="px-5 py-4">
+            <p className="mb-3 text-[15px] text-ink-muted">目前是鎖定狀態，解鎖後才能修改設定</p>
             <VaultUnlock compact />
-          </>
+          </div>
         )}
 
         {vault.status === "unlocked" && mode === "idle" && (
-          <div className="flex flex-col gap-4">
-            <p className="flex items-center gap-2 text-sm text-phos">
-              <span className="led" aria-hidden />
-              已啟用加密，目前已解鎖。
-            </p>
-            <div className="flex flex-wrap gap-2 border-t border-line pt-4">
-              <Button
-                variant="bordered"
-                className="font-display tracking-[0.08em]"
-                startContent={<FontAwesomeIcon icon={faLock} className="w-3.5" />}
-                onPress={vault.lock}
-              >
-                立即鎖定
-              </Button>
-              <Button variant="bordered" className="font-display tracking-[0.08em]" onPress={() => resetForm("change")}>
-                更改密碼
-              </Button>
-              <Button
-                variant="bordered"
-                color="danger"
-                className="font-display tracking-[0.08em]"
-                onPress={() => resetForm("disable")}
-              >
-                停用加密
-              </Button>
-            </div>
-          </div>
+          <>
+            <button type="button" className={actionClass} onClick={vault.lock}>
+              立即鎖定
+            </button>
+            <button type="button" className={actionClass} onClick={() => resetForm("change")}>
+              更改密碼
+            </button>
+            <button type="button" className={dangerClass} onClick={() => resetForm("disable")}>
+              停用加密
+            </button>
+          </>
         )}
 
         {vault.status === "unlocked" && mode !== "idle" && (
           <form
-            className="flex flex-col gap-4"
+            className="divide-y divide-line/60"
             onSubmit={(e) => {
               e.preventDefault();
               if (!current) return;
               if (mode === "change") {
                 if (!newPassphraseOk) return;
-                run(() => vault.changePassphrase(current, passphrase), "已更改加密密碼！", "更改密碼失敗");
+                run(() => vault.changePassphrase(current, passphrase), "已更改加密密碼", "更改密碼失敗");
               } else {
                 run(() => vault.disable(current), "已停用金鑰加密", "停用加密失敗");
               }
             }}
           >
-            <p className="tech-label">{mode === "change" ? "CHANGE PASSPHRASE" : "DISABLE VAULT"}</p>
-            <Input
-              variant="bordered"
-              label="目前的密碼"
-              type="password"
-              autoComplete="current-password"
-              value={current}
-              onValueChange={setCurrent}
-            />
-            {mode === "change" && newPassphraseFields}
-            {mode === "disable" && (
-              <p className="flex items-center gap-2 text-sm text-alarm">
-                <span className="led led-alarm" aria-hidden />
-                停用後金鑰會改回明文存放在伺服器。
-              </p>
-            )}
-            <div className="flex gap-2 border-t border-line pt-4">
-              <Button
-                variant="bordered"
-                className="font-display tracking-[0.08em]"
-                onPress={() => resetForm()}
-                isDisabled={pending}
-              >
-                取消
-              </Button>
-              <Button
-                type="submit"
-                color={mode === "disable" ? "danger" : "primary"}
-                className="font-display tracking-[0.08em]"
-                isLoading={pending}
-                isDisabled={!current || (mode === "change" && !newPassphraseOk)}
-              >
-                {mode === "change" ? "更改密碼" : "停用加密"}
-              </Button>
+            <div className="px-5 py-4">
+              <Input
+                variant="flat"
+                labelPlacement="outside"
+                size="lg"
+                label="目前的密碼"
+                type="password"
+                autoComplete="current-password"
+                value={current}
+                onValueChange={setCurrent}
+                description={mode === "disable" ? "停用後金鑰會改回明文存放在伺服器" : undefined}
+              />
             </div>
+            {mode === "change" && newPassphraseFields}
+            <button
+              type="submit"
+              className={mode === "disable" ? dangerClass : actionClass}
+              disabled={pending || !current || (mode === "change" && !newPassphraseOk)}
+            >
+              {pending ? "處理中…" : mode === "change" ? "更改密碼" : "停用加密"}
+            </button>
+            <button type="button" className={cancelClass} onClick={() => resetForm()} disabled={pending}>
+              取消
+            </button>
           </form>
         )}
       </div>
+      <p className="mt-2 px-5 text-[13px] text-ink-muted">
+        啟用後，驗證碼的金鑰會先在你的瀏覽器用密碼加密才存到伺服器，資料庫裡只剩密文，網站管理員也看不到。
+        名稱與類別不會加密，分享到群組的驗證碼也不會加密。每次在新的裝置或登出後都要輸入密碼
+      </p>
     </section>
   );
 };
