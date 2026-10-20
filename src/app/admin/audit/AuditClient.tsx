@@ -19,8 +19,8 @@ const AuditClient = () => {
   }
 
   return (
-    <div className="boot">
-      <PageHeader index="04 // AUDIT LOG" title="操作紀錄" subtitle="全站的身分組、使用者與 2FA 相關操作" />
+    <div>
+      <PageHeader title="操作紀錄" subtitle="全站的身分組、使用者與 2FA 相關操作" />
       <AuditLogList load={loadLog} />
     </div>
   );

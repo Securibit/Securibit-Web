@@ -73,30 +73,22 @@ const AuditLogList = (props: AuditLogListProps) => {
   if (logs === null) return <Spinner />;
 
   if (logs.length === 0) {
-    return (
-      <div className="hatch border border-line p-10 text-center">
-        <p className="tech-label">NO DATA</p>
-        <p className="mt-2 text-ink-muted">還沒有任何紀錄</p>
-      </div>
-    );
+    return <div className="rounded-[18px] bg-surface-1 px-6 py-12 text-center text-ink-muted">還沒有任何紀錄</div>;
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <ul className="border-t border-line">
+      <ul className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
         {logs.map((log) => {
           const target = targetText(log);
           return (
-            <li
-              key={log.id}
-              className="grid gap-x-4 gap-y-1 border-b border-line py-3 transition-colors hover:bg-ink/5 sm:grid-cols-[10.5rem_12rem_1fr] sm:items-center"
-            >
-              <time dateTime={log.created_at} className="font-mono text-xs tabular-nums text-ink-dim">
+            <li key={log.id} className="grid gap-x-4 gap-y-1 px-5 py-3 sm:grid-cols-[9.5rem_11rem_1fr] sm:items-center">
+              <time dateTime={log.created_at} className="text-[13px] tabular-nums text-ink-muted">
                 {formatDateTime(log.created_at)}
               </time>
               <UserChip user={log.actor} size="sm" className="min-w-0" />
-              <p className="min-w-0 text-sm">
-                <span className="font-display font-medium tracking-wide text-ink-muted">{auditActionText(log.action)}</span>
+              <p className="min-w-0 text-[15px]">
+                <span className="text-ink-muted">{auditActionText(log.action)}</span>
                 {target && <span className="ml-2 break-all text-ink">{target}</span>}
               </p>
             </li>
@@ -104,12 +96,7 @@ const AuditLogList = (props: AuditLogListProps) => {
         })}
       </ul>
       {hasMore && (
-        <Button
-          variant="bordered"
-          className="self-center font-display tracking-[0.08em]"
-          onPress={loadMore}
-          isLoading={loadingMore}
-        >
+        <Button variant="light" color="primary" radius="full" className="self-center text-[17px]" onPress={loadMore} isLoading={loadingMore}>
           載入更多
         </Button>
       )}

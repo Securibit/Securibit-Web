@@ -50,20 +50,16 @@ const RolesClient = () => {
   }, [load, refresh]);
 
   return (
-    <div className="boot">
+    <div>
       <PageHeader
-        index="02 // ROLES"
         title="身分組"
-        subtitle={canManage ? "建立、編輯身分組並調整順序" : "你只能查看，需要「管理身分組」權限才能修改"}
+        subtitle={canManage ? "身分組越上面越高，權限會合併計算" : "你只能查看，需要「管理身分組」權限才能修改"}
       />
 
-      <div className="mb-6 border border-line bg-surface-1 p-4 text-sm text-ink-muted">
-        <p className="tech-label mb-2">NOTE</p>
-        <div className="space-y-1">
-          <p>全站身分組決定每個人在整個網站（後台、建立群組等）能做什麼，和群組裡的身分組是分開的。一個人可以有多個身分組，權限會合併計算；每個人都有 @everyone。</p>
-          <p>身分組越上面越高。除了「管理員」以外，你只能編輯、刪除、指派比自己最高身分組還低的身分組，而且只能開啟自己也有的權限。</p>
-        </div>
-      </div>
+      <p className="mb-6 text-[13px] text-ink-muted">
+        全站身分組決定每個人在整個網站（後台、建立群組等）能做什麼，和群組裡的身分組是分開的；每個人都有 @everyone。
+        除了「管理員」以外，只能編輯、刪除、指派比自己最高身分組還低的身分組，而且只能開啟自己也有的權限。
+      </p>
 
       {roles === undefined ? (
         <Spinner block label="載入身分組…" />

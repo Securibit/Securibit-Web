@@ -2,7 +2,7 @@ import { faClockRotateLeft, faGauge, faPeopleGroup, faShieldHalved, faUsers } fr
 import { SITE } from "@/lib/permissions/bits";
 import { AdminNavItem } from "@/types/Admin/AdminNav";
 
-// 後台的各個區塊：導覽列與總覽頁的入口卡片共用
+// 後台的各個區塊：側欄與總覽頁的入口共用
 export const ADMIN_SECTIONS: AdminNavItem[] = [
   {
     href: "/admin",
@@ -35,7 +35,7 @@ export const ADMIN_SECTIONS: AdminNavItem[] = [
   },
   {
     href: "/admin/audit",
-    text: "紀錄",
+    text: "操作紀錄",
     description: "全站操作紀錄",
     icon: faClockRotateLeft,
     permission: SITE.VIEW_AUDIT_LOG,

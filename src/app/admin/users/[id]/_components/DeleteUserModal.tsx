@@ -25,22 +25,15 @@ const DeleteUserModal = (props: DeleteUserModalProps) => {
       showError("刪除使用者失敗", result.message);
       return;
     }
-    toast.success("已刪除使用者！", { position: "top-right" });
+    toast.success("已刪除使用者", { position: "top-right" });
     props.onDeleted();
   };
 
   return (
-    <Modal
-      isOpen
-      onOpenChange={(open) => !open && !pending && props.onClose()}
-      className="border border-line bg-surface-1 text-ink"
-    >
+    <Modal isOpen onOpenChange={(open) => !open && !pending && props.onClose()} className="bg-surface text-ink">
       <ModalContent>
-        <ModalHeader className="flex items-center gap-3 border-b border-line font-display tracking-wide">
-          <span className="led led-alarm" aria-hidden />
-          刪除使用者
-        </ModalHeader>
-        <ModalBody className="py-5 font-normal text-ink-muted">
+        <ModalHeader>刪除使用者</ModalHeader>
+        <ModalBody className="text-ink-muted">
           <p>
             確定要刪除「{user.name || user.email}」嗎？他的帳號、所有驗證碼與群組成員資格都會刪除，無法恢復。
             擁有群組的使用者要先轉移或刪除群組。
@@ -54,22 +47,23 @@ const DeleteUserModal = (props: DeleteUserModalProps) => {
           >
             <Input
               label={user.email ? "輸入對方的 Email 以確認" : "輸入使用者 ID 以確認"}
+              labelPlacement="outside"
+              variant="flat"
+              size="lg"
               placeholder={expected}
-              variant="bordered"
               value={typed}
               onValueChange={setTyped}
               autoComplete="off"
               spellCheck="false"
-              classNames={{ input: "font-mono text-sm" }}
             />
           </form>
         </ModalBody>
-        <ModalFooter className="border-t border-line">
-          <Button variant="bordered" onPress={props.onClose} isDisabled={pending}>
+        <ModalFooter>
+          <Button variant="light" onPress={props.onClose} isDisabled={pending}>
             取消
           </Button>
           <Button color="danger" type="submit" form="admin-user-delete-form" isDisabled={!matched} isLoading={pending}>
-            刪除使用者
+            刪除
           </Button>
         </ModalFooter>
       </ModalContent>

@@ -48,19 +48,19 @@ const UserEditModal = (props: UserEditModalProps) => {
       showError("修改使用者失敗", result.message);
       return;
     }
-    toast.success("已更新使用者資料！", { position: "top-right" });
+    toast.success("已儲存", { position: "top-right" });
     await props.onSaved();
     props.onClose();
   };
 
   return (
-    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} className="border border-line bg-surface-1 text-ink">
+    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} className="bg-surface text-ink">
       <ModalContent>
-        <ModalHeader className="border-b border-line font-display tracking-wide">修改使用者資料</ModalHeader>
-        <ModalBody className="py-5">
+        <ModalHeader>編輯使用者</ModalHeader>
+        <ModalBody>
           <form
             id="admin-user-edit-form"
-            className="flex flex-col gap-4"
+            className="flex flex-col gap-5"
             onSubmit={(e) => {
               e.preventDefault();
               handleSave();
@@ -68,7 +68,9 @@ const UserEditModal = (props: UserEditModalProps) => {
           >
             <Input
               label="名稱"
-              variant="bordered"
+              labelPlacement="outside"
+              variant="flat"
+              size="lg"
               isRequired
               value={name}
               onValueChange={setName}
@@ -77,22 +79,23 @@ const UserEditModal = (props: UserEditModalProps) => {
             />
             <Input
               label="@ID"
-              variant="bordered"
+              labelPlacement="outside"
+              variant="flat"
+              size="lg"
               placeholder="留空代表清除"
               value={username}
               onValueChange={setUsername}
-              startContent={<span className="font-mono text-sm text-ink-dim">@</span>}
+              startContent={<span className="text-ink-muted">@</span>}
               autoComplete="off"
               spellCheck="false"
               isInvalid={!!usernameError}
               errorMessage={usernameError}
               description="小寫英文、數字、底線與點，3～32 字"
-              classNames={{ input: "font-mono" }}
             />
           </form>
         </ModalBody>
-        <ModalFooter className="border-t border-line">
-          <Button variant="bordered" onPress={props.onClose} isDisabled={saving}>
+        <ModalFooter>
+          <Button variant="light" onPress={props.onClose} isDisabled={saving}>
             取消
           </Button>
           <Button color="primary" type="submit" form="admin-user-edit-form" isLoading={saving}>

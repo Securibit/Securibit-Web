@@ -1,25 +1,19 @@
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowRight } from "@fortawesome/free-solid-svg-icons";
+import { faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { AdminSectionCardProps } from "@/types/Admin/AdminSectionCard";
 
-// 總覽頁的區塊入口：規格表的一列（編號、名稱與說明、讀數、箭頭）
+// 總覽頁「管理」群組的一列：圖示、名稱，右邊讀數與箭頭，整列可點
 const AdminSectionCard = (props: AdminSectionCardProps) => (
   <li>
-    <Link
-      href={props.href}
-      className="group grid grid-cols-[3rem_1fr_auto] items-center gap-x-4 border-b border-line py-4 transition-colors hover:bg-ink/5 sm:grid-cols-[4rem_11rem_1fr_auto]"
-    >
-      <span className="readout text-sm text-ink-dim">{props.index}</span>
-      <span className="font-display text-lg font-semibold text-ink transition-colors group-hover:text-phos">{props.title}</span>
-      <span className="col-start-2 text-sm text-ink-muted sm:col-start-3">{props.description}</span>
-      <span className="col-start-3 row-start-1 flex items-center gap-4 sm:col-start-4">
-        {props.count !== undefined && (
-          <span className="readout text-xl text-ink">{props.count}</span>
-        )}
-        <span className="flex h-8 w-8 items-center justify-center border border-line text-ink-muted transition-colors group-hover:border-phos group-hover:text-phos">
-          <FontAwesomeIcon icon={faArrowRight} className="w-3" />
-        </span>
+    <Link href={props.href} className="flex items-center justify-between gap-6 px-5 py-3 hover:bg-surface-1">
+      <span className="flex min-w-0 items-center gap-3 text-[17px]">
+        {props.icon && <FontAwesomeIcon icon={props.icon} className="w-4 shrink-0 text-ink-muted" />}
+        <span className="truncate">{props.title}</span>
+      </span>
+      <span className="flex shrink-0 items-center gap-3 text-[17px] text-ink-muted">
+        {props.count !== undefined && <span className="tabular-nums">{props.count}</span>}
+        <FontAwesomeIcon icon={faChevronRight} className="w-2.5" />
       </span>
     </Link>
   </li>

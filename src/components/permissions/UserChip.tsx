@@ -7,15 +7,15 @@ import { cn } from "@/lib/utils";
 import { UserChipProps } from "@/types/Permission/UserChip";
 
 const TEXT_SIZE = {
-  sm: { name: "text-sm", sub: "text-[11px]" },
-  md: { name: "text-sm sm:text-base", sub: "text-xs" },
-  lg: { name: "text-base sm:text-lg", sub: "text-sm" },
+  sm: { name: "text-[15px]", sub: "text-[13px]" },
+  md: { name: "text-[17px]", sub: "text-[13px]" },
+  lg: { name: "text-[22px] font-semibold", sub: "text-[15px]" },
 };
 
 // 名稱的第一個字（用 Array.from 才不會把 emoji 切成一半）
 const firstChar = (name: string) => Array.from(name.trim())[0]?.toUpperCase() ?? "?";
 
-// 方形小頭像 + 名稱 + 第二行等寬字的 @ID（沒有 @ID 時改顯示 Email）；使用者已刪除時傳 null
+// 圓頭像 + 名稱 + 灰字的 @ID（沒有 @ID 時改顯示 Email）；使用者已刪除時傳 null
 const UserChip = (props: UserChipProps) => {
   const { user } = props;
   const size = props.size ?? "md";
@@ -30,23 +30,23 @@ const UserChip = (props: UserChipProps) => {
         : user.email || null;
 
   return (
-    <div className={cn("flex min-w-0 items-center gap-2.5", props.className)}>
+    <div className={cn("flex min-w-0 items-center gap-3", props.className)}>
       <Avatar
         size={size}
-        radius="none"
+        radius="full"
         src={user?.photo_url ?? undefined}
         name={user ? user.name || "?" : undefined}
         getInitials={firstChar}
         icon={user ? undefined : <FontAwesomeIcon icon={faUser} className="w-3.5" />}
         showFallback
-        className="flex-shrink-0 border border-line"
-        classNames={{ name: "font-display font-semibold" }}
+        className="shrink-0 bg-surface-1 text-ink"
+        classNames={{ name: "font-semibold" }}
       />
       <div className="min-w-0">
-        <p className={cn("truncate font-display font-medium text-ink", text.name, !user && "text-ink-dim")}>
+        <p className={cn("truncate text-ink", text.name, !user && "text-ink-muted")}>
           {user ? user.name || "（未命名）" : "已刪除的使用者"}
         </p>
-        {sub && <p className={cn("truncate font-mono text-ink-muted", text.sub)}>{sub}</p>}
+        {sub && <p className={cn("truncate text-ink-muted", text.sub)}>{sub}</p>}
       </div>
     </div>
   );

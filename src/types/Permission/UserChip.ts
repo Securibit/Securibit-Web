@@ -1,6 +1,6 @@
 import { UserBrief } from "@/types/Permission/Permission";
 
-// 大頭照 + 名稱 + @ID
+// 圓頭像 + 名稱 + 灰字的 @ID
 export interface UserChipProps {
   user: UserBrief | null;
   size?: 'sm' | 'md' | 'lg';

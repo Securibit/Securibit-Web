@@ -1,23 +1,22 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { useRouter } from "nextjs-toploader/app";
-import { Button } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faCopy, faCrown, faShieldHalved, faTrash, faUserPen } from "@fortawesome/free-solid-svg-icons";
+import { faChevronLeft, faCopy, faCrown } from "@fortawesome/free-solid-svg-icons";
 import PageHeader from "@/components/layout/PageHeader";
 import Spinner from "@/components/ui/Loading/Spinner";
 import RoleChip from "@/components/permissions/RoleChip";
 import RoleAssignModal from "@/components/permissions/RoleAssignModal";
-import UserChip from "@/components/permissions/UserChip";
 import useAuth from "@/components/auth/useAuth";
 import { loadAdminUser, loadSiteRoles, setUserSiteRoles } from "@/lib/admin/admin";
 import { SITE, SITE_PERMISSIONS, permissionName } from "@/lib/permissions/bits";
 import { Actor, canManageMember, sortRoles } from "@/lib/permissions/hierarchy";
 import { showError } from "@/lib/errorDialog";
-import { cn, formatDateTime } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
 import { AdminUserDetail } from "@/types/Admin/Admin";
 import { Role } from "@/types/Permission/Permission";
 import { UserDetailClientProps } from "@/types/Admin/UserDetailClient";
@@ -37,16 +36,13 @@ const fetchUser = async (userId: string) => {
 
 // 回列表的連結（放在標題上方）
 const BackLink = () => (
-  <Link
-    href="/admin/users"
-    className="mb-4 inline-flex items-center gap-2 font-display text-xs tracking-[0.12em] text-ink-muted transition-colors hover:text-phos"
-  >
-    <FontAwesomeIcon icon={faArrowLeft} className="w-3" />
-    使用者列表
+  <Link href="/admin/users" className="mb-3 inline-flex items-center gap-1.5 text-[17px] text-accent hover:underline">
+    <FontAwesomeIcon icon={faChevronLeft} className="w-2.5" />
+    使用者
   </Link>
 );
 
-// 後台使用者詳情：基本資料規格表、身分組、2FA、危險區（修改 / 刪除）
+// 後台使用者詳情：像 iOS 設定的分組列表（帳號、登入紀錄、身分組、2FA），最後是刪除
 const UserDetailClient = (props: UserDetailClientProps) => {
   const { userId } = props;
   const router = useRouter();
@@ -86,12 +82,9 @@ const UserDetailClient = (props: UserDetailClientProps) => {
   if (detail === undefined) return <Spinner block label="載入使用者…" />;
   if (detail === null) {
     return (
-      <div className="boot">
+      <div>
         <BackLink />
-        <div className="hatch border border-line p-10 text-center">
-          <p className="tech-label">NOT FOUND</p>
-          <p className="mt-2 text-ink-muted">找不到這位使用者</p>
-        </div>
+        <div className="rounded-[18px] bg-surface-1 px-6 py-12 text-center text-ink-muted">找不到這位使用者</div>
       </div>
     );
   }
@@ -105,9 +98,9 @@ const UserDetailClient = (props: UserDetailClientProps) => {
   const copyId = async () => {
     try {
       await navigator.clipboard.writeText(detail.id);
-      toast.success("已複製使用者 ID！", { position: "top-right" });
+      toast.success("已複製", { position: "top-right" });
     } catch {
-      showError("無法複製", "瀏覽器不允許存取剪貼簿，請手動複製。");
+      showError("無法複製", "瀏覽器不允許存取剪貼簿，請手動複製使用者 ID。");
     }
   };
 
@@ -121,76 +114,58 @@ const UserDetailClient = (props: UserDetailClientProps) => {
   };
 
   return (
-    <div className="boot">
+    <div>
       <BackLink />
       <PageHeader
-        index="01 // USERS / DETAIL"
         title={detail.name || detail.email || "使用者"}
         subtitle={detail.username ? `@${detail.username}` : undefined}
         right={
           canManageUser && (
-            <Button
-              variant="bordered"
-              className="font-display tracking-[0.08em]"
-              startContent={<FontAwesomeIcon icon={faUserPen} className="w-3.5" />}
-              onPress={() => setEditOpen(true)}
-            >
-              修改資料
-            </Button>
+            <button type="button" onClick={() => setEditOpen(true)} className="text-[17px] text-accent hover:underline">
+              編輯
+            </button>
           )
         }
       />
 
-      <div className="flex flex-col gap-6">
-        {/* 基本資料：主要面板 */}
-        <section className="panel p-5">
-          <p className="tech-label">01 // PROFILE</p>
-          <div className="mt-3">
-            <UserChip user={detail} size="lg" showEmail />
+      <div className="flex flex-col gap-8">
+        {/* 身分 */}
+        <div className="flex items-center gap-4 overflow-hidden rounded-[18px] border border-line/70 bg-surface px-5 py-5">
+          {detail.photo_url ? (
+            <img className="h-16 w-16 shrink-0 rounded-full object-cover" src={detail.photo_url} referrerPolicy="no-referrer" alt="" />
+          ) : (
+            // 沒有大頭照時顯示名字的第一個字
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-surface-1 text-2xl font-semibold">
+              {Array.from(detail.name.trim())[0] || "?"}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[22px] font-semibold">{detail.name || "（未命名）"}</p>
+            <p className="truncate text-[15px] text-ink-muted">{detail.email || "沒有電子郵件"}</p>
           </div>
-          <dl className="mt-4 border-t border-line">
-            <InfoRow label="USER ID">
-              <span className="inline-flex max-w-full items-center gap-2">
-                <span className="break-all text-xs">{detail.id}</span>
-                <button
-                  type="button"
-                  onClick={copyId}
-                  aria-label="複製使用者 ID"
-                  title="複製使用者 ID"
-                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center border border-line text-ink-muted transition-colors hover:border-phos hover:text-phos"
-                >
-                  <FontAwesomeIcon icon={faCopy} className="w-3" />
-                </button>
-              </span>
+        </div>
+
+        {/* 帳號 */}
+        <section>
+          <h2 className="mb-2 px-5 text-[13px] font-normal text-ink-muted">帳號</h2>
+          <dl className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
+            <InfoRow label="@ID">{detail.username ? `@${detail.username}` : "未設定"}</InfoRow>
+            <InfoRow label="使用者 ID">
+              <button type="button" onClick={copyId} title="點一下複製" className="flex max-w-full items-center gap-2 text-ink hover:opacity-60">
+                <span className="truncate text-[15px]">{detail.id}</span>
+                <FontAwesomeIcon icon={faCopy} className="w-3.5 shrink-0 text-ink-muted" />
+              </button>
             </InfoRow>
-            <InfoRow label="EMAIL">{detail.email || "無"}</InfoRow>
-            <InfoRow label="@ID">{detail.username ? `@${detail.username}` : <span className="text-ink-dim">未設定</span>}</InfoRow>
-            <InfoRow label="CREATED">{formatDateTime(detail.creation_time)}</InfoRow>
-            <InfoRow label="LAST LOGIN">
-              <span className="block">{formatDateTime(detail.last_login_at)}</span>
-              {detail.last_login_ip && <span className="block text-xs text-ink-muted">IP：{detail.last_login_ip}</span>}
-              {detail.last_login_device && (
-                <span className="block text-xs text-ink-muted">裝置：{detail.last_login_device}</span>
-              )}
-            </InfoRow>
-            <InfoRow label="VAULT">
-              <span className="tech-label inline-flex items-center gap-2">
-                <span className={cn("led", !detail.vault_enabled && "led-off")} aria-hidden />
-                {detail.vault_enabled ? "已啟用" : "未啟用"}
-              </span>
-            </InfoRow>
-            <InfoRow label="GROUPS">
+            <InfoRow label="電子郵件">{detail.email || "無"}</InfoRow>
+            <InfoRow label="個人加密">{detail.vault_enabled ? "已啟用" : "未啟用"}</InfoRow>
+            <InfoRow label="群組">
               {detail.groups.length === 0 ? (
-                <span className="text-ink-dim">無</span>
+                "無"
               ) : (
-                <span className="flex flex-wrap gap-1.5">
+                <span className="flex flex-wrap justify-end gap-1.5">
                   {detail.groups.map((group) => (
-                    <Link
-                      key={group.id}
-                      href={`/groups/${group.id}`}
-                      className="tech-label inline-flex items-center gap-1.5 border border-line px-1.5 py-0.5 normal-case tracking-[0.08em] text-ink transition-colors hover:border-phos hover:text-phos"
-                    >
-                      {group.is_owner && <FontAwesomeIcon icon={faCrown} className="w-3 text-phos" aria-label="擁有者" />}
+                    <Link key={group.id} href={`/groups/${group.id}`} className="inline-flex items-center gap-1.5 rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-ink hover:bg-line/60">
+                      {group.is_owner && <FontAwesomeIcon icon={faCrown} className="w-3 text-ink-muted" aria-label="擁有者" />}
                       {group.name}
                     </Link>
                   ))}
@@ -198,71 +173,64 @@ const UserDetailClient = (props: UserDetailClientProps) => {
               )}
             </InfoRow>
           </dl>
-          {isSelf && (
-            <p className="mt-3 font-mono text-[11px] tracking-[0.08em] text-ink-dim">
-              這是你自己的帳號，請到「管理帳戶」修改資料。
-            </p>
-          )}
+          {isSelf && <p className="mt-2 px-5 text-[13px] text-ink-muted">這是你自己的帳號，請到「個人頁面」修改資料</p>}
+        </section>
+
+        {/* 登入紀錄 */}
+        <section>
+          <h2 className="mb-2 px-5 text-[13px] font-normal text-ink-muted">登入紀錄</h2>
+          <dl className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
+            <InfoRow label="建立時間">{formatDateTime(detail.creation_time)}</InfoRow>
+            <InfoRow label="最後登入">{formatDateTime(detail.last_login_at)}</InfoRow>
+            <InfoRow label="IP">{detail.last_login_ip || "無"}</InfoRow>
+            <InfoRow label="裝置">{detail.last_login_device || "無"}</InfoRow>
+          </dl>
         </section>
 
         {/* 身分組 */}
-        <section className="border border-line bg-surface-1 p-5">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="tech-label">02 // SITE ROLES</p>
-              <h2 className="mt-1 font-display text-xl font-bold text-ink">身分組</h2>
-            </div>
+        <section>
+          <div className="mb-2 flex items-center justify-between px-5">
+            <h2 className="text-[13px] font-normal text-ink-muted">身分組</h2>
             {canAssignRoles && (
-              <Button
-                size="sm"
-                variant="bordered"
-                className="font-display tracking-[0.08em]"
-                startContent={<FontAwesomeIcon icon={faShieldHalved} className="w-3.5" />}
-                onPress={() => setRolesOpen(true)}
-                isDisabled={roles.length === 0}
+              <button
+                type="button"
+                onClick={() => setRolesOpen(true)}
+                disabled={roles.length === 0}
+                className="text-[13px] text-accent hover:underline disabled:opacity-50"
               >
-                編輯身分組
-              </Button>
+                編輯
+              </button>
             )}
           </div>
-          {userRoles.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {userRoles.map((role) => (
-                <RoleChip key={role.id} role={role} />
-              ))}
-            </div>
-          ) : (
-            <p className="font-mono text-sm text-ink-dim">只有 @everyone</p>
-          )}
+          <div className="rounded-[18px] border border-line/70 bg-surface px-5 py-3">
+            {userRoles.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {userRoles.map((role) => (
+                  <RoleChip key={role.id} role={role} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-[17px] text-ink-muted">只有 @everyone</p>
+            )}
+          </div>
         </section>
 
         {/* 2FA */}
         {can(SITE.VIEW_USER_TOTP) && <UserTotpList user={detail} canManage={can(SITE.MANAGE_USER_TOTP)} />}
 
-        {/* 危險區 */}
+        {/* 刪除 */}
         {canManageUser && (
-          <section className="border border-alarm p-5">
-            <p className="tech-label flex items-center gap-2 text-alarm">
-              <span className="led led-alarm" aria-hidden />
-              04 // DANGER ZONE
+          <section>
+            <button
+              type="button"
+              onClick={() => setDeleteOpen(true)}
+              className="w-full rounded-[18px] border border-line/70 bg-surface py-3 text-center text-[17px] text-alarm hover:bg-surface-1"
+            >
+              刪除使用者
+            </button>
+            <p className="mt-2 px-5 text-[13px] text-ink-muted">
+              會刪除帳號、所有驗證碼與群組成員資格，無法恢復；擁有群組的使用者要先轉移或刪除群組
             </p>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
-              <div className="min-w-0">
-                <h2 className="font-display text-base font-semibold text-ink">刪除使用者</h2>
-                <p className="mt-1 text-sm text-ink-muted">
-                  刪除帳號、所有驗證碼與群組成員資格，無法恢復。擁有群組的使用者要先轉移或刪除群組。
-                </p>
-              </div>
-              <Button
-                variant="bordered"
-                color="danger"
-                className="font-display tracking-[0.08em]"
-                startContent={<FontAwesomeIcon icon={faTrash} className="w-3.5" />}
-                onPress={() => setDeleteOpen(true)}
-              >
-                刪除使用者
-              </Button>
-            </div>
           </section>
         )}
       </div>
@@ -276,7 +244,7 @@ const UserDetailClient = (props: UserDetailClientProps) => {
       <RoleAssignModal
         isOpen={rolesOpen}
         onClose={() => setRolesOpen(false)}
-        title={`指派身分組給 ${detail.name || detail.email}`}
+        title="指派身分組"
         roles={roles}
         selected={detail.role_ids}
         actor={actor}

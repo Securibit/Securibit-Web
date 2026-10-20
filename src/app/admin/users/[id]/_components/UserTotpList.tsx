@@ -2,9 +2,6 @@
 
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Button } from "@heroui/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { deleteAdminUserTotp, loadAdminUserTotp, updateAdminUserTotp } from "@/lib/admin/admin";
 import { normalizeSecret } from "@/lib/totp/crud";
 import { showError } from "@/lib/errorDialog";
@@ -14,7 +11,7 @@ import { UserTotpListProps } from "@/types/Admin/UserTotpList";
 import AdminTotpRow from "./AdminTotpRow";
 import AdminTotpEditModal from "./AdminTotpEditModal";
 
-// 使用者的 2FA：按「顯示 2FA」才載入（每次載入都會寫一筆操作紀錄）
+// 使用者的 2FA：按「顯示」才載入（每次載入都會寫一筆操作紀錄）
 const UserTotpList = (props: UserTotpListProps) => {
   const { user } = props;
   const [items, setItems] = useState<AdminTotpItem[]>();
@@ -54,7 +51,7 @@ const UserTotpList = (props: UserTotpListProps) => {
           : current
       )
     );
-    toast.success("已儲存驗證碼！", { position: "top-right" });
+    toast.success("已儲存", { position: "top-right" });
     return true;
   };
 
@@ -65,72 +62,49 @@ const UserTotpList = (props: UserTotpListProps) => {
       return;
     }
     setItems((prev) => prev?.filter((current) => current.id !== item.id));
-    toast.success("已刪除驗證碼！", { position: "top-right" });
+    toast.success("已刪除", { position: "top-right" });
   };
 
+  const count = items ? items.length : user.totp_count;
+
   return (
-    <section className="border border-line bg-surface-1 p-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="tech-label">03 // 2FA</p>
-          <h2 className="mt-1 font-display text-xl font-bold text-ink">
-            驗證碼
-            <span className="ml-3 font-mono text-sm font-normal text-ink-muted">{items ? items.length : user.totp_count} 筆</span>
-          </h2>
-        </div>
-        <div className="flex items-center gap-3">
-          {!items && <span className="font-mono text-[11px] tracking-[0.08em] text-ink-dim">查看會被記錄在操作紀錄</span>}
-          {items ? (
-            <Button
-              size="sm"
-              variant="bordered"
-              className="font-display tracking-[0.08em]"
-              startContent={<FontAwesomeIcon icon={faEyeSlash} className="w-3.5" />}
-              onPress={() => setItems(undefined)}
-            >
-              隱藏
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              color="primary"
-              className="font-display tracking-[0.08em]"
-              isLoading={loading}
-              startContent={!loading && <FontAwesomeIcon icon={faEye} className="w-3.5" />}
-              onPress={reveal}
-            >
-              顯示 2FA
-            </Button>
-          )}
-        </div>
+    <section>
+      <div className="mb-2 flex items-center justify-between px-5">
+        <h2 className="text-[13px] font-normal text-ink-muted">驗證碼（{count} 筆）</h2>
+        {items ? (
+          <button type="button" onClick={() => setItems(undefined)} className="text-[13px] text-accent hover:underline">
+            隱藏
+          </button>
+        ) : (
+          <button type="button" onClick={reveal} disabled={loading} className="text-[13px] text-accent hover:underline disabled:opacity-50">
+            {loading ? "載入中…" : "顯示"}
+          </button>
+        )}
       </div>
 
-      {user.vault_enabled && (
-        <p className="mt-4 flex items-center gap-3 border-l-2 border-line-strong pl-3 text-sm text-ink-muted">
-          <span className="led-off" aria-hidden />
-          此使用者啟用了個人加密，管理員無法查看金鑰
-        </p>
+      {!items ? (
+        <div className="rounded-[18px] border border-line/70 bg-surface px-5 py-3 text-[17px] text-ink-muted">
+          點「顯示」才會載入，查看會被記錄在操作紀錄
+        </div>
+      ) : items.length === 0 ? (
+        <div className="rounded-[18px] bg-surface-1 px-6 py-12 text-center text-ink-muted">這位使用者沒有驗證碼</div>
+      ) : (
+        <ul className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
+          {items.map((item) => (
+            <AdminTotpRow
+              key={item.id}
+              item={item}
+              canManage={props.canManage}
+              onEdit={() => setEditing(item)}
+              onDelete={() => handleDelete(item)}
+            />
+          ))}
+        </ul>
       )}
 
-      {items &&
-        (items.length === 0 ? (
-          <div className="hatch mt-4 border border-line p-10 text-center">
-            <p className="tech-label">NO DATA</p>
-            <p className="mt-2 text-ink-muted">這位使用者沒有驗證碼</p>
-          </div>
-        ) : (
-          <ul className="mt-4 border-t border-line">
-            {items.map((item) => (
-              <AdminTotpRow
-                key={item.id}
-                item={item}
-                canManage={props.canManage}
-                onEdit={() => setEditing(item)}
-                onDelete={() => handleDelete(item)}
-              />
-            ))}
-          </ul>
-        ))}
+      {user.vault_enabled && (
+        <p className="mt-2 px-5 text-[13px] text-ink-muted">此使用者啟用了個人加密，管理員無法查看金鑰</p>
+      )}
 
       {editing && (
         <AdminTotpEditModal

@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDebounce } from "react-use";
-import { useRouter } from "nextjs-toploader/app";
-import { Input, Pagination, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
+import Link from "next/link";
+import { Pagination } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+import { faChevronRight, faLock, faMagnifyingGlass, faXmark } from "@fortawesome/free-solid-svg-icons";
 import PageHeader from "@/components/layout/PageHeader";
 import Spinner from "@/components/ui/Loading/Spinner";
 import RoleChip from "@/components/permissions/RoleChip";
@@ -22,11 +22,10 @@ import NoPermission from "../_components/NoPermission";
 
 const PAGE_SIZE = 20;
 
-// 後台使用者列表：搜尋（email / 名稱 / @ID）+ 分頁表格，點一列進入詳情
+// 後台使用者列表：搜尋（email / 名稱 / @ID）+ 分頁，點一列進入詳情
 const UsersClient = () => {
   const { can } = useAuth();
   const allowed = can(SITE.VIEW_USERS);
-  const router = useRouter();
 
   const [keyword, setKeyword] = useState("");
   // 停止輸入 300ms 後才送出的搜尋字
@@ -81,86 +80,70 @@ const UsersClient = () => {
   const pages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
   return (
-    <div className="boot">
-      <PageHeader index="01 // USERS" title="使用者" subtitle={data ? `共 ${data.total} 位使用者` : undefined} />
+    <div>
+      <PageHeader title="使用者" />
 
-      <Input
-        aria-label="搜尋使用者"
-        placeholder="搜尋 Email、名稱或 @ID"
-        variant="bordered"
-        value={keyword}
-        onValueChange={setKeyword}
-        isClearable
-        onClear={() => setKeyword("")}
-        startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="w-3.5 text-ink-dim" />}
-        classNames={{ input: "font-mono text-sm" }}
-        className="mb-4 sm:max-w-sm"
-      />
+      {/* 搜尋 */}
+      <label className="mb-3 flex items-center gap-2 rounded-[12px] bg-surface-1 px-3.5 py-2 text-[17px] text-ink-muted focus-within:ring-2 focus-within:ring-accent/40">
+        <FontAwesomeIcon icon={faMagnifyingGlass} className="w-4 shrink-0" />
+        <input
+          type="search"
+          aria-label="搜尋使用者"
+          placeholder="搜尋 Email、名稱或 @ID"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-muted"
+        />
+        {keyword && (
+          <button type="button" onClick={() => setKeyword("")} aria-label="清除" className="hover:text-ink">
+            <FontAwesomeIcon icon={faXmark} className="w-3.5" />
+          </button>
+        )}
+      </label>
 
       {!data ? (
         <Spinner block label="載入使用者…" />
+      ) : data.users.length === 0 ? (
+        <div className="rounded-[18px] bg-surface-1 px-6 py-12 text-center text-ink-muted">
+          {search ? "沒有符合的使用者" : "還沒有使用者"}
+        </div>
       ) : (
-        <Table
-          aria-label="使用者列表"
-          onRowAction={(key) => router.push(`/admin/users/${String(key)}`)}
-          bottomContentPlacement="outside"
-          classNames={{
-            wrapper: "border border-line bg-surface-1 p-0 shadow-none",
-            th: "tech-label h-9 bg-surface-2 first:rounded-none last:rounded-none",
-            tr: "cursor-pointer border-b border-line transition-colors last:border-b-0 hover:bg-ink/5",
-            td: "py-3",
-          }}
-          bottomContent={
-            pages > 1 && (
-              <div className="flex justify-center">
-                <Pagination showControls variant="bordered" page={page} total={pages} onChange={setPage} isDisabled={loading} />
-              </div>
-            )
-          }
-        >
-          <TableHeader>
-            <TableColumn>使用者</TableColumn>
-            <TableColumn>身分組</TableColumn>
-            <TableColumn align="end">驗證碼</TableColumn>
-            <TableColumn>個人加密</TableColumn>
-            <TableColumn>最後登入</TableColumn>
-          </TableHeader>
-          <TableBody
-            isLoading={loading}
-            loadingContent={<Spinner />}
-            emptyContent={
-              <div className="hatch py-8 text-center">
-                <p className="tech-label">NO DATA</p>
-                <p className="mt-2 text-sm text-ink-muted">{search ? "沒有符合條件的使用者" : "還沒有使用者"}</p>
-              </div>
-            }
-          >
-            {data.users.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>
-                  <UserChip user={user} showEmail />
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {sortedRoles
-                      .filter((role) => user.role_ids.includes(role.id))
-                      .map((role) => (
-                        <RoleChip key={role.id} role={role} />
-                      ))}
-                  </div>
-                </TableCell>
-                <TableCell className="readout text-sm text-ink">{user.totp_count}</TableCell>
-                <TableCell>
-                  <span className="tech-label inline-flex items-center gap-2 whitespace-nowrap">
-                    <span className={cn("led", !user.vault_enabled && "led-off")} aria-hidden />
-                    {user.vault_enabled ? "已啟用" : "未啟用"}
-                  </span>
-                </TableCell>
-                <TableCell className="whitespace-nowrap font-mono text-xs text-ink-muted">{formatDateTime(user.last_login_at)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <>
+          <ul className={cn("divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface", loading && "opacity-60")}>
+            {data.users.map((user) => {
+              const userRoles = sortedRoles.filter((role) => user.role_ids.includes(role.id));
+              return (
+                <li key={user.id}>
+                  <Link href={`/admin/users/${user.id}`} className="flex items-center gap-4 px-5 py-3 hover:bg-surface-1">
+                    <UserChip user={user} showEmail className="min-w-0 flex-1" />
+                    {userRoles.length > 0 && (
+                      <div className="hidden max-w-56 flex-wrap justify-end gap-1 sm:flex">
+                        {userRoles.map((role) => (
+                          <RoleChip key={role.id} role={role} />
+                        ))}
+                      </div>
+                    )}
+                    <div className="shrink-0 text-right">
+                      <p className="flex items-center justify-end gap-1.5 text-[17px] tabular-nums text-ink-muted">
+                        {user.vault_enabled && <FontAwesomeIcon icon={faLock} className="w-3" aria-label="已啟用個人加密" />}
+                        {user.totp_count} 筆
+                      </p>
+                      <p className="text-[13px] tabular-nums text-ink-muted">{formatDateTime(user.last_login_at)}</p>
+                    </div>
+                    <FontAwesomeIcon icon={faChevronRight} className="w-2.5 shrink-0 text-ink-muted" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-1">
+            <p className="text-[13px] text-ink-muted">共 {data.total} 位使用者</p>
+            {pages > 1 && (
+              <Pagination showControls variant="light" radius="full" page={page} total={pages} onChange={setPage} isDisabled={loading} />
+            )}
+          </div>
+        </>
       )}
     </div>
   );

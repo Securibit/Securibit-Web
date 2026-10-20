@@ -2,39 +2,53 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
+import { Tab, Tabs } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import useAuth from "@/components/auth/useAuth";
 import { cn } from "@/lib/utils";
 import { ADMIN_SECTIONS, isSectionActive } from "./sections";
 
-// 後台導覽：桌機是左側一條窄側欄（選中的項目左邊亮一條磷光），手機變成頂部橫向 tabs；沒有權限的項目不顯示
+// 後台導覽：桌機是左側一條側欄（像 macOS 系統設定，選中的列是藍底白字），手機變成頂部分段控制；沒有權限的項目不顯示
 const AdminNav = () => {
   const pathname = usePathname();
+  const router = useRouter();
   const { can } = useAuth();
 
+  const sections = ADMIN_SECTIONS.filter((section) => can(section.permission));
+  const activeHref = sections.find((section) => isSectionActive(section.href, pathname))?.href ?? "/admin";
+
   return (
-    <nav
-      aria-label="後台導覽"
-      className="-mx-5 border-b border-line px-5 md:sticky md:top-[4.5rem] md:mx-0 md:w-44 md:shrink-0 md:self-start md:border-b-0 md:border-r md:px-0 md:pr-4"
-    >
-      <p className="tech-label hidden pb-3 md:block">ADMIN // CONSOLE</p>
-      <ul className="flex overflow-x-auto md:flex-col md:gap-0.5 md:overflow-visible">
-        {ADMIN_SECTIONS.filter((section) => can(section.permission)).map((section) => {
-          const active = isSectionActive(section.href, pathname);
+    <nav aria-label="後台導覽" className="md:sticky md:top-24 md:w-52 md:shrink-0 md:self-start">
+      {/* 手機：頂部分段控制 */}
+      <Tabs
+        aria-label="後台導覽"
+        variant="light"
+        radius="full"
+        selectedKey={activeHref}
+        onSelectionChange={(key) => router.push(String(key))}
+        classNames={{ base: "md:hidden", tabList: "bg-surface-1 p-1", cursor: "bg-surface" }}
+      >
+        {sections.map((section) => (
+          <Tab key={section.href} title={section.text} />
+        ))}
+      </Tabs>
+
+      {/* 桌機：側欄 */}
+      <ul className="hidden flex-col gap-0.5 md:flex">
+        {sections.map((section) => {
+          const active = section.href === activeHref;
           return (
-            <li key={section.href} className="shrink-0">
+            <li key={section.href}>
               <Link
                 href={section.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  // 手機：底線式 tab；桌機：左邊 2px 的側欄項目
-                  "flex items-center gap-2.5 whitespace-nowrap border-b-2 px-3 py-2.5 font-display text-[13px] tracking-[0.12em] transition-colors md:border-b-0 md:border-l-2",
-                  active
-                    ? "border-phos text-phos md:bg-phos/10"
-                    : "border-transparent text-ink-muted hover:text-ink md:hover:bg-ink/5"
+                  "flex items-center gap-3 rounded-[10px] px-3 py-1.5 text-[15px]",
+                  active ? "bg-accent text-accent-ink" : "text-ink hover:bg-surface-1"
                 )}
               >
-                <FontAwesomeIcon icon={section.icon} className="w-3.5" />
+                <FontAwesomeIcon icon={section.icon} className={cn("w-4", !active && "text-ink-muted")} />
                 {section.text}
               </Link>
             </li>
