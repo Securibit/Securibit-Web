@@ -5,10 +5,8 @@ import toast from "react-hot-toast";
 import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
 import { updateAdminUser } from "@/lib/admin/admin";
 import { showError } from "@/lib/errorDialog";
+import { usernameProblem } from "@/lib/totp/account";
 import { UserEditModalProps } from "@/types/Admin/UserEditModal";
-
-// 與資料庫 profiles_username_format 相同（存小寫）
-const USERNAME_PATTERN = /^[a-z0-9_.]{3,32}$/;
 
 // 去掉開頭的 @、轉小寫（資料庫也會再處理一次）
 const normalizeUsername = (value: string) => value.trim().replace(/^@/, "").toLowerCase();
@@ -23,8 +21,9 @@ const UserEditModal = (props: UserEditModalProps) => {
   const nextName = name.trim();
   const nextUsername = normalizeUsername(username);
   const nameError = nextName ? undefined : "請輸入名稱";
+  // 格式、UUID 樣式、保留字（同資料庫）；沒改的不檢查（舊的 @ID 可能是後來才變成保留字）
   const usernameError =
-    nextUsername && !USERNAME_PATTERN.test(nextUsername) ? "只能用小寫英文、數字、底線與點，長度 3～32 字" : undefined;
+    nextUsername && nextUsername !== (user.username ?? "") ? usernameProblem(nextUsername) : undefined;
 
   const handleSave = async () => {
     if (nameError || usernameError) return;

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Input } from "@heroui/react";
 import useAuth from "@/components/auth/useAuth";
-import { USERNAME_PATTERN, isUsernameAvailable, setUsername } from "@/lib/totp/account";
+import { isUsernameAvailable, setUsername, usernameProblem } from "@/lib/totp/account";
 import { showError } from "@/lib/errorDialog";
 
 const FORMAT_HINT = "3～32 字，只能用小寫英文、數字、底線、點";
@@ -24,9 +24,10 @@ const UsernameSettings = () => {
 
   const name = normalize(value);
   const changed = name !== current;
-  const formatOk = USERNAME_PATTERN.test(name);
-  // 只有「有改、格式正確」時才需要查資料庫
-  const needCheck = changed && name !== "" && formatOk;
+  // 格式、UUID 樣式、保留字（不用查資料庫）；沒改的不檢查（舊的 @ID 可能是後來才變成保留字）
+  const problem = changed && name !== "" ? usernameProblem(name) : undefined;
+  // 只有「有改、本地檢查通過」時才需要查資料庫
+  const needCheck = changed && name !== "" && !problem;
   const checked = check?.name === name ? check : undefined;
 
   useEffect(() => {
@@ -47,11 +48,11 @@ const UsernameSettings = () => {
     };
   }, [name, needCheck]);
 
-  const invalid = (name !== "" && !formatOk) || checked?.available === false || checked?.available === null;
-  const errorMessage = !formatOk
-    ? FORMAT_HINT
+  const invalid = !!problem || checked?.available === false || checked?.available === null;
+  const errorMessage = problem
+    ? problem
     : checked?.available === false
-      ? "已被使用"
+      ? "這個 @ID 已被使用"
       : `無法檢查：${checked?.message ?? ""}`;
   // 欄位下方的即時檢查文字
   const description = !changed

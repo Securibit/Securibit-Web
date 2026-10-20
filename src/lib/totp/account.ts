@@ -50,6 +50,35 @@ export const isUsernameAvailable = (username: string) =>
 // @ID 格式：3～32 字，小寫英數、底線、點
 export const USERNAME_PATTERN = /^[a-z0-9_.]{3,32}$/;
 
+// 不能當 @ID 的字（同資料庫 0013 的 username_reserved）
+const RESERVED_USERNAMES = new Set([
+  'admin', 'administrator', 'root', 'system', 'securibit', 'everyone',
+  'here', 'support', 'help', 'null', 'undefined',
+  'me', 'u', 'api', 'auth', 'about', 'disclaimer', 'code', 'codes', 'addcode',
+  'groups', 'group', 'invite', 'invites', 'invitation', 'invitations',
+  'settings', 'setting', 'new', 'edit', 'login', 'logout', 'signin', 'signout', 'signup', 'register',
+  'user', 'users', 'profile', 'profiles', 'mypage', 'update_info', 'account', 'accounts',
+  'notifications', 'roles', 'audit', 'callback', 'static', 'public', 'assets',
+  '_next', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'manifest.json',
+]);
+
+// 看起來像 UUID：整個是 32 位十六進位，或含 8-4-4-4-12 的形狀
+const looksLikeUuid = (name: string) =>
+  /^[0-9a-f]{32}$/i.test(name) || /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(name);
+
+// 錯誤訊息和資料庫（username_assert）一致
+export const USERNAME_FORMAT_MESSAGE = '@ID 只能使用 3～32 個英文小寫字母、數字、底線（_）或句點（.）';
+export const USERNAME_UUID_MESSAGE = '@ID 不能是 UUID 的格式（32 位英數字）';
+export const USERNAME_RESERVED_MESSAGE = '這個 @ID 是保留字，不能使用';
+
+/** 不查資料庫就能判斷的問題（格式、UUID 樣式、保留字）；name 要先正規化（小寫、去掉 @）。沒問題回傳 undefined */
+export const usernameProblem = (name: string) => {
+  if (!USERNAME_PATTERN.test(name)) return USERNAME_FORMAT_MESSAGE;
+  if (looksLikeUuid(name)) return USERNAME_UUID_MESSAGE;
+  if (RESERVED_USERNAMES.has(name)) return USERNAME_RESERVED_MESSAGE;
+  return undefined;
+};
+
 // 確保使用者有 profile（沒有就依 email 自我修復、接回舊資料）。冪等、可重複呼叫。
 export const ensureProfile = async () => {
   const { error } = await supabase.rpc('ensure_profile');

@@ -10,7 +10,7 @@ import { showError } from "@/lib/errorDialog";
 import { SITE } from "@/lib/permissions/bits";
 
 // 需要登入才能進的路徑（前綴比對）
-const PROTECTED_ROUTES = ['/code', '/addCode', '/me', '/groups', '/invite', '/admin'];
+const PROTECTED_ROUTES = ['/code', '/addCode', '/me', '/u', '/groups', '/invite', '/admin'];
 
 const matches = (pathname: string, route: string) => pathname === route || pathname.startsWith(`${route}/`);
 
