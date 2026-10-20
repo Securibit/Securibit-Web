@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useRouter } from "nextjs-toploader/app";
-import { Button, Chip, Tab, Tabs } from "@heroui/react";
+import { Button, Tab, Tabs } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faCrown, faShieldHalved } from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import PageContent from "@/components/layout/PageContent";
 import PageHeader from "@/components/layout/PageHeader";
 import Spinner from "@/components/ui/Loading/Spinner";
@@ -89,13 +89,15 @@ const GroupClient = () => {
   const tabProps = { detail, actor, onChanged: reload };
 
   return (
-    <PageContent>
+    <PageContent className="boot">
       <PageHeader
+        index="02 // GROUPS"
         title={detail.group.name}
         subtitle={detail.group.description || undefined}
         right={
           <Button
-            variant="light"
+            variant="bordered"
+            className="font-display tracking-[0.08em]"
             startContent={<FontAwesomeIcon icon={faArrowLeft} className="w-3.5" />}
             onPress={() => router.push("/groups")}
           >
@@ -105,21 +107,15 @@ const GroupClient = () => {
       />
 
       {/* 我的身分 */}
-      <div className="-mt-1 mb-5 flex flex-wrap items-center gap-1.5 text-sm text-gray-blue-500 dark:text-gray-blue-400">
-        <span>我的身分組：</span>
-        {detail.is_owner && (
-          <Chip size="sm" variant="flat" color="warning" startContent={<FontAwesomeIcon icon={faCrown} className="ml-1 w-3" />}>
-            擁有者
-          </Chip>
-        )}
+      <div className="-mt-1 mb-5 flex flex-wrap items-center gap-2 text-sm">
+        <span className="tech-label">MY ROLES</span>
+        {detail.is_owner && <span className="tech-label border border-phos px-1.5 py-0.5 text-phos">OWNER</span>}
         {myRoles.map((role) => (
           <RoleChip key={role.id} role={role} />
         ))}
-        {me && !detail.is_owner && myRoles.length === 0 && <span>@everyone</span>}
+        {me && !detail.is_owner && myRoles.length === 0 && <span className="font-mono text-xs text-ink-muted">@everyone</span>}
         {!me && (
-          <Chip size="sm" variant="flat" color="secondary" startContent={<FontAwesomeIcon icon={faShieldHalved} className="ml-1 w-3" />}>
-            非成員（以全站管理權限檢視）
-          </Chip>
+          <span className="tech-label border border-line-strong px-1.5 py-0.5">非成員 // 以全站管理權限檢視</span>
         )}
       </div>
 
@@ -131,12 +127,26 @@ const GroupClient = () => {
         onSelectionChange={(key) => setTab(key as TabKey)}
         // 切換分頁時保留內容，避免驗證碼每次切回來都重新讀取金鑰（每次讀取都會記一筆紀錄）
         destroyInactiveTabPanel={false}
-        classNames={{ tabList: "flex-wrap", panel: "px-0 pt-4" }}
+        classNames={{
+          base: "w-full",
+          tabList: "w-full flex-wrap gap-x-6 gap-y-0 border-b border-line p-0",
+          tab: "h-11 px-0",
+          tabContent: "font-display text-[13px] tracking-[0.12em] text-ink-muted group-data-[selected=true]:text-phos",
+          cursor: "h-0.5 w-full bg-phos",
+          panel: "px-0 pt-6",
+        }}
       >
         <Tab key="codes" title="驗證碼">
           <GroupCodes {...tabProps} />
         </Tab>
-        <Tab key="members" title={`成員 ${detail.members.length}`}>
+        <Tab
+          key="members"
+          title={
+            <span>
+              成員 <span className="font-mono text-ink-dim">{detail.members.length}</span>
+            </span>
+          }
+        >
           <GroupMembers {...tabProps} />
         </Tab>
         <Tab key="roles" title="身分組">
@@ -152,7 +162,10 @@ const GroupClient = () => {
         </Tab>
         {visible.audit && (
           <Tab key="audit" title="紀錄">
-            <AuditLogList load={(before) => loadGroupAuditLog(gid, before)} />
+            <div>
+              <p className="tech-label mb-4">06 // AUDIT LOG</p>
+              <AuditLogList load={(before) => loadGroupAuditLog(gid, before)} />
+            </div>
           </Tab>
         )}
       </Tabs>

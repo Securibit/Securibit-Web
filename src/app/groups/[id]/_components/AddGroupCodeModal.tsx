@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Divider, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
+import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
 import TotpForm from "@/components/totp/TotpForm";
 import QrImport from "@/app/addCode/_components/QrImport";
 import { TotpErrors, validateTotpInput } from "@/lib/totp/validate";
@@ -44,17 +44,17 @@ const AddGroupCodeModal = (props: AddGroupCodeModalProps) => {
       onOpenChange={(open) => !open && props.onClose()}
       size="lg"
       scrollBehavior="inside"
-      className="dark:bg-gray-blue-800"
+      className="border border-line bg-surface-1 text-ink"
     >
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-1 text-black dark:text-white">
+        <ModalHeader className="flex flex-col gap-1 border-b border-line font-display tracking-wide">
           新增驗證碼到群組
-          <span className="text-sm font-normal text-gray-blue-500 dark:text-gray-blue-400">
+          <span className="text-sm font-normal tracking-normal text-ink-muted">
             新增後群組成員會依身分組權限看到這筆驗證碼
           </span>
         </ModalHeader>
-        <ModalBody className="text-black dark:text-white">
-          <h3 className="font-semibold">快速匯入</h3>
+        <ModalBody className="py-5">
+          <p className="tech-label">01 // IMPORT</p>
           <QrImport
             onImport={(input) => {
               setForm({ ...input, category: form.category || input.category });
@@ -64,10 +64,10 @@ const AddGroupCodeModal = (props: AddGroupCodeModalProps) => {
             onImportMany={props.onImportMany}
           />
 
-          <div className="my-2 flex items-center gap-3 text-sm text-gray-blue-400">
-            <Divider className="flex-1" />
-            或手動輸入
-            <Divider className="flex-1" />
+          <div className="my-2 flex items-center gap-3">
+            <div className="rule flex-1" />
+            <span className="tech-label">02 // MANUAL</span>
+            <div className="rule flex-1" />
           </div>
 
           <form
@@ -90,11 +90,11 @@ const AddGroupCodeModal = (props: AddGroupCodeModalProps) => {
             />
           </form>
         </ModalBody>
-        <ModalFooter>
-          <Button variant="bordered" onPress={props.onClose} isDisabled={saving}>
+        <ModalFooter className="border-t border-line">
+          <Button variant="bordered" className="font-display tracking-[0.08em]" onPress={props.onClose} isDisabled={saving}>
             完成
           </Button>
-          <Button color="primary" type="submit" form="group-code-add-form" isLoading={saving}>
+          <Button color="primary" className="font-display tracking-[0.08em]" type="submit" form="group-code-add-form" isLoading={saving}>
             新增
           </Button>
         </ModalFooter>

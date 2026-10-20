@@ -97,11 +97,11 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
       onOpenChange={(open) => !open && props.onClose()}
       size="lg"
       scrollBehavior="inside"
-      className="dark:bg-gray-blue-800"
+      className="border border-line bg-surface-1 text-ink"
     >
       <ModalContent>
-        <ModalHeader className="text-black dark:text-white">編輯驗證碼</ModalHeader>
-        <ModalBody>
+        <ModalHeader className="border-b border-line font-display tracking-wide">編輯驗證碼</ModalHeader>
+        <ModalBody className="py-5">
           <form
             id="group-code-edit-form"
             className="flex flex-col gap-4"
@@ -113,6 +113,7 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
             <Input
               label="名稱"
               placeholder="例如：Google - me@example.com"
+              variant="bordered"
               isRequired
               value={form.name}
               onValueChange={(name) => set({ name })}
@@ -123,6 +124,7 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
             <Autocomplete
               label="類別"
               placeholder="例如：工作、個人、遊戲"
+              variant="bordered"
               allowsCustomValue
               inputValue={form.category}
               onInputChange={(category) => set({ category })}
@@ -134,6 +136,7 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
             <Input
               label="金鑰（Secret）"
               placeholder={secretKnown ? "JBSWY3DPEHPK3PXP" : "不修改請留空"}
+              variant="bordered"
               isRequired={secretKnown}
               type={showSecret ? "text" : "password"}
               autoComplete="off"
@@ -142,6 +145,7 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
               onValueChange={(secret) => set({ secret })}
               isInvalid={!!errors.secret}
               errorMessage={errors.secret}
+              classNames={{ input: "font-mono" }}
               description={
                 secretKnown
                   ? "Base32 格式（A-Z、2-7），空白與小寫會自動轉換"
@@ -152,21 +156,27 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
                   type="button"
                   onClick={() => setShowSecret((prev) => !prev)}
                   aria-label={showSecret ? "隱藏金鑰" : "顯示金鑰"}
-                  className="text-gray-blue-400 hover:text-tpp"
+                  className="text-ink-dim transition-colors hover:text-phos"
                 >
                   <FontAwesomeIcon icon={showSecret ? faEyeSlash : faEye} className="w-4" />
                 </button>
               }
             />
 
-            <Accordion variant="bordered" defaultExpandedKeys={advancedChanged ? ["advanced"] : []}>
-              <AccordionItem key="advanced" title="進階設定" subtitle={`${digits} 位數 · ${period} 秒 · ${algorithm}`}>
-                <p className="mb-3 text-sm text-gray-blue-500 dark:text-gray-blue-400">
+            <Accordion variant="bordered" className="border-line" defaultExpandedKeys={advancedChanged ? ["advanced"] : []}>
+              <AccordionItem
+                key="advanced"
+                title="進階設定"
+                subtitle={`${digits} 位數 · ${period} 秒 · ${algorithm}`}
+                classNames={{ title: "font-display text-sm tracking-wide text-ink", subtitle: "font-mono text-xs text-ink-dim" }}
+              >
+                <p className="mb-3 text-sm text-ink-muted">
                   大多數服務使用預設值（6 位數、30 秒、SHA-1），除非服務另有說明否則不需更改。
                 </p>
                 <div className="grid gap-3 pb-2 sm:grid-cols-3">
                   <Select
                     label="位數"
+                    variant="bordered"
                     selectedKeys={[String(digits)]}
                     disallowEmptySelection
                     onChange={(e) => e.target.value && set({ digits: Number(e.target.value) })}
@@ -175,6 +185,7 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
                   </Select>
                   <Select
                     label="週期"
+                    variant="bordered"
                     selectedKeys={[String(period)]}
                     disallowEmptySelection
                     onChange={(e) => e.target.value && set({ period: Number(e.target.value) })}
@@ -183,6 +194,7 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
                   </Select>
                   <Select
                     label="演算法"
+                    variant="bordered"
                     selectedKeys={[algorithm]}
                     disallowEmptySelection
                     onChange={(e) => e.target.value && set({ algorithm: e.target.value as TotpAlgorithm })}
@@ -194,17 +206,17 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
             </Accordion>
           </form>
           {secretChanged && (
-            <div className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-              <FontAwesomeIcon icon={faTriangleExclamation} className="mt-0.5 w-4" />
+            <div className="flex gap-2 border border-alarm bg-alarm/10 p-3 text-sm text-ink">
+              <FontAwesomeIcon icon={faTriangleExclamation} className="mt-0.5 w-4 text-alarm" />
               <p>更換金鑰後會產生完全不同的驗證碼，群組裡所有成員看到的驗證碼都會跟著改變。</p>
             </div>
           )}
         </ModalBody>
-        <ModalFooter>
-          <Button variant="bordered" onPress={props.onClose} isDisabled={saving}>
+        <ModalFooter className="border-t border-line">
+          <Button variant="bordered" className="font-display tracking-[0.08em]" onPress={props.onClose} isDisabled={saving}>
             取消
           </Button>
-          <Button color="primary" type="submit" form="group-code-edit-form" isLoading={saving}>
+          <Button color="primary" className="font-display tracking-[0.08em]" type="submit" form="group-code-edit-form" isLoading={saving}>
             儲存
           </Button>
         </ModalFooter>

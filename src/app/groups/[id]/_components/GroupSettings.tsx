@@ -84,86 +84,110 @@ const GroupSettings = ({ detail, onChanged }: GroupSettingsProps) => {
     }
   };
 
-  const sectionClass =
-    "rounded-lg border border-gray-blue-200 bg-white p-4 shadow sm:p-6 dark:border-gray-blue-700 dark:bg-gray-blue-800";
-
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
-      <section className={sectionClass}>
-        <h2 className="mb-4 font-semibold">群組資料</h2>
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (canEdit) handleSave();
-          }}
-        >
-          <Input
-            label="群組名稱"
-            isRequired
-            isReadOnly={!canEdit}
-            maxLength={NAME_MAX}
-            value={name}
-            onValueChange={(value) => {
-              setName(value);
-              setNameError(undefined);
+    <div className="flex flex-col gap-8">
+      {/* 群組資料：左說明、右表單 */}
+      <section className="panel p-4 sm:p-6">
+        <div className="grid grid-cols-12 gap-6">
+          <div className="col-span-12 md:col-span-5">
+            <p className="tech-label">05 // SETTINGS</p>
+            <h2 className="font-display text-lg font-bold text-ink">群組資料</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              {canEdit ? "名稱與說明會顯示給所有成員，以及收到邀請的人。" : "需要「管理群組」權限才能修改。"}
+            </p>
+            <dl className="mt-5 flex flex-col gap-3 text-sm">
+              <div>
+                <dt className="tech-label">GROUP ID</dt>
+                <dd className="mt-1 flex min-w-0 items-center gap-2">
+                  <code className="min-w-0 truncate border border-line bg-surface-2 px-2 py-1 font-mono text-xs text-ink">
+                    {group.id}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={copyId}
+                    aria-label="複製群組 ID"
+                    title="複製"
+                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center border border-line text-ink-muted transition-colors hover:border-phos hover:text-phos"
+                  >
+                    <FontAwesomeIcon icon={faCopy} className="w-3.5" />
+                  </button>
+                </dd>
+              </div>
+              <div>
+                <dt className="tech-label">CREATED</dt>
+                <dd className="mt-1 font-mono text-xs text-ink">{formatDateTime(group.created_at)}</dd>
+              </div>
+            </dl>
+          </div>
+          <form
+            className="col-span-12 flex flex-col gap-4 md:col-span-7"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (canEdit) handleSave();
             }}
-            isInvalid={!!nameError}
-            errorMessage={nameError}
-          />
-          <Textarea
-            label="說明"
-            isReadOnly={!canEdit}
-            maxLength={DESCRIPTION_MAX}
-            value={description}
-            onValueChange={setDescription}
-            description={canEdit ? `${description.length} / ${DESCRIPTION_MAX}` : undefined}
-          />
-          {canEdit ? (
-            <div>
-              <Button type="submit" color="primary" isLoading={saving} isDisabled={!dirty}>
-                儲存
-              </Button>
-            </div>
-          ) : (
-            <p className="text-sm text-gray-blue-500 dark:text-gray-blue-400">需要「管理群組」權限才能修改。</p>
-          )}
-        </form>
-        <dl className="mt-6 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-          <dt className="text-gray-blue-500 dark:text-gray-blue-400">群組 ID</dt>
-          <dd className="flex min-w-0 items-center gap-2">
-            <span className="truncate font-mono">{group.id}</span>
-            <button onClick={copyId} aria-label="複製群組 ID" className="text-gray-blue-400 hover:text-tpp">
-              <FontAwesomeIcon icon={faCopy} className="w-3.5" />
-            </button>
-          </dd>
-          <dt className="text-gray-blue-500 dark:text-gray-blue-400">建立時間</dt>
-          <dd>{formatDateTime(group.created_at)}</dd>
-        </dl>
+          >
+            <Input
+              label="群組名稱"
+              variant="bordered"
+              isRequired
+              isReadOnly={!canEdit}
+              maxLength={NAME_MAX}
+              value={name}
+              onValueChange={(value) => {
+                setName(value);
+                setNameError(undefined);
+              }}
+              isInvalid={!!nameError}
+              errorMessage={nameError}
+            />
+            <Textarea
+              label="說明"
+              variant="bordered"
+              isReadOnly={!canEdit}
+              maxLength={DESCRIPTION_MAX}
+              value={description}
+              onValueChange={setDescription}
+              description={canEdit ? <span className="font-mono">{description.length} / {DESCRIPTION_MAX}</span> : undefined}
+            />
+            {canEdit && (
+              <div className="flex justify-end">
+                <Button type="submit" color="primary" className="font-display tracking-[0.08em]" isLoading={saving} isDisabled={!dirty}>
+                  儲存
+                </Button>
+              </div>
+            )}
+          </form>
+        </div>
       </section>
 
       {detail.is_owner && (
-        <section className={sectionClass}>
-          <h2 className="mb-1 font-semibold">轉移擁有權</h2>
-          <p className="text-sm text-gray-blue-500 dark:text-gray-blue-400">
+        <section className="border border-line bg-surface-1 p-4 sm:p-6">
+          <p className="tech-label">TRANSFER</p>
+          <h2 className="font-display text-lg font-bold text-ink">轉移擁有權</h2>
+          <p className="mt-1 text-sm text-ink-muted">
             到「成員」分頁，在要接手的成員旁按「轉移擁有權」。擁有者不能離開群組，要先轉移或刪除群組。
           </p>
         </section>
       )}
 
       {(isMember && !detail.is_owner) || canDelete ? (
-        <section className="rounded-lg border border-red-300 bg-white p-4 shadow sm:p-6 dark:border-red-800 dark:bg-gray-blue-800">
-          <h2 className="mb-4 font-semibold text-red-600 dark:text-red-400">危險區域</h2>
-          <div className="flex flex-col gap-4">
+        <section className="border border-alarm bg-surface-1 p-4 sm:p-6">
+          <p className="tech-label flex items-center gap-2 text-alarm">
+            <span className="led led-alarm" aria-hidden />
+            DANGER ZONE
+          </p>
+          <h2 className="font-display text-lg font-bold text-ink">危險區域</h2>
+          <div className="mt-4 flex flex-col">
             {isMember && !detail.is_owner && (
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-2 border-t border-line py-4 sm:flex-row sm:items-center">
                 <div className="flex-1">
-                  <p className="font-medium">離開群組</p>
-                  <p className="text-sm text-gray-blue-500 dark:text-gray-blue-400">離開後就看不到群組的驗證碼，要重新受邀才能再加入。</p>
+                  <p className="font-display font-semibold text-ink">離開群組</p>
+                  <p className="text-sm text-ink-muted">離開後就看不到群組的驗證碼，要重新受邀才能再加入。</p>
                 </div>
                 <Button
                   color="danger"
                   variant="bordered"
+                  className="font-display tracking-[0.08em]"
                   startContent={<FontAwesomeIcon icon={faRightFromBracket} className="w-3.5" />}
                   onPress={() => setLeaveOpen(true)}
                 >
@@ -172,13 +196,14 @@ const GroupSettings = ({ detail, onChanged }: GroupSettingsProps) => {
               </div>
             )}
             {canDelete && (
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-2 border-t border-line py-4 sm:flex-row sm:items-center">
                 <div className="flex-1">
-                  <p className="font-medium">刪除群組</p>
-                  <p className="text-sm text-gray-blue-500 dark:text-gray-blue-400">所有驗證碼與金鑰都會一併刪除，無法恢復。</p>
+                  <p className="font-display font-semibold text-ink">刪除群組</p>
+                  <p className="text-sm text-ink-muted">所有驗證碼與金鑰都會一併刪除，無法恢復。</p>
                 </div>
                 <Button
                   color="danger"
+                  className="font-display tracking-[0.08em]"
                   startContent={<FontAwesomeIcon icon={faTrashCan} className="w-3.5" />}
                   onPress={() => setDeleteOpen(true)}
                 >

@@ -4,7 +4,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { Button, Input, Select, SelectItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faAt, faBan, faCopy, faLink, faPaperPlane, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faBan, faCopy, faPaperPlane, faXmark } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import UserChip from "@/components/permissions/UserChip";
 import useAuth from "@/components/auth/useAuth";
@@ -35,6 +35,12 @@ const USES_OPTIONS: { key: string; label: string; uses: number | null }[] = [
 
 const remainingText = (invite: GroupInvite) =>
   invite.max_uses === null ? `不限（已用 ${invite.uses} 次）` : `剩 ${Math.max(0, invite.max_uses - invite.uses)} / ${invite.max_uses} 次`;
+
+// 方形圖示按鈕；danger 版 hover 變警示色
+const ICON_BUTTON =
+  "flex h-8 w-8 flex-shrink-0 items-center justify-center border border-line text-ink-muted transition-colors hover:border-phos hover:text-phos disabled:opacity-40";
+const ICON_BUTTON_DANGER =
+  "flex h-8 w-8 flex-shrink-0 items-center justify-center border border-line text-ink-muted transition-colors hover:border-alarm hover:text-alarm disabled:opacity-40";
 
 // 邀請分頁：建立邀請連結、連結列表、Email / @ID 邀請與待回覆清單
 const GroupInvites = ({ detail, onChanged }: GroupInvitesProps) => {
@@ -105,86 +111,107 @@ const GroupInvites = ({ detail, onChanged }: GroupInvitesProps) => {
     await onChanged();
   };
 
-  const sectionClass =
-    "rounded-lg border border-gray-blue-200 bg-white p-4 shadow sm:p-6 dark:border-gray-blue-700 dark:bg-gray-blue-800";
-
   return (
-    <div className="flex flex-col gap-6">
-      {/* 建立邀請連結 */}
+    <div className="flex flex-col gap-8">
+      {/* 建立邀請連結（主要區塊） */}
       {canInvite && (
-        <section className={sectionClass}>
-          <h2 className="mb-1 flex items-center gap-2 font-semibold">
-            <FontAwesomeIcon icon={faLink} className="w-4 text-tpp" />
-            建立邀請連結
-          </h2>
-          <p className="mb-4 text-sm text-gray-blue-500 dark:text-gray-blue-400">
-            拿到連結的人登入後就能加入群組，加入後只有 @everyone 的權限。
-          </p>
-          <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-center">
-            <Select
-              label="有效時間"
-              selectedKeys={[expiresKey]}
-              disallowEmptySelection
-              onChange={(e) => e.target.value && setExpiresKey(e.target.value)}
-            >
-              {EXPIRES_OPTIONS.map((option) => <SelectItem key={option.key}>{option.label}</SelectItem>)}
-            </Select>
-            <Select
-              label="使用次數"
-              selectedKeys={[usesKey]}
-              disallowEmptySelection
-              onChange={(e) => e.target.value && setUsesKey(e.target.value)}
-            >
-              {USES_OPTIONS.map((option) => <SelectItem key={option.key}>{option.label}</SelectItem>)}
-            </Select>
-            <Button color="primary" size="lg" isLoading={creating} onPress={handleCreate}>
-              建立連結
-            </Button>
+        <section className="panel p-4 sm:p-6">
+          <div className="grid grid-cols-12 gap-6">
+            <div className="col-span-12 md:col-span-5">
+              <p className="tech-label">04 // INVITE LINK</p>
+              <h2 className="font-display text-lg font-bold text-ink">建立邀請連結</h2>
+              <p className="mt-1 text-sm text-ink-muted">
+                拿到連結的人登入後就能加入群組，加入後只有 @everyone 的權限。
+              </p>
+            </div>
+            <div className="col-span-12 md:col-span-7">
+              <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                <Select
+                  label="有效時間"
+                  variant="bordered"
+                  selectedKeys={[expiresKey]}
+                  disallowEmptySelection
+                  onChange={(e) => e.target.value && setExpiresKey(e.target.value)}
+                >
+                  {EXPIRES_OPTIONS.map((option) => <SelectItem key={option.key}>{option.label}</SelectItem>)}
+                </Select>
+                <Select
+                  label="使用次數"
+                  variant="bordered"
+                  selectedKeys={[usesKey]}
+                  disallowEmptySelection
+                  onChange={(e) => e.target.value && setUsesKey(e.target.value)}
+                >
+                  {USES_OPTIONS.map((option) => <SelectItem key={option.key}>{option.label}</SelectItem>)}
+                </Select>
+                <Button color="primary" size="lg" className="font-display tracking-[0.08em]" isLoading={creating} onPress={handleCreate}>
+                  建立連結
+                </Button>
+              </div>
+              {created && <InviteCreated key={created} code={created} onClose={() => setCreated(undefined)} />}
+            </div>
           </div>
-          {created && <InviteCreated key={created} code={created} onClose={() => setCreated(undefined)} />}
         </section>
       )}
 
       {/* 有效的邀請連結 */}
-      <section className={sectionClass}>
-        <h2 className="mb-3 font-semibold">有效的邀請連結</h2>
+      <section>
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div>
+            <p className="tech-label">ACTIVE LINKS</p>
+            <h2 className="font-display text-lg font-bold text-ink">有效的邀請連結</h2>
+          </div>
+          <p className="font-mono text-xs text-ink-dim tabular-nums">{detail.invites.length}</p>
+        </div>
         {detail.invites.length === 0 ? (
-          <p className="text-sm text-gray-blue-500 dark:text-gray-blue-400">目前沒有有效的邀請連結。</p>
+          <div className="hatch border border-line p-8 text-center">
+            <p className="tech-label">NO DATA</p>
+            <p className="mt-2 text-sm text-ink-muted">目前沒有有效的邀請連結。</p>
+          </div>
         ) : (
-          <ul className="divide-y divide-gray-blue-200 dark:divide-gray-blue-700">
+          <ul className="border-t border-line">
             {detail.invites.map((invite) => {
               const canRevoke = canManageGroup || (!!user && invite.created_by?.id === user.uid);
               return (
-                <li key={invite.code} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center">
+                <li
+                  key={invite.code}
+                  className="flex flex-col gap-3 border-b border-line py-3 transition-colors hover:bg-ink/5 sm:flex-row sm:items-center"
+                >
                   <div className="min-w-0 flex-1">
-                    <p className="font-mono text-sm text-gray-blue-900 dark:text-white">{invite.code}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-blue-500 dark:text-gray-blue-400">
+                    <code className="inline-block max-w-full truncate border border-line bg-surface-2 px-2 py-1 font-mono text-xs text-ink">
+                      {invite.code}
+                    </code>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
                       <span className="flex items-center gap-1.5">
-                        建立者 <UserChip user={invite.created_by} size="sm" />
+                        <span className="tech-label">BY</span>
+                        <UserChip user={invite.created_by} size="sm" />
                       </span>
-                      <span>{remainingText(invite)}</span>
-                      <span>{invite.expires_at ? `到期：${formatDateTime(invite.expires_at)}` : "永不過期"}</span>
+                      <span className="font-mono">{remainingText(invite)}</span>
+                      <span className="font-mono text-ink-dim">
+                        {invite.expires_at ? `EXP ${formatDateTime(invite.expires_at)}` : "永不過期"}
+                      </span>
                     </div>
                   </div>
                   <div className="flex flex-shrink-0 gap-2">
-                    <Button
-                      size="sm"
-                      variant="bordered"
-                      startContent={<FontAwesomeIcon icon={faCopy} className="w-3" />}
-                      onPress={() => copyInviteUrl(invite.code)}
+                    <button
+                      type="button"
+                      onClick={() => copyInviteUrl(invite.code)}
+                      aria-label="複製邀請連結"
+                      title="複製"
+                      className={ICON_BUTTON}
                     >
-                      複製
-                    </Button>
+                      <FontAwesomeIcon icon={faCopy} className="w-3.5" />
+                    </button>
                     {canRevoke && (
-                      <Button
-                        size="sm"
-                        variant="bordered"
-                        color="danger"
-                        startContent={<FontAwesomeIcon icon={faBan} className="w-3" />}
-                        onPress={() => setRevoking(invite)}
+                      <button
+                        type="button"
+                        onClick={() => setRevoking(invite)}
+                        aria-label="撤銷邀請連結"
+                        title="撤銷"
+                        className={ICON_BUTTON_DANGER}
                       >
-                        撤銷
-                      </Button>
+                        <FontAwesomeIcon icon={faBan} className="w-3.5" />
+                      </button>
                     )}
                   </div>
                 </li>
@@ -195,18 +222,18 @@ const GroupInvites = ({ detail, onChanged }: GroupInvitesProps) => {
       </section>
 
       {/* Email / @ID 邀請 */}
-      <section className={sectionClass}>
-        <h2 className="mb-1 flex items-center gap-2 font-semibold">
-          <FontAwesomeIcon icon={faAt} className="w-4 text-tpp" />
-          用 Email / @ID 邀請
-        </h2>
+      <section>
+        <div className="mb-3">
+          <p className="tech-label">DIRECT INVITE</p>
+          <h2 className="font-display text-lg font-bold text-ink">用 Email / @ID 邀請</h2>
+        </div>
         {canInvite && (
-          <>
-            <p className="mb-4 text-sm text-gray-blue-500 dark:text-gray-blue-400">
+          <div className="mb-5 border border-line bg-surface-1 p-4 sm:p-5">
+            <p className="mb-3 text-sm text-ink-muted">
               對方登入後會在「群組」頁看到邀請，可以選擇接受或拒絕。Email 可以是還沒註冊的人。
             </p>
             <form
-              className="mb-4 flex gap-2"
+              className="flex gap-2"
               onSubmit={(e) => {
                 e.preventDefault();
                 handleInviteUser();
@@ -215,13 +242,16 @@ const GroupInvites = ({ detail, onChanged }: GroupInvitesProps) => {
               <Input
                 aria-label="Email 或 @ID"
                 placeholder="name@example.com 或 @someone"
+                variant="bordered"
                 value={target}
                 onValueChange={setTarget}
                 autoComplete="off"
+                classNames={{ input: "font-mono text-sm" }}
               />
               <Button
                 type="submit"
                 color="primary"
+                className="font-display tracking-[0.08em]"
                 isLoading={inviting}
                 isDisabled={!target.trim()}
                 startContent={!inviting && <FontAwesomeIcon icon={faPaperPlane} className="w-3.5" />}
@@ -229,25 +259,35 @@ const GroupInvites = ({ detail, onChanged }: GroupInvitesProps) => {
                 邀請
               </Button>
             </form>
-          </>
+          </div>
         )}
 
-        <h3 className="mb-2 text-sm font-semibold text-gray-blue-600 dark:text-gray-blue-300">等待回覆</h3>
+        <div className="mb-2 flex items-end justify-between gap-3">
+          <p className="tech-label">PENDING // 等待回覆</p>
+          <p className="font-mono text-xs text-ink-dim tabular-nums">{detail.email_invites.length}</p>
+        </div>
         {detail.email_invites.length === 0 ? (
-          <p className="text-sm text-gray-blue-500 dark:text-gray-blue-400">沒有等待回覆的邀請。</p>
+          <div className="hatch border border-line p-8 text-center">
+            <p className="tech-label">NO DATA</p>
+            <p className="mt-2 text-sm text-ink-muted">沒有等待回覆的邀請。</p>
+          </div>
         ) : (
-          <ul className="divide-y divide-gray-blue-200 dark:divide-gray-blue-700">
+          <ul className="border-t border-line">
             {detail.email_invites.map((invite) => {
               const canCancel = canInvite || (!!user && invite.invited_by?.id === user.uid);
               return (
-                <li key={invite.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center">
+                <li
+                  key={invite.id}
+                  className="flex flex-col gap-2 border-b border-line py-3 transition-colors hover:bg-ink/5 sm:flex-row sm:items-center"
+                >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-gray-blue-900 dark:text-white">{invite.email}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-blue-500 dark:text-gray-blue-400">
+                    <p className="truncate font-mono text-sm text-ink">{invite.email}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
                       <span className="flex items-center gap-1.5">
-                        邀請人 <UserChip user={invite.invited_by} size="sm" />
+                        <span className="tech-label">BY</span>
+                        <UserChip user={invite.invited_by} size="sm" />
                       </span>
-                      <span>{formatDateTime(invite.created_at)}</span>
+                      <span className="font-mono text-ink-dim">{formatDateTime(invite.created_at)}</span>
                     </div>
                   </div>
                   {canCancel && (
@@ -255,6 +295,7 @@ const GroupInvites = ({ detail, onChanged }: GroupInvitesProps) => {
                       size="sm"
                       variant="bordered"
                       color="danger"
+                      className="font-display tracking-[0.08em]"
                       isLoading={cancelling === invite.id}
                       startContent={cancelling !== invite.id && <FontAwesomeIcon icon={faXmark} className="w-3" />}
                       onPress={() => handleCancel(invite.id)}

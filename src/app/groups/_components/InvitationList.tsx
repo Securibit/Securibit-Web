@@ -3,8 +3,6 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { Button } from "@heroui/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEnvelopeOpenText, faUsers } from "@fortawesome/free-solid-svg-icons";
 import UserChip from "@/components/permissions/UserChip";
 import { respondInvitation } from "@/lib/groups/invites";
 import { showError } from "@/lib/errorDialog";
@@ -34,38 +32,43 @@ const InvitationList = (props: InvitationListProps) => {
   };
 
   return (
-    <section className="mb-8">
-      <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-gray-blue-900 dark:text-white">
-        <FontAwesomeIcon icon={faEnvelopeOpenText} className="w-4 text-tpp" />
-        收到的邀請
-      </h2>
-      <ul className="divide-y divide-gray-blue-200 rounded-lg border border-gray-blue-200 bg-white shadow dark:divide-gray-blue-700 dark:border-gray-blue-700 dark:bg-gray-blue-800">
+    <section className="panel mb-8 p-4 sm:p-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="tech-label flex items-center gap-2">
+          <span className="led" aria-hidden />
+          PENDING // 收到的邀請
+        </p>
+        <p className="font-mono text-xs text-ink-dim tabular-nums">{props.invitations.length}</p>
+      </div>
+      <ul>
         {props.invitations.map((invitation) => (
-          <li key={invitation.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+          <li
+            key={invitation.id}
+            className="flex flex-col gap-3 border-t border-line py-3 sm:flex-row sm:items-center"
+          >
             <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-gray-blue-900 dark:text-white">{invitation.group.name}</p>
+              <p className="truncate font-display text-base font-semibold text-ink">{invitation.group.name}</p>
               {invitation.group.description && (
-                <p className="line-clamp-2 text-sm text-gray-blue-500 dark:text-gray-blue-400">
-                  {invitation.group.description}
-                </p>
+                <p className="line-clamp-2 text-sm text-ink-muted">{invitation.group.description}</p>
               )}
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-blue-500 dark:text-gray-blue-400">
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-ink-muted">
                 <span className="flex items-center gap-1.5">
-                  <FontAwesomeIcon icon={faUsers} className="w-3.5" />
-                  {invitation.group.member_count} 位成員
+                  <span className="tech-label">MEMBERS</span>
+                  <span className="font-mono text-ink tabular-nums">{invitation.group.member_count}</span>
                 </span>
                 {invitation.invited_by && (
                   <span className="flex items-center gap-2">
-                    邀請人
+                    <span className="tech-label">FROM</span>
                     <UserChip user={invitation.invited_by} size="sm" />
                   </span>
                 )}
-                <span>{formatDateTime(invitation.created_at)}</span>
+                <span className="font-mono text-ink-dim">{formatDateTime(invitation.created_at)}</span>
               </div>
             </div>
             <div className="flex flex-shrink-0 gap-2">
               <Button
                 variant="bordered"
+                className="font-display tracking-[0.08em]"
                 isDisabled={!!pending}
                 isLoading={pending?.id === invitation.id && !pending.accept}
                 onPress={() => respond(invitation.id, false)}
@@ -74,6 +77,7 @@ const InvitationList = (props: InvitationListProps) => {
               </Button>
               <Button
                 color="primary"
+                className="font-display tracking-[0.08em]"
                 isDisabled={!!pending}
                 isLoading={pending?.id === invitation.id && pending.accept}
                 onPress={() => respond(invitation.id, true)}

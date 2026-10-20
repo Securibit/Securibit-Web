@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Button, Chip, Input, Switch } from "@heroui/react";
+import { Button, Input, Switch } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowsUpDown, faCheck, faKey, faMagnifyingGlass, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faArrowsUpDown, faCheck, faMagnifyingGlass, faPlus } from "@fortawesome/free-solid-svg-icons";
 import Spinner from "@/components/ui/Loading/Spinner";
 import useAuth from "@/components/auth/useAuth";
 import OverwriteEditor from "@/components/permissions/OverwriteEditor";
@@ -21,6 +21,7 @@ import {
 import { GROUP, has } from "@/lib/permissions/bits";
 import { ImportTextResult } from "@/lib/totp/importText";
 import { showError } from "@/lib/errorDialog";
+import { cn } from "@/lib/utils";
 import { GroupAccount, GroupCodes as GroupCodesResult } from "@/types/Group/Group";
 import { GroupCodesProps } from "@/types/Group/GroupCodes";
 import { TotpInput, TotpItem } from "@/types/Totp/Totp";
@@ -288,36 +289,53 @@ const GroupCodes = ({ detail, actor }: GroupCodesProps) => {
 
   if (accounts === undefined) return <Spinner block label="載入驗證碼…" />;
 
+  // 類別篩選用的方形標籤按鈕
+  const filterClass = (active: boolean) =>
+    cn(
+      "tech-label border px-2 py-1 transition-colors",
+      active ? "border-phos bg-phos/10 text-phos" : "border-line hover:border-line-strong hover:text-ink"
+    );
+
   return (
     <div>
-      {(canAdd || accounts.length > 1) && (
-        <div className="mb-4 flex flex-wrap justify-end gap-2">
-          {canAdd && accounts.length > 1 && (
-            <Button
-              variant={sorting ? "solid" : "bordered"}
-              color="primary"
-              startContent={<FontAwesomeIcon icon={sorting ? faCheck : faArrowsUpDown} className="w-3.5" />}
-              onPress={() => setSorting(!sorting)}
-            >
-              {sorting ? "完成排序" : "排序"}
-            </Button>
-          )}
-          {canAdd && !sorting && (
-            <Button
-              color="primary"
-              startContent={<FontAwesomeIcon icon={faPlus} className="w-3.5" />}
-              onPress={() => setAddOpen(true)}
-            >
-              新增驗證碼
-            </Button>
-          )}
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="tech-label">01 // CODES</p>
+          <h2 className="font-display text-lg font-bold text-ink">
+            驗證碼 <span className="font-mono text-sm font-normal text-ink-dim">{accounts.length}</span>
+          </h2>
         </div>
-      )}
+        {(canAdd || accounts.length > 1) && (
+          <div className="flex flex-wrap gap-2">
+            {canAdd && accounts.length > 1 && (
+              <Button
+                variant={sorting ? "solid" : "bordered"}
+                color="primary"
+                className="font-display tracking-[0.08em]"
+                startContent={<FontAwesomeIcon icon={sorting ? faCheck : faArrowsUpDown} className="w-3.5" />}
+                onPress={() => setSorting(!sorting)}
+              >
+                {sorting ? "完成排序" : "排序"}
+              </Button>
+            )}
+            {canAdd && !sorting && (
+              <Button
+                color="primary"
+                className="font-display tracking-[0.08em]"
+                startContent={<FontAwesomeIcon icon={faPlus} className="w-3.5" />}
+                onPress={() => setAddOpen(true)}
+              >
+                新增驗證碼
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
 
       {accounts.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-gray-blue-300 px-6 py-12 text-center dark:border-gray-blue-700">
-          <FontAwesomeIcon icon={faKey} className="h-8 w-8 text-gray-blue-300 dark:text-gray-blue-600" />
-          <p className="text-gray-blue-500 dark:text-gray-blue-400">
+        <div className="hatch border border-line p-10 text-center">
+          <p className="tech-label">NO DATA</p>
+          <p className="mt-2 text-ink-muted">
             {canAdd
               ? "群組還沒有驗證碼，按「新增驗證碼」加入第一筆。"
               : "目前沒有你能查看的驗證碼。如果需要，請群組管理者調整你的身分組權限。"}
@@ -326,44 +344,42 @@ const GroupCodes = ({ detail, actor }: GroupCodesProps) => {
       ) : (
         <>
           {sorting ? (
-            <p className="mb-4 text-sm text-gray-blue-500 dark:text-gray-blue-400">
+            <p className="mb-4 border-l-2 border-phos pl-3 text-sm text-ink-muted">
               用箭頭調整順序，釘選的項目固定排在最上面。順序對所有成員都一樣，調整完按「完成排序」。
             </p>
           ) : (
             <div className="mb-4 flex flex-col gap-3">
-              <Input
-                aria-label="搜尋驗證碼"
-                placeholder="搜尋名稱或類別"
-                value={keyword}
-                onValueChange={setKeyword}
-                isClearable
-                onClear={() => setKeyword("")}
-                startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="w-3.5 text-gray-blue-400" />}
-                className="sm:max-w-sm"
-              />
-              <Switch size="sm" isSelected={hideCodes} onValueChange={toggleHideCodes}>
-                隱藏驗證碼（點一下才顯示）
-              </Switch>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                <Input
+                  aria-label="搜尋驗證碼"
+                  placeholder="搜尋名稱或類別"
+                  variant="bordered"
+                  value={keyword}
+                  onValueChange={setKeyword}
+                  isClearable
+                  onClear={() => setKeyword("")}
+                  startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="w-3.5 text-ink-dim" />}
+                  className="sm:max-w-sm"
+                />
+                <Switch size="sm" isSelected={hideCodes} onValueChange={toggleHideCodes} classNames={{ label: "text-sm text-ink-muted" }}>
+                  隱藏驗證碼（點一下才顯示）
+                </Switch>
+              </div>
               {categories.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  <Chip
-                    as="button"
-                    variant={activeCategory ? "bordered" : "solid"}
-                    color="primary"
-                    onClick={() => setCategory(undefined)}
-                  >
-                    全部 {accounts.length}
-                  </Chip>
+                  <button type="button" className={filterClass(!activeCategory)} onClick={() => setCategory(undefined)}>
+                    全部 <span className="font-mono">{accounts.length}</span>
+                  </button>
                   {categories.map((name) => (
-                    <Chip
+                    <button
                       key={name}
-                      as="button"
-                      variant={activeCategory === name ? "solid" : "bordered"}
-                      color="primary"
+                      type="button"
+                      className={filterClass(activeCategory === name)}
                       onClick={() => setCategory(activeCategory === name ? undefined : name)}
                     >
-                      {name} {accounts.filter((account) => account.category === name).length}
-                    </Chip>
+                      {name}{" "}
+                      <span className="font-mono">{accounts.filter((account) => account.category === name).length}</span>
+                    </button>
                   ))}
                 </div>
               )}
@@ -371,10 +387,13 @@ const GroupCodes = ({ detail, actor }: GroupCodesProps) => {
           )}
 
           {filtered.length === 0 ? (
-            <p className="py-10 text-center text-gray-blue-500 dark:text-gray-blue-400">沒有符合條件的驗證碼</p>
+            <div className="hatch border border-line p-10 text-center">
+              <p className="tech-label">NO MATCH</p>
+              <p className="mt-2 text-ink-muted">沒有符合條件的驗證碼</p>
+            </div>
           ) : (
-            <div className="w-full p-4 bg-white border border-gray-blue-200 rounded-lg shadow sm:px-8 dark:bg-gray-blue-800 dark:border-gray-blue-700">
-              <ul role="list" className="divide-y divide-gray-blue-200 dark:divide-gray-blue-700">
+            <div className="panel px-4 sm:px-6">
+              <ul role="list">
                 {filtered.map((account, index) => {
                   // 單筆的有效權限（已套用覆寫）
                   const canManage = has(account.permissions, GROUP.MANAGE_CODES);

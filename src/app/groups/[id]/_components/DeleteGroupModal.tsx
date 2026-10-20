@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { DeleteGroupModalProps } from "@/types/Group/DeleteGroupModal";
 
 // 刪除群組：要輸入群組名稱才能按確認
@@ -29,18 +27,23 @@ const DeleteGroupModal = (props: DeleteGroupModalProps) => {
   };
 
   return (
-    <Modal isOpen={props.isOpen} onOpenChange={(open) => !open && cancel()} className="dark:bg-gray-blue-800">
+    <Modal
+      isOpen={props.isOpen}
+      onOpenChange={(open) => !open && cancel()}
+      className="border border-alarm bg-surface-1 text-ink"
+    >
       <ModalContent>
-        <ModalHeader className="flex items-center gap-2 text-black dark:text-white">
-          <FontAwesomeIcon icon={faTriangleExclamation} className="w-4 text-red-500" />
+        <ModalHeader className="flex items-center gap-3 border-b border-line font-display tracking-wide">
+          <span className="led led-alarm" aria-hidden />
           刪除群組
         </ModalHeader>
-        <ModalBody className="text-black dark:text-white">
-          <p>
-            刪除後群組的所有驗證碼、金鑰、身分組、成員與邀請都會一併刪除，<b>無法恢復</b>。
+        <ModalBody className="py-5">
+          <p className="text-ink-muted">
+            刪除後群組的所有驗證碼、金鑰、身分組、成員與邀請都會一併刪除，
+            <b className="text-alarm">無法恢復</b>。
           </p>
-          <p className="text-sm">
-            請輸入群組名稱 <span className="font-semibold">「{props.groupName}」</span> 確認：
+          <p className="text-sm text-ink-muted">
+            請輸入群組名稱 <span className="font-display font-semibold text-ink">「{props.groupName}」</span> 確認：
           </p>
           <form
             id="delete-group-form"
@@ -49,14 +52,29 @@ const DeleteGroupModal = (props: DeleteGroupModalProps) => {
               confirm();
             }}
           >
-            <Input aria-label="群組名稱" placeholder={props.groupName} value={typed} onValueChange={setTyped} autoComplete="off" />
+            <Input
+              aria-label="群組名稱"
+              variant="bordered"
+              placeholder={props.groupName}
+              value={typed}
+              onValueChange={setTyped}
+              autoComplete="off"
+              autoFocus
+            />
           </form>
         </ModalBody>
-        <ModalFooter>
-          <Button variant="bordered" onPress={cancel} isDisabled={pending}>
+        <ModalFooter className="border-t border-line">
+          <Button variant="bordered" className="font-display tracking-[0.08em]" onPress={cancel} isDisabled={pending}>
             取消
           </Button>
-          <Button color="danger" type="submit" form="delete-group-form" isDisabled={!matched} isLoading={pending}>
+          <Button
+            color="danger"
+            className="font-display tracking-[0.08em]"
+            type="submit"
+            form="delete-group-form"
+            isDisabled={!matched}
+            isLoading={pending}
+          >
             刪除群組
           </Button>
         </ModalFooter>

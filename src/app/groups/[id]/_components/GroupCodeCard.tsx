@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useInterval } from "react-use";
-import { CircularProgress, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Progress, Tooltip } from "@heroui/react";
+import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Tooltip } from "@heroui/react";
 import { toast } from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import { faArrowDown, faArrowUp, faEllipsis, faLock, faPen, faQrcode, faShieldHalved, faThumbtack, faTrash } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import ExportItemModal from "@/app/code/_components/ExportItemModal";
+import { cn } from "@/lib/utils";
 import { generateOtp } from "@/lib/totp/otp";
 import { isValidSecret } from "@/lib/totp/crud";
 import { showError } from "@/lib/errorDialog";
@@ -20,6 +21,10 @@ const formatOtp = (otp: string) =>
   otp.length === 6 ? `${otp.slice(0, 3)} ${otp.slice(3)}` : otp.replace(/(.{4})(?=.)/g, "$1 ");
 
 type MenuKey = "pin" | "export" | "permissions" | "delete";
+
+// 方形圖示按鈕，操作區統一用這個
+const ICON_BUTTON =
+  "flex h-8 w-8 flex-shrink-0 items-center justify-center border border-line text-ink-muted transition-colors hover:border-phos hover:text-phos disabled:opacity-30 disabled:hover:border-line disabled:hover:text-ink-muted";
 
 // 群組的一筆驗證碼，外觀同 CodeCard；動態碼來自金鑰（瀏覽器產生）或伺服器
 const GroupCodeCard = (props: GroupCodeCardProps) => {
@@ -118,55 +123,93 @@ const GroupCodeCard = (props: GroupCodeCardProps) => {
   const hasActions = !!props.onEdit || menu.length > 0;
 
   return (
-    <li className="py-3 sm:py-4">
-      <Progress
-        aria-label="剩餘時間"
-        maxValue={period}
-        value={timeLeft}
-        color={danger ? "danger" : "primary"}
-        className="mb-2 h-1"
-      />
+    <li className="group relative border-b border-line py-4 transition-colors hover:bg-ink/5">
       <div className="flex items-center gap-3 sm:gap-4">
-        {/* 操作按鈕；排序模式改成上下移動 */}
+        {/* 左：名稱 + 類別 */}
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-display text-base font-semibold text-ink">
+            {account.pinned && (
+              <FontAwesomeIcon icon={faThumbtack} className="mr-1.5 w-3 text-phos" aria-label="已釘選" />
+            )}
+            {account.has_overwrites && (
+              <Tooltip content="這筆驗證碼有個別設定權限">
+                <FontAwesomeIcon icon={faLock} className="mr-1.5 w-3 text-ink-dim" aria-label="有個別權限設定" />
+              </Tooltip>
+            )}
+            {account.name}
+          </p>
+          {account.category && (
+            <span className="tech-label mt-1 inline-block border border-line px-1.5 py-0.5">{account.category}</span>
+          )}
+        </div>
+
+        {/* 右：讀數（點一下複製）+ 秒數 */}
+        <div className="flex flex-col items-end">
+          {otp === undefined ? (
+            <p className="readout text-2xl text-ink-dim sm:text-3xl">--- ---</p>
+          ) : otp.value && !revealed ? (
+            <button
+              onClick={() => setRevealedCounter(counter)}
+              title="點擊顯示"
+              aria-label="顯示驗證碼"
+              className="readout text-2xl text-ink-dim transition-colors hover:text-phos sm:text-3xl"
+            >
+              {formatOtp("•".repeat(otp.value.length))}
+            </button>
+          ) : otp.value ? (
+            <button
+              key={counter}
+              onClick={() => otp.value && copyToClipboard(otp.value)}
+              title="點擊複製"
+              className="readout settle glow text-2xl text-phos transition-colors hover:text-ink sm:text-3xl"
+            >
+              {formatOtp(otp.value)}
+            </button>
+          ) : (
+            <p className="font-mono text-base text-alarm sm:text-lg">金鑰錯誤</p>
+          )}
+          <span
+            className={cn(
+              "font-mono text-[11px] tracking-[0.08em] text-ink-dim tabular-nums",
+              danger && "text-alarm"
+            )}
+          >
+            {timeLeft} s
+          </span>
+          {danger && revealed && otp?.value && otp.next && (
+            <button
+              onClick={() => otp.next && copyToClipboard(otp.next)}
+              title="點擊複製下一組"
+              className="font-mono text-[11px] tabular-nums text-ink-dim transition-colors hover:text-phos"
+            >
+              下一組 {formatOtp(otp.next)}
+            </button>
+          )}
+        </div>
+
+        {/* 操作：方形圖示按鈕 + Dropdown；排序模式改成上下移動 */}
         {props.sort ? (
           <div className="flex flex-shrink-0 gap-2">
-            <button
-              onClick={props.sort.onUp}
-              disabled={!props.sort.canUp}
-              aria-label="往上移"
-              className="rounded-full border-2 border-tpp w-10 h-10 flex items-center justify-center hover:bg-tpp/10 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-            >
-              <FontAwesomeIcon icon={faArrowUp} className="w-4 h-4 text-tpp" />
+            <button onClick={props.sort.onUp} disabled={!props.sort.canUp} aria-label="往上移" className={ICON_BUTTON}>
+              <FontAwesomeIcon icon={faArrowUp} className="w-3.5" />
             </button>
-            <button
-              onClick={props.sort.onDown}
-              disabled={!props.sort.canDown}
-              aria-label="往下移"
-              className="rounded-full border-2 border-tpp w-10 h-10 flex items-center justify-center hover:bg-tpp/10 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-            >
-              <FontAwesomeIcon icon={faArrowDown} className="w-4 h-4 text-tpp" />
+            <button onClick={props.sort.onDown} disabled={!props.sort.canDown} aria-label="往下移" className={ICON_BUTTON}>
+              <FontAwesomeIcon icon={faArrowDown} className="w-3.5" />
             </button>
           </div>
         ) : (
           hasActions && (
             <div className="flex flex-shrink-0 gap-2">
               {props.onEdit && (
-                <button
-                  onClick={props.onEdit}
-                  aria-label="編輯驗證碼"
-                  className="rounded-full border-2 border-tpp w-10 h-10 flex items-center justify-center hover:bg-tpp/10 transition-colors"
-                >
-                  <FontAwesomeIcon icon={faPen} className="w-4 h-4 text-tpp" />
+                <button onClick={props.onEdit} aria-label="編輯驗證碼" className={ICON_BUTTON}>
+                  <FontAwesomeIcon icon={faPen} className="w-3.5" />
                 </button>
               )}
               {menu.length > 0 && (
-                <Dropdown className="dark:bg-gray-blue-800">
+                <Dropdown className="border border-line bg-surface-1">
                   <DropdownTrigger>
-                    <button
-                      aria-label="更多操作"
-                      className="rounded-full border-2 border-gray-blue-300 w-10 h-10 flex items-center justify-center hover:bg-gray-blue-500/10 transition-colors dark:border-gray-blue-600"
-                    >
-                      <FontAwesomeIcon icon={faEllipsis} className="w-4 h-4 text-gray-blue-500 dark:text-gray-blue-300" />
+                    <button aria-label="更多操作" className={ICON_BUTTON}>
+                      <FontAwesomeIcon icon={faEllipsis} className="w-3.5" />
                     </button>
                   </DropdownTrigger>
                   <DropdownMenu aria-label="驗證碼操作" items={menu} onAction={(key) => handleMenu(key as MenuKey)}>
@@ -186,70 +229,13 @@ const GroupCodeCard = (props: GroupCodeCardProps) => {
             </div>
           )
         )}
+      </div>
 
-        {/* 名稱與類別 */}
-        <div className="flex-1 min-w-0">
-          <p className="text-base sm:text-lg font-medium text-gray-blue-900 truncate dark:text-white">
-            {account.pinned && (
-              <FontAwesomeIcon icon={faThumbtack} className="mr-1.5 w-3 text-tpp" aria-label="已釘選" />
-            )}
-            {account.has_overwrites && (
-              <Tooltip content="這筆驗證碼有個別設定權限">
-                <FontAwesomeIcon icon={faLock} className="mr-1.5 w-3 text-gray-blue-400" aria-label="有個別權限設定" />
-              </Tooltip>
-            )}
-            {account.name}
-          </p>
-          {account.category && (
-            <span className="text-xs font-medium px-2 sm:px-2.5 sm:py-0.5 rounded bg-purple-100 text-purple-800 border-2 border-purple-300 dark:bg-tpp/30 dark:text-bityo dark:border-tpp">
-              {account.category}
-            </span>
-          )}
-        </div>
-
-        {/* 驗證碼（點擊複製） */}
-        {otp === undefined ? (
-          <p className="text-xl font-semibold text-gray-blue-400 tabular-nums">------</p>
-        ) : otp.value && !revealed ? (
-          <button
-            onClick={() => setRevealedCounter(counter)}
-            title="點擊顯示"
-            aria-label="顯示驗證碼"
-            className="text-xl sm:text-2xl font-semibold tracking-widest text-gray-blue-400 hover:text-tpp transition-colors"
-          >
-            {formatOtp("•".repeat(otp.value.length))}
-          </button>
-        ) : otp.value ? (
-          <div className="flex flex-col items-end">
-            <button
-              onClick={() => otp.value && copyToClipboard(otp.value)}
-              title="點擊複製"
-              className="text-xl sm:text-2xl font-semibold tabular-nums text-gray-blue-900 dark:text-white hover:text-tpp transition-colors"
-            >
-              {formatOtp(otp.value)}
-            </button>
-            {danger && otp.next && (
-              <button
-                onClick={() => otp.next && copyToClipboard(otp.next)}
-                title="點擊複製下一組"
-                className="text-xs tabular-nums text-gray-blue-500 hover:text-tpp transition-colors dark:text-gray-blue-400"
-              >
-                下一組 {formatOtp(otp.next)}
-              </button>
-            )}
-          </div>
-        ) : (
-          <p className="text-sm sm:text-xl font-semibold text-red-500">金鑰錯誤！</p>
-        )}
-
-        <CircularProgress
-          aria-label="剩餘秒數"
-          size="lg"
-          maxValue={period}
-          value={timeLeft}
-          color={danger ? "danger" : "primary"}
-          formatOptions={{ style: "unit", unit: "second", unitDisplay: "narrow" }}
-          showValueLabel={true}
+      {/* 倒數條：貼在列底部 */}
+      <div className="absolute inset-x-0 bottom-0 h-px bg-line">
+        <div
+          className={cn("h-full transition-[width] duration-1000 ease-linear", danger ? "bg-alarm" : "bg-phos")}
+          style={{ width: `${(timeLeft / period) * 100}%` }}
         />
       </div>
 

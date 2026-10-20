@@ -43,10 +43,14 @@ const CreateGroupModal = (props: CreateGroupModalProps) => {
   };
 
   return (
-    <Modal isOpen={props.isOpen} onOpenChange={(open) => !open && close()} className="dark:bg-gray-blue-800">
+    <Modal
+      isOpen={props.isOpen}
+      onOpenChange={(open) => !open && close()}
+      className="border border-line bg-surface-1 text-ink"
+    >
       <ModalContent>
-        <ModalHeader className="text-black dark:text-white">建立群組</ModalHeader>
-        <ModalBody>
+        <ModalHeader className="border-b border-line font-display tracking-wide">建立群組</ModalHeader>
+        <ModalBody className="py-5">
           <form
             id="create-group-form"
             className="flex flex-col gap-4"
@@ -58,6 +62,7 @@ const CreateGroupModal = (props: CreateGroupModalProps) => {
             <Input
               label="群組名稱"
               placeholder="例如：工程部共用帳號"
+              variant="bordered"
               isRequired
               autoFocus
               maxLength={NAME_MAX}
@@ -72,21 +77,22 @@ const CreateGroupModal = (props: CreateGroupModalProps) => {
             <Textarea
               label="說明（選填）"
               placeholder="這個群組用來放哪些帳號的驗證碼"
+              variant="bordered"
               maxLength={DESCRIPTION_MAX}
               value={description}
               onValueChange={setDescription}
-              description={`${description.length} / ${DESCRIPTION_MAX}`}
+              description={<span className="font-mono">{description.length} / {DESCRIPTION_MAX}</span>}
             />
           </form>
-          <p className="text-sm text-gray-blue-500 dark:text-gray-blue-400">
+          <p className="text-sm text-ink-muted">
             建立後你就是擁有者，可以邀請成員、設定身分組，決定誰能看到哪些驗證碼。
           </p>
         </ModalBody>
-        <ModalFooter>
-          <Button variant="bordered" onPress={close} isDisabled={saving}>
+        <ModalFooter className="border-t border-line">
+          <Button variant="bordered" className="font-display tracking-[0.08em]" onPress={close} isDisabled={saving}>
             取消
           </Button>
-          <Button color="primary" type="submit" form="create-group-form" isLoading={saving}>
+          <Button color="primary" className="font-display tracking-[0.08em]" type="submit" form="create-group-form" isLoading={saving}>
             建立
           </Button>
         </ModalFooter>

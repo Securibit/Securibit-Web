@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Button, Tooltip } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCrown, faRightLeft, faTags, faUserMinus } from "@fortawesome/free-solid-svg-icons";
+import { faRightLeft, faTags, faUserMinus } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import UserChip from "@/components/permissions/UserChip";
 import RoleChip from "@/components/permissions/RoleChip";
@@ -69,29 +69,40 @@ const GroupMembers = ({ detail, actor, onChanged }: GroupMembersProps) => {
 
   return (
     <div>
-      <p className="mb-4 text-sm text-gray-blue-500 dark:text-gray-blue-400">共 {members.length} 位成員</p>
-      <ul className="divide-y divide-gray-blue-200 rounded-lg border border-gray-blue-200 bg-white shadow dark:divide-gray-blue-700 dark:border-gray-blue-700 dark:bg-gray-blue-800">
+      <div className="mb-4">
+        <p className="tech-label">02 // MEMBERS</p>
+        <h2 className="font-display text-lg font-bold text-ink">
+          成員 <span className="font-mono text-sm font-normal text-ink-dim">{members.length}</span>
+        </h2>
+      </div>
+
+      <ul className="border-t border-line">
         {members.map((member) => {
           const manageable = canManageMember(actor, member);
           const isSelf = member.id === user?.uid;
           const memberRoles = roles.filter((role) => !role.is_default && member.role_ids.includes(role.id));
           return (
-            <li key={member.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+            <li
+              key={member.id}
+              className="flex flex-col gap-3 border-b border-line py-3 transition-colors hover:bg-ink/5 sm:flex-row sm:items-center"
+            >
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <UserChip user={member} />
                   {member.is_owner && (
-                    <Tooltip content="群組擁有者">
-                      <FontAwesomeIcon icon={faCrown} className="w-4 text-amber-500" aria-label="群組擁有者" />
-                    </Tooltip>
+                    <span className="tech-label border border-phos px-1.5 py-0.5 text-phos" title="群組擁有者">
+                      OWNER
+                    </span>
                   )}
-                  {isSelf && <span className="text-xs text-gray-blue-400">（你）</span>}
+                  {isSelf && <span className="tech-label border border-line px-1.5 py-0.5">YOU</span>}
                 </div>
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
                   {memberRoles.map((role) => (
                     <RoleChip key={role.id} role={role} />
                   ))}
-                  <span className="text-xs text-gray-blue-400">加入於 {formatDateTime(member.joined_at)}</span>
+                  <span className="font-mono text-[11px] tracking-[0.04em] text-ink-dim">
+                    JOINED {formatDateTime(member.joined_at)}
+                  </span>
                 </div>
               </div>
               <div className="flex flex-shrink-0 flex-wrap gap-2">
@@ -99,6 +110,7 @@ const GroupMembers = ({ detail, actor, onChanged }: GroupMembersProps) => {
                   <Button
                     size="sm"
                     variant="bordered"
+                    className="font-display tracking-[0.08em]"
                     startContent={<FontAwesomeIcon icon={faTags} className="w-3" />}
                     onPress={() => setAssigning(member)}
                   >
@@ -109,7 +121,7 @@ const GroupMembers = ({ detail, actor, onChanged }: GroupMembersProps) => {
                   <Button
                     size="sm"
                     variant="bordered"
-                    color="warning"
+                    className="font-display tracking-[0.08em]"
                     startContent={<FontAwesomeIcon icon={faRightLeft} className="w-3" />}
                     onPress={() => setTransferring(member)}
                   >
@@ -121,6 +133,7 @@ const GroupMembers = ({ detail, actor, onChanged }: GroupMembersProps) => {
                     size="sm"
                     variant="bordered"
                     color="danger"
+                    className="font-display tracking-[0.08em]"
                     startContent={<FontAwesomeIcon icon={faUserMinus} className="w-3" />}
                     onPress={() => setKicking(member)}
                   >
@@ -169,8 +182,8 @@ const GroupMembers = ({ detail, actor, onChanged }: GroupMembersProps) => {
         title="轉移擁有權"
         description={
           <div className="flex flex-col gap-2">
-            <p>確定要把群組擁有權轉移給 {transferring ? displayName(transferring) : ""} 嗎？</p>
-            <p className="text-sm text-gray-blue-500 dark:text-gray-blue-400">
+            <p className="text-ink">確定要把群組擁有權轉移給 {transferring ? displayName(transferring) : ""} 嗎？</p>
+            <p className="text-sm text-ink-muted">
               轉移後你會變成一般成員（保留目前的身分組），不能再刪除群組或轉移擁有權，也可能失去部分權限。這個動作只有新的擁有者能再轉回來。
             </p>
           </div>

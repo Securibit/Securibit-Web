@@ -5,8 +5,6 @@ import { useParams } from "next/navigation";
 import { useRouter } from "nextjs-toploader/app";
 import toast from "react-hot-toast";
 import { Button } from "@heroui/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleExclamation, faUserGroup, faUsers } from "@fortawesome/free-solid-svg-icons";
 import PageContent from "@/components/layout/PageContent";
 import Spinner from "@/components/ui/Loading/Spinner";
 import UserChip from "@/components/permissions/UserChip";
@@ -61,51 +59,94 @@ const InviteClient = () => {
     : (info.reason && INVITE_REASON_TEXT[info.reason]) || "這個邀請連結無法使用";
 
   return (
-    <PageContent className="flex max-w-lg justify-center">
-      <div className="mt-6 w-full rounded-xl border border-gray-blue-200 bg-white p-6 text-center shadow sm:p-8 dark:border-gray-blue-700 dark:bg-gray-blue-800">
+    <PageContent className="boot flex max-w-lg justify-center">
+      <div className="panel mt-6 w-full p-6 sm:p-8">
         {invalid ? (
-          <div className="flex flex-col items-center gap-4">
-            <FontAwesomeIcon icon={faCircleExclamation} className="h-12 w-12 text-red-400" />
-            <h1 className="text-xl font-bold text-gray-blue-900 dark:text-white">無法使用這個邀請</h1>
-            <p className="text-gray-blue-500 dark:text-gray-blue-400">{reason}</p>
-            <p className="text-sm text-gray-blue-400">請向邀請你的人索取新的邀請連結。</p>
-            <Button color="primary" variant="flat" onPress={() => router.push("/groups")}>
+          <>
+            <p className="tech-label flex items-center gap-2 text-alarm">
+              <span className="led led-alarm" aria-hidden />
+              INVITE // INVALID
+            </p>
+            <h1 className="mt-3 font-display text-2xl font-bold text-ink">無法使用這個邀請</h1>
+            <p className="mt-3 text-ink-muted">{reason}</p>
+            <p className="mt-1 text-sm text-ink-dim">請向邀請你的人索取新的邀請連結。</p>
+            <div className="rule mt-6" />
+            <Button
+              variant="bordered"
+              className="mt-6 w-full font-display tracking-[0.08em]"
+              onPress={() => router.push("/groups")}
+            >
               回到我的群組
             </Button>
-          </div>
+          </>
         ) : (
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-tpp/10">
-              <FontAwesomeIcon icon={faUserGroup} className="h-7 w-7 text-tpp" />
-            </div>
-            <p className="text-sm text-gray-blue-500 dark:text-gray-blue-400">你受邀加入群組</p>
-            <h1 className="break-words text-2xl font-bold text-gray-blue-900 dark:text-white">{info.group?.name}</h1>
-            {info.group?.description && (
-              <p className="whitespace-pre-line text-gray-blue-600 dark:text-gray-blue-300">{info.group.description}</p>
-            )}
-            <p className="flex items-center gap-1.5 text-sm text-gray-blue-500 dark:text-gray-blue-400">
-              <FontAwesomeIcon icon={faUsers} className="w-3.5" />
-              {info.group?.member_count} 位成員
+          <>
+            <p className="tech-label flex items-center gap-2">
+              <span className="led" aria-hidden />
+              INVITE // 你受邀加入群組
             </p>
-            {info.inviter && (
-              <div className="flex items-center gap-2 text-sm text-gray-blue-500 dark:text-gray-blue-400">
-                邀請人
-                <UserChip user={info.inviter} size="sm" />
-              </div>
+            <h1 className="mt-3 break-words font-display text-3xl font-bold text-ink sm:text-4xl">{info.group?.name}</h1>
+            {info.group?.description && (
+              <p className="mt-3 whitespace-pre-line text-sm text-ink-muted">{info.group.description}</p>
             )}
+
+            <dl className="mt-6 grid grid-cols-2 gap-4 border-t border-line pt-4">
+              <div>
+                <dt className="tech-label">MEMBERS</dt>
+                <dd className="mt-1 font-mono text-lg text-ink tabular-nums">{info.group?.member_count}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="tech-label">INVITED BY</dt>
+                <dd className="mt-1">
+                  {info.inviter ? (
+                    <UserChip user={info.inviter} size="sm" />
+                  ) : (
+                    <span className="font-mono text-sm text-ink-dim">--</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="rule mt-6" />
+
             {info.already_member ? (
               <>
-                <p className="text-sm text-emerald-600 dark:text-emerald-400">你已經是這個群組的成員。</p>
-                <Button color="primary" size="lg" className="w-full" onPress={() => router.push(`/groups/${info.group?.id}`)}>
+                <p className="mt-4 flex items-center gap-2 text-sm text-ink-muted">
+                  <span className="led" aria-hidden />
+                  你已經是這個群組的成員。
+                </p>
+                <Button
+                  color="primary"
+                  size="lg"
+                  className="mt-4 w-full font-display tracking-[0.08em]"
+                  onPress={() => router.push(`/groups/${info.group?.id}`)}
+                >
                   前往群組
                 </Button>
               </>
             ) : (
-              <Button color="primary" size="lg" className="w-full" isLoading={joining} onPress={handleJoin}>
-                加入群組
-              </Button>
+              <div className="mt-6 grid grid-cols-12 gap-3">
+                <Button
+                  variant="bordered"
+                  size="lg"
+                  className="col-span-5 font-display tracking-[0.08em]"
+                  isDisabled={joining}
+                  onPress={() => router.push("/groups")}
+                >
+                  拒絕
+                </Button>
+                <Button
+                  color="primary"
+                  size="lg"
+                  className="col-span-7 font-display tracking-[0.08em]"
+                  isLoading={joining}
+                  onPress={handleJoin}
+                >
+                  加入群組
+                </Button>
+              </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </PageContent>

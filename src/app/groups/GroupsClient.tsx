@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "nextjs-toploader/app";
 import { Button } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faUserGroup } from "@fortawesome/free-solid-svg-icons";
+import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import PageContent from "@/components/layout/PageContent";
 import PageHeader from "@/components/layout/PageHeader";
 import Spinner from "@/components/ui/Loading/Spinner";
@@ -18,7 +18,7 @@ import GroupCard from "./_components/GroupCard";
 import CreateGroupModal from "./_components/CreateGroupModal";
 import InvitationList from "./_components/InvitationList";
 
-// 我的群組：群組卡片、建立群組、收到的邀請
+// 我的群組：群組列表、建立群組、收到的邀請
 const GroupsClient = () => {
   const { user, can } = useAuth();
   const router = useRouter();
@@ -49,14 +49,16 @@ const GroupsClient = () => {
   const openGroup = (groupId: string) => router.push(`/groups/${groupId}`);
 
   return (
-    <PageContent>
+    <PageContent className="boot">
       <PageHeader
+        index="02 // GROUPS"
         title="群組"
         subtitle="和其他人共用 2FA 驗證碼，用身分組決定誰能看到哪些驗證碼"
         right={
           canCreate && (
             <Button
               color="primary"
+              className="font-display tracking-[0.08em]"
               startContent={<FontAwesomeIcon icon={faPlus} className="w-3.5" />}
               onPress={() => setCreateOpen(true)}
             >
@@ -77,10 +79,10 @@ const GroupsClient = () => {
       {groups === undefined ? (
         <Spinner block label="載入群組…" />
       ) : groups.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-gray-blue-300 px-6 py-12 text-center dark:border-gray-blue-700">
-          <FontAwesomeIcon icon={faUserGroup} className="h-10 w-10 text-gray-blue-300 dark:text-gray-blue-600" />
-          <p className="text-lg font-semibold text-gray-blue-900 dark:text-white">你還沒有加入任何群組</p>
-          <p className="max-w-md text-sm text-gray-blue-500 dark:text-gray-blue-400">
+        <div className="hatch border border-line p-10 text-center">
+          <p className="tech-label">NO DATA</p>
+          <p className="mt-2 font-display text-lg font-semibold text-ink">你還沒有加入任何群組</p>
+          <p className="mx-auto mt-2 max-w-md text-sm text-ink-muted">
             群組可以讓團隊共用同一組 2FA 驗證碼，並透過身分組控制每個人能看到驗證碼、金鑰，或管理驗證碼。
             {canCreate
               ? "按「建立群組」開始，或請群組成員傳邀請連結給你。"
@@ -89,7 +91,8 @@ const GroupsClient = () => {
           {canCreate && (
             <Button
               color="primary"
-              variant="flat"
+              variant="bordered"
+              className="mt-5 font-display tracking-[0.08em]"
               startContent={<FontAwesomeIcon icon={faPlus} className="w-3.5" />}
               onPress={() => setCreateOpen(true)}
             >
@@ -99,14 +102,15 @@ const GroupsClient = () => {
         </div>
       ) : (
         <section>
-          {invitations.length > 0 && (
-            <h2 className="mb-3 text-lg font-semibold text-gray-blue-900 dark:text-white">我的群組</h2>
-          )}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <p className="tech-label">MY GROUPS</p>
+            <p className="font-mono text-xs text-ink-dim tabular-nums">{groups.length}</p>
+          </div>
+          <ul className="border border-line border-b-0 bg-surface-1">
             {groups.map((group) => (
               <GroupCard key={group.id} group={group} onOpen={() => openGroup(group.id)} />
             ))}
-          </div>
+          </ul>
         </section>
       )}
 

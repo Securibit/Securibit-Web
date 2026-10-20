@@ -1,51 +1,49 @@
 "use client";
 
-import { Card, CardBody, Chip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCrown, faKey, faUsers } from "@fortawesome/free-solid-svg-icons";
+import { faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { GroupCardProps } from "@/types/Group/GroupCard";
 
-// 群組列表的一張卡片：名稱、說明、成員數、驗證碼數、擁有者標記
+// 群組列表的一列：名稱、說明、成員數、驗證碼數、擁有者標記；整列可按
 const GroupCard = (props: GroupCardProps) => {
   const { group } = props;
 
   return (
-    <Card
-      isPressable
-      onPress={props.onOpen}
-      shadow="sm"
-      className="border border-gray-blue-200 dark:border-gray-blue-700 dark:bg-gray-blue-800"
-    >
-      <CardBody className="flex flex-col gap-2 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <h2 className="min-w-0 truncate text-lg font-semibold text-gray-blue-900 dark:text-white">{group.name}</h2>
-          {group.is_owner && (
-            <Chip
-              size="sm"
-              variant="flat"
-              color="warning"
-              startContent={<FontAwesomeIcon icon={faCrown} className="ml-1 w-3" />}
-              className="flex-shrink-0"
-            >
-              擁有者
-            </Chip>
-          )}
+    <li className="border-b border-line">
+      <button
+        type="button"
+        onClick={props.onOpen}
+        className="group flex w-full items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-ink/5 sm:px-5"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="truncate font-display text-base font-semibold text-ink group-hover:text-phos">{group.name}</p>
+            {group.is_owner && (
+              <span className="tech-label flex-shrink-0 border border-phos px-1.5 py-0.5 text-phos">OWNER</span>
+            )}
+          </div>
+          <p className="mt-0.5 truncate text-sm text-ink-muted">{group.description || "沒有說明"}</p>
         </div>
-        <p className="line-clamp-2 min-h-[2.5rem] text-sm text-gray-blue-500 dark:text-gray-blue-400">
-          {group.description || "沒有說明"}
+
+        {/* 成員數 / 驗證碼數 */}
+        <dl className="hidden flex-shrink-0 items-center gap-6 sm:flex">
+          <div className="text-right">
+            <dt className="tech-label">MEMBERS</dt>
+            <dd className="font-mono text-sm text-ink tabular-nums">{group.member_count}</dd>
+          </div>
+          <div className="text-right">
+            <dt className="tech-label">CODES</dt>
+            <dd className="font-mono text-sm text-ink tabular-nums">{group.account_count}</dd>
+          </div>
+        </dl>
+        {/* 手機：縮成一行 */}
+        <p className="flex-shrink-0 font-mono text-xs text-ink-dim tabular-nums sm:hidden">
+          {group.member_count}人 · {group.account_count}碼
         </p>
-        <div className="flex gap-4 text-sm text-gray-blue-600 dark:text-gray-blue-300">
-          <span className="flex items-center gap-1.5">
-            <FontAwesomeIcon icon={faUsers} className="w-3.5" />
-            {group.member_count} 位成員
-          </span>
-          <span className="flex items-center gap-1.5">
-            <FontAwesomeIcon icon={faKey} className="w-3.5" />
-            {group.account_count} 個驗證碼
-          </span>
-        </div>
-      </CardBody>
-    </Card>
+
+        <FontAwesomeIcon icon={faChevronRight} className="w-3 flex-shrink-0 text-ink-dim transition-colors group-hover:text-phos" />
+      </button>
+    </li>
   );
 };
 
