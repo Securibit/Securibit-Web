@@ -36,11 +36,12 @@ const remainingText = (invite: GroupInvite) =>
 
 const byText = (user: UserBrief | null) => `由 ${user ? user.name || (user.username ? `@${user.username}` : "成員") : "已刪除的使用者"}`;
 
-// 列裡的選單：灰底圓角的小選單
+// 列裡的選單：灰底圓角的小選單。寬度要固定，w-auto 會讓選單和下拉清單縮到看不到字
 const rowSelectClassNames = {
-  base: "w-auto",
+  base: "w-32 shrink-0",
   trigger: "h-9 min-h-0 rounded-[10px] bg-surface-1 px-3",
   value: "text-[15px] text-ink",
+  popoverContent: "min-w-32 bg-surface text-ink",
 };
 
 // 邀請分頁：建立邀請連結、連結列表、電子郵件 / @ID 邀請與待回覆清單
