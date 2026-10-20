@@ -164,7 +164,7 @@ const GroupCodeCard = (props: GroupCodeCardProps) => {
             {formatOtp("•".repeat(otp.value.length))}
           </button>
         ) : otp.value ? (
-          <button onClick={() => otp.value && copyToClipboard(otp.value)} title="點一下複製" className="readout text-[30px] text-ink transition-opacity hover:opacity-60 sm:text-[40px]">
+          <button onClick={() => otp.value && copyToClipboard(otp.value)} title="點一下複製" className={cn("readout text-[30px] transition-[color,opacity] hover:opacity-60 sm:text-[40px]", danger ? "text-alarm" : "text-ink")}>
             {formatOtp(otp.value)}
           </button>
         ) : (

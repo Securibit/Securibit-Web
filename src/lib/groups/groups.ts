@@ -28,6 +28,9 @@ export const transferGroup = (gid: string, newOwner: string) =>
 
 export const leaveGroup = (gid: string) => rpcVoid('group_leave', { gid });
 
+// 調整我的群組順序：ids 是我所在的全部群組（由上到下），只影響自己看到的順序
+export const reorderMyGroups = (ids: string[]) => rpcVoid('my_groups_reorder', { ids });
+
 // 設為我的預設群組（只能是自己擁有的群組）
 export const setDefaultGroup = (gid: string) => rpcVoid('group_set_default', { gid });
 

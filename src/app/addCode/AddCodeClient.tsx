@@ -35,7 +35,7 @@ const isDefaultAdvanced = (input: TotpInput) =>
   input.period === TOTP_DEFAULTS.period &&
   input.algorithm === TOTP_DEFAULTS.algorithm;
 
-// 新增驗證碼：放到哪個群組（預設是預設群組，也就是「我的」）、匯入或手動輸入
+// 新增驗證碼：放到哪個群組（預設放在預設群組）、匯入或手動輸入
 const AddCodeClient = () => {
   const { user } = useAuth();
   const vault = useVault();
@@ -192,7 +192,7 @@ const AddCodeClient = () => {
         ) : !targetGroup ? (
           <div className="rounded-[18px] bg-surface-1 px-6 py-12 text-center">
             <p className="text-[19px] font-semibold">沒有可以新增驗證碼的群組</p>
-            <p className="mt-1 text-ink-muted">重新整理頁面試試看；登入時會自動建立「我的」</p>
+            <p className="mt-1 text-ink-muted">重新整理頁面試試看；登入時會自動建立預設群組</p>
           </div>
         ) : (
           <section>

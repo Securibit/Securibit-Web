@@ -106,7 +106,7 @@ const AdminTotpRow = (props: AdminTotpRowProps) => {
           ) : invalidSecret ? (
             <p className="text-[15px] text-alarm">金鑰錯誤</p>
           ) : otp ? (
-            <button onClick={() => copy(otp)} title="點一下複製" className="readout text-[30px] text-ink hover:opacity-60 sm:text-[40px]">
+            <button onClick={() => copy(otp)} title="點一下複製" className={cn("readout text-[30px] hover:opacity-60 sm:text-[40px]", danger ? "text-alarm" : "text-ink")}>
               {formatOtp(otp)}
             </button>
           ) : (

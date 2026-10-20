@@ -66,7 +66,7 @@ const LiveReadout = () => {
               <p className="text-[17px] font-semibold">{item.name}</p>
               <p className="truncate text-[15px] text-ink-muted">{item.account}</p>
             </div>
-            <p className={cn("readout text-[34px] sm:text-[40px]", otps ? "text-ink" : "text-ink-muted")}>
+            <p className={cn("readout text-[34px] sm:text-[40px]", !otps ? "text-ink-muted" : danger ? "text-alarm" : "text-ink")}>
               {otps ? formatOtp(otps[i]) : '--- ---'}
             </p>
             <div className="relative h-9 w-9 shrink-0">

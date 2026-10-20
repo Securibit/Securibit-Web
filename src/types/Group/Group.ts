@@ -12,6 +12,8 @@ export interface GroupSummary {
   is_default: boolean;
   // 已開啟加密（金鑰用擁有者的加密密碼加密，只有擁有者一個成員）
   encrypted: boolean;
+  // 我自己排的順序（0 起算，只影響自己看到的順序；my_groups 已照它排好）
+  position: number;
   member_count: number;
   // 我看得到的驗證碼數
   account_count: number;

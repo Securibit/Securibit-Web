@@ -21,7 +21,7 @@ Supabase 會配一個全新的 uuid，所以無法用 uid 對應舊資料。
 ## 1. 建立 Supabase 專案與資料表
 
 1. 在 https://supabase.com 建立專案
-2. 進 SQL Editor，依序貼上並執行 `supabase/migrations/` 裡的每個檔案（0001 → 0011，都可重複執行）：
+2. 進 SQL Editor，依序貼上並執行 `supabase/migrations/` 裡的每個檔案（0001 → 0016，都可重複執行）：
    - `0001_init.sql`：`profiles`、`legacy_import`、RLS 政策與 `handle_new_user` 觸發器
    - `0002_migration_notice.sql`：舊使用者第一次登入的遷移提示
    - `0003_ensure_profile.sql`：登入時自動建立 profile、接回舊資料
@@ -49,6 +49,21 @@ Supabase 會配一個全新的 uuid，所以無法用 uid 對應舊資料。
      - 原本有啟用加密（`profiles.vault`）的使用者，預設群組標成「已加密」（金鑰本來就是密文，直接搬）
      - 新使用者建立 profile 時自動建立「我的」；從 Firebase 接回的舊資料直接放進預設群組
      - 加密的群組只能有擁有者一個成員，不能邀請；刪除帳號時只有自己一個人的群組會一起刪除
+   - `0012_user_public.sql`：別人的個人頁面（`/u/[id]`）用的 `user_public`：只回傳名稱、@ID、大頭照、建立時間、全站身分組與共同群組（不含 email、電話、登入紀錄、驗證碼）
+   - `0013_username_rules.sql`：個人頁面網址改用 @ID（`/u/<username>`），新增 `user_public_by_username`；@ID 不能看起來像 UUID（32 位十六進位）或和網站路由同名（me、api、groups、invite、settings、new…），已在用的不會被清掉，之後改 @ID 時才檢查
+   - `0014_activity_log.sql`：使用者的登入紀錄與帳號操作紀錄：
+     - 新表 `login_history`：每次登入一筆（時間、IP、裝置、user-agent、登入方式），由 `/api/record-login` 寫入
+     - 帳號變更沿用 `audit_logs`（`target_type = 'user'`），由資料庫觸發器 / RPC 寫入：@ID、名稱、大頭照、背景、電話、email、
+       金鑰加密（啟用 / 改密碼 / 停用 / 忘記密碼重設）、預設群組；登入時自動套用的全站身分組也會記一筆
+     - 本人在「個人頁面」與 `/me/activity` 看得到自己的紀錄（含管理員查看 / 修改 / 刪除他的 2FA、身分組變更、加入 / 離開 / 被移出群組）；
+       後台有「查看使用者」的人在使用者頁看得到，有「查看操作紀錄」的人在全站操作紀錄看得到帳號變更
+     - 後台看比自己高（或同階）的人時，登入 IP 一律不顯示（含使用者列表的最後登入 IP）
+     - 先執行 0014 再部署前端：舊版前端照常可用（只是不會寫入 `login_history`）；新版前端若先上線，紀錄區塊會提示「請先執行 0014」，登入時只會更新最後登入資訊
+   - `0015_default_group_name.sql`：預設群組改用使用者名稱命名：
+     - 新建的預設群組叫「<名稱>的群組」（例如「Andy的群組」），名稱依序取：名稱 → @ID → email 的 @ 前段，都沒有用「我的群組」；超過 50 字只截名稱、保留「的群組」
+     - 既有的預設群組若名稱仍是「我的」，改成新規則的名稱（使用者自己改過名的不動），每個群組的操作紀錄記一筆「修改群組資料」（操作者為系統）；重複執行不會再改
+     - 只改資料庫，前端不需要一起部署
+   - `0016_group_order.sql`：每個人自己排群組順序（`group_members.position`，只影響自己看到的順序）：既有資料照原本順序編號（預設群組在最前）、新加入的群組排最後、`my_groups` 依此排序、新增 `my_groups_reorder`；沒執行前「調整順序」會失敗並復原，其他照常
 
 > **部署新版前端前，必須先執行 0008、0009**，否則驗證碼頁會顯示錯誤
 > （「資料庫還沒更新，請先在 Supabase 執行 0008_accounts.sql。」），群組與後台也無法使用。

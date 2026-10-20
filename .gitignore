@@ -38,3 +38,6 @@ legacy-users.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# vim 暫存檔
+*.swp

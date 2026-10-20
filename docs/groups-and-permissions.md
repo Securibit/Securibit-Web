@@ -509,15 +509,18 @@ src/app/admin/                     後台（總覽、使用者、使用者詳情
 
 - 「我的驗證碼」改成一個群組：每個使用者都有一個**預設群組**（`profiles.default_group_id`，只能指向**自己擁有**的群組，
   由觸發器 `profiles_default_group_guard` 擋下其他值；使用者不能直接改這個欄位）。
-- 新使用者建立 profile 時（`handle_new_user` / `ensure_profile` 的 insert）由觸發器自動建立「我的」並設為預設；
-  `ensure_profile` 每次登入也會確認預設群組還在（`ensure_default_group`），無效時補建「我的」。
+- 新使用者建立 profile 時（`handle_new_user` / `ensure_profile` 的 insert）由觸發器自動建立預設群組並設為預設；
+  `ensure_profile` 每次登入也會確認預設群組還在（`ensure_default_group`），無效時補建。
+- 預設群組的名稱（0015 起）：「<名稱>的群組」，名稱依序取 `profiles.name`（trim 後非空）→ @ID → email 的 @ 前段，
+  都沒有用「我的群組」；超過 50 字只截名稱、保留「的群組」（`default_group_name(uid)`）。0011 建立、名稱仍是「我的」的預設群組由 0015 改名
+  （群組紀錄記一筆操作者為系統的 `group.update`），使用者自己改過名的不動。
 - 執行 0011 時：每個既有使用者建立「我的」，把個人驗證碼（`totp_accounts.owner_id` = 他）改成 `group_id` = 新群組、`owner_id` = null，
   金鑰（`totp_secrets`）、順序、釘選、類別不動。之後加上 check 約束 `totp_accounts_group_only (owner_id is null)`，個人路徑不能再寫入。
 - 預設群組和一般群組一樣：可以邀請、設身分組、覆寫（加密時例外，見 7.2）。
 - `group_set_default(gid)`：把自己擁有的群組設為預設，否則 raise「只能把自己擁有的群組設為預設」。
 - `group_delete`：擁有者不能刪自己的預設群組（「這是你的預設群組，請先把其他群組設為預設再刪除」），
   也不能刪唯一擁有的群組（「你至少要擁有一個群組，不能刪除唯一的群組」）。全站 ADMINISTRATOR 可以刪別人的預設群組，
-  刪除後擁有者的預設改到他擁有的另一個群組（最早建立的），沒有就建立新的「我的」。
+  刪除後擁有者的預設改到他擁有的另一個群組（最早建立的），沒有就建立新的預設群組。
 - `group_transfer`：轉移自己的預設群組時，預設自動改到自己擁有的另一個群組（最早建立的），沒有就 raise
   「這是你唯一擁有的群組，請先建立另一個群組再轉移」；新擁有者的預設不受影響。觸發器 `groups_owner_guard` 也擋下直接改預設群組的擁有者。
 - `my_groups()` 多了 `is_default`、`encrypted`，預設群組排第一；`group_detail()` 的 `group` 多了 `encrypted`，另外回傳

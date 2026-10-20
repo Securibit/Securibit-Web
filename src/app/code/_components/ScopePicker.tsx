@@ -11,10 +11,10 @@ const pillClass = (active: boolean) =>
     active ? "bg-ink text-surface" : "bg-surface-1 text-ink hover:bg-line/60"
   );
 
-// 驗證碼頁最上面的切換：我的（預設群組，排第一）/ 家人 / 公司 … / ＋ 群組
+// 驗證碼頁最上面的切換：預設群組 / 家人 / 公司 … / ＋ 群組
+// 直接照 my_groups 的順序（使用者在群組頁自己排的），預設群組標「預設」
 const ScopePicker = (props: ScopePickerProps) => {
-  // 預設群組排第一，其餘維持原順序
-  const groups = [...props.groups.filter((group) => group.is_default), ...props.groups.filter((group) => !group.is_default)];
+  const { groups } = props;
 
   return (
     <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]" role="tablist" aria-label="驗證碼來源">

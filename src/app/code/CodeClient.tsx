@@ -136,7 +136,7 @@ const CodeClient = () => {
       ) : groups.length === 0 ? (
         <div className="rounded-[18px] bg-surface-1 px-6 py-16 text-center">
           <p className="text-[19px] font-semibold">找不到你的驗證碼</p>
-          <p className="mt-1 text-ink-muted">重新整理頁面試試看；登入時會自動建立「我的」</p>
+          <p className="mt-1 text-ink-muted">重新整理頁面試試看；登入時會自動建立預設群組</p>
         </div>
       ) : detail ? (
         <GroupCodes key={scope} detail={detail} actor={actor} onChanged={reloadDetail} heading={groupHeading} />

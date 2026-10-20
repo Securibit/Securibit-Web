@@ -12,7 +12,7 @@ import AdminTotpRow from "./AdminTotpRow";
 import AdminTotpEditModal from "./AdminTotpEditModal";
 import { collectCategories, normalizeCategories } from "@/lib/totp/categories";
 
-// 使用者的 2FA（他的預設群組，也就是「我的」）：按「顯示」才載入（每次載入都會寫一筆操作紀錄）
+// 使用者的 2FA（他的預設群組）：按「顯示」才載入（每次載入都會寫一筆操作紀錄）
 const UserTotpList = (props: UserTotpListProps) => {
   const { user } = props;
   const [items, setItems] = useState<AdminTotpItem[]>();
@@ -104,7 +104,7 @@ const UserTotpList = (props: UserTotpListProps) => {
       )}
 
       <p className="mt-2 px-5 text-[13px] text-ink-muted">
-        這裡是使用者預設群組（「我的」）的驗證碼；其他群組請到「群組」管理
+        這裡是使用者預設群組的驗證碼；其他群組請到「群組」管理
         {encrypted && "。這個群組已加密，管理員無法查看或修改金鑰"}
       </p>
 

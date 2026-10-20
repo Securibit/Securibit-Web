@@ -299,7 +299,7 @@ const GroupSettings = ({ detail, onChanged }: GroupSettingsProps) => {
             )}
           </div>
           <p className="mt-2 px-5 text-[13px] text-ink-muted">
-            預設群組就是驗證碼頁的「我的」，新增驗證碼時預設放在這裡。
+            預設群組排在驗證碼頁的第一個，新增驗證碼時預設放在這裡。
             {encryptionHint ?? "加密要先到「帳戶設定」設定一組只有你知道的加密密碼"}
           </p>
         </section>
