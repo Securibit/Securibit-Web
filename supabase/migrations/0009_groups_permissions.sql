@@ -13,6 +13,15 @@
 --           GROUP_ALL = 511，可覆寫 GROUP_OVERWRITABLE = 14
 -- ============================================================
 
+-- ---------- 補齊前面 migration 加的欄位（0002 / 0004 / 0007 沒跑過也能用）----------
+alter table public.profiles
+  add column if not exists migrated            boolean not null default false,
+  add column if not exists migration_notified  boolean not null default false,
+  add column if not exists last_login_at       timestamptz,
+  add column if not exists last_login_ip       text,
+  add column if not exists last_login_device   text,
+  add column if not exists vault               jsonb;
+
 -- ============================================================
 -- 資料表
 -- ============================================================

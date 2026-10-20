@@ -7,6 +7,15 @@
 -- 可重複執行。
 -- ============================================================
 
+-- ---------- 補齊前面 migration 加的欄位（0002 / 0004 / 0007 沒跑過也能用）----------
+alter table public.profiles
+  add column if not exists migrated            boolean not null default false,
+  add column if not exists migration_notified  boolean not null default false,
+  add column if not exists last_login_at       timestamptz,
+  add column if not exists last_login_ip       text,
+  add column if not exists last_login_device   text,
+  add column if not exists vault               jsonb;
+
 -- ---------- profiles 加 @ID（存小寫）----------
 alter table public.profiles add column if not exists username text;
 create unique index if not exists profiles_username_key on public.profiles (username);
