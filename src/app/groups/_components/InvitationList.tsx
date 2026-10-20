@@ -2,20 +2,17 @@
 
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { Button } from "@heroui/react";
-import UserChip from "@/components/permissions/UserChip";
 import { respondInvitation } from "@/lib/groups/invites";
 import { showError } from "@/lib/errorDialog";
-import { formatDateTime } from "@/lib/utils";
 import { InvitationListProps } from "@/types/Group/InvitationList";
 
-// 收到的邀請（用 Email / @ID 邀請我的），可以接受或拒絕
+// 收到的邀請（用電子郵件或 @ID 邀請我的），每列可以接受或拒絕
 const InvitationList = (props: InvitationListProps) => {
-  // 正在處理的邀請 id 與動作，鎖住按鈕避免重複送出
-  const [pending, setPending] = useState<{ id: string; accept: boolean }>();
+  // 正在處理的邀請 id，鎖住按鈕避免重複送出
+  const [pending, setPending] = useState<string>();
 
   const respond = async (inviteId: string, accept: boolean) => {
-    setPending({ id: inviteId, accept });
+    setPending(inviteId);
     const result = await respondInvitation(inviteId, accept);
     setPending(undefined);
     if (!result.success) {
@@ -23,7 +20,7 @@ const InvitationList = (props: InvitationListProps) => {
       return;
     }
     if (accept && result.data) {
-      toast.success("已加入群組！", { position: "top-right" });
+      toast.success("已加入群組", { position: "top-right" });
       props.onAccepted(result.data);
     } else {
       toast.success("已拒絕邀請", { position: "top-right" });
@@ -32,58 +29,36 @@ const InvitationList = (props: InvitationListProps) => {
   };
 
   return (
-    <section className="panel mb-8 p-4 sm:p-5">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="tech-label flex items-center gap-2">
-          <span className="led" aria-hidden />
-          PENDING // 收到的邀請
-        </p>
-        <p className="font-mono text-xs text-ink-dim tabular-nums">{props.invitations.length}</p>
-      </div>
-      <ul>
+    <section>
+      <h2 className="mb-2 px-5 text-[13px] font-normal text-ink-muted">收到的邀請</h2>
+      <ul role="list" className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
         {props.invitations.map((invitation) => (
-          <li
-            key={invitation.id}
-            className="flex flex-col gap-3 border-t border-line py-3 sm:flex-row sm:items-center"
-          >
+          <li key={invitation.id} className="flex items-center gap-4 px-5 py-3">
             <div className="min-w-0 flex-1">
-              <p className="truncate font-display text-base font-semibold text-ink">{invitation.group.name}</p>
-              {invitation.group.description && (
-                <p className="line-clamp-2 text-sm text-ink-muted">{invitation.group.description}</p>
-              )}
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-ink-muted">
-                <span className="flex items-center gap-1.5">
-                  <span className="tech-label">MEMBERS</span>
-                  <span className="font-mono text-ink tabular-nums">{invitation.group.member_count}</span>
-                </span>
-                {invitation.invited_by && (
-                  <span className="flex items-center gap-2">
-                    <span className="tech-label">FROM</span>
-                    <UserChip user={invitation.invited_by} size="sm" />
-                  </span>
-                )}
-                <span className="font-mono text-ink-dim">{formatDateTime(invitation.created_at)}</span>
-              </div>
+              <p className="truncate text-[17px] text-ink">{invitation.group.name}</p>
+              <p className="truncate text-[15px] text-ink-muted tabular-nums">
+                {invitation.invited_by ? `由 ${invitation.invited_by.name || "成員"} 邀請` : "邀請人已刪除"}
+                {" · "}
+                {invitation.group.member_count} 位成員
+              </p>
             </div>
-            <div className="flex flex-shrink-0 gap-2">
-              <Button
-                variant="bordered"
-                className="font-display tracking-[0.08em]"
-                isDisabled={!!pending}
-                isLoading={pending?.id === invitation.id && !pending.accept}
-                onPress={() => respond(invitation.id, false)}
+            <div className="flex shrink-0 items-center gap-4 text-[17px]">
+              <button
+                type="button"
+                disabled={!!pending}
+                onClick={() => respond(invitation.id, false)}
+                className="text-alarm hover:underline disabled:opacity-40 disabled:hover:no-underline"
               >
                 拒絕
-              </Button>
-              <Button
-                color="primary"
-                className="font-display tracking-[0.08em]"
-                isDisabled={!!pending}
-                isLoading={pending?.id === invitation.id && pending.accept}
-                onPress={() => respond(invitation.id, true)}
+              </button>
+              <button
+                type="button"
+                disabled={!!pending}
+                onClick={() => respond(invitation.id, true)}
+                className="text-accent hover:underline disabled:opacity-40 disabled:hover:no-underline"
               >
                 接受
-              </Button>
+              </button>
             </div>
           </li>
         ))}

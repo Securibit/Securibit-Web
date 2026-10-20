@@ -38,31 +38,29 @@ const CreateGroupModal = (props: CreateGroupModalProps) => {
       showError("建立群組失敗", result.message);
       return;
     }
-    toast.success("已建立群組！", { position: "top-right" });
+    toast.success("已建立群組", { position: "top-right" });
     props.onCreated(result.data);
   };
 
   return (
-    <Modal
-      isOpen={props.isOpen}
-      onOpenChange={(open) => !open && close()}
-      className="border border-line bg-surface-1 text-ink"
-    >
+    <Modal isOpen={props.isOpen} onOpenChange={(open) => !open && close()} className="bg-surface text-ink">
       <ModalContent>
-        <ModalHeader className="border-b border-line font-display tracking-wide">建立群組</ModalHeader>
-        <ModalBody className="py-5">
+        <ModalHeader>建立群組</ModalHeader>
+        <ModalBody>
           <form
             id="create-group-form"
-            className="flex flex-col gap-4"
+            className="flex flex-col gap-5"
             onSubmit={(e) => {
               e.preventDefault();
               handleCreate();
             }}
           >
             <Input
-              label="群組名稱"
+              label="名稱"
               placeholder="例如：工程部共用帳號"
-              variant="bordered"
+              variant="flat"
+              labelPlacement="outside"
+              size="lg"
               isRequired
               autoFocus
               maxLength={NAME_MAX}
@@ -75,24 +73,24 @@ const CreateGroupModal = (props: CreateGroupModalProps) => {
               errorMessage={nameError}
             />
             <Textarea
-              label="說明（選填）"
+              label="說明"
               placeholder="這個群組用來放哪些帳號的驗證碼"
-              variant="bordered"
+              variant="flat"
+              labelPlacement="outside"
+              size="lg"
               maxLength={DESCRIPTION_MAX}
               value={description}
               onValueChange={setDescription}
-              description={<span className="font-mono">{description.length} / {DESCRIPTION_MAX}</span>}
+              description={`選填，${description.length} / ${DESCRIPTION_MAX}`}
             />
           </form>
-          <p className="text-sm text-ink-muted">
-            建立後你就是擁有者，可以邀請成員、設定身分組，決定誰能看到哪些驗證碼。
-          </p>
+          <p className="text-[13px] text-ink-muted">建立後你就是擁有者，可以邀請成員、設定身分組，決定誰能看到哪些驗證碼</p>
         </ModalBody>
-        <ModalFooter className="border-t border-line">
-          <Button variant="bordered" className="font-display tracking-[0.08em]" onPress={close} isDisabled={saving}>
+        <ModalFooter>
+          <Button variant="light" onPress={close} isDisabled={saving}>
             取消
           </Button>
-          <Button color="primary" className="font-display tracking-[0.08em]" type="submit" form="create-group-form" isLoading={saving}>
+          <Button color="primary" type="submit" form="create-group-form" isLoading={saving}>
             建立
           </Button>
         </ModalFooter>

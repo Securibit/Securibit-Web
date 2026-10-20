@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { useRouter } from "nextjs-toploader/app";
-import { Button, Tab, Tabs } from "@heroui/react";
+import { Tab, Tabs } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
+import { faChevronLeft } from "@fortawesome/free-solid-svg-icons";
 import PageContent from "@/components/layout/PageContent";
 import PageHeader from "@/components/layout/PageHeader";
 import Spinner from "@/components/ui/Loading/Spinner";
@@ -89,64 +90,52 @@ const GroupClient = () => {
   const tabProps = { detail, actor, onChanged: reload };
 
   return (
-    <PageContent className="boot">
+    <PageContent className="max-w-3xl">
       <PageHeader
-        index="02 // GROUPS"
         title={detail.group.name}
         subtitle={detail.group.description || undefined}
         right={
-          <Button
-            variant="bordered"
-            className="font-display tracking-[0.08em]"
-            startContent={<FontAwesomeIcon icon={faArrowLeft} className="w-3.5" />}
-            onPress={() => router.push("/groups")}
-          >
+          <Link href="/groups" className="flex items-center gap-1.5 text-[17px] text-accent hover:underline">
+            <FontAwesomeIcon icon={faChevronLeft} className="w-2.5" />
             所有群組
-          </Button>
+          </Link>
         }
       />
 
       {/* 我的身分 */}
-      <div className="-mt-1 mb-5 flex flex-wrap items-center gap-2 text-sm">
-        <span className="tech-label">MY ROLES</span>
-        {detail.is_owner && <span className="tech-label border border-phos px-1.5 py-0.5 text-phos">OWNER</span>}
+      <div className="mb-5 flex flex-wrap items-center gap-2 px-1 text-[15px] text-ink-muted">
+        <span>我的身分</span>
+        {detail.is_owner && <span className="rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-ink">擁有者</span>}
         {myRoles.map((role) => (
           <RoleChip key={role.id} role={role} />
         ))}
-        {me && !detail.is_owner && myRoles.length === 0 && <span className="font-mono text-xs text-ink-muted">@everyone</span>}
-        {!me && (
-          <span className="tech-label border border-line-strong px-1.5 py-0.5">非成員 // 以全站管理權限檢視</span>
+        {me && !detail.is_owner && myRoles.length === 0 && (
+          <span className="rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-ink">@everyone</span>
         )}
+        {!me && <span className="rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-ink">非成員，以全站管理權限檢視</span>}
       </div>
 
       <Tabs
         aria-label="群組分頁"
-        color="primary"
-        variant="underlined"
+        variant="light"
+        radius="full"
+        fullWidth
         selectedKey={activeTab}
         onSelectionChange={(key) => setTab(key as TabKey)}
         // 切換分頁時保留內容，避免驗證碼每次切回來都重新讀取金鑰（每次讀取都會記一筆紀錄）
         destroyInactiveTabPanel={false}
         classNames={{
-          base: "w-full",
-          tabList: "w-full flex-wrap gap-x-6 gap-y-0 border-b border-line p-0",
-          tab: "h-11 px-0",
-          tabContent: "font-display text-[13px] tracking-[0.12em] text-ink-muted group-data-[selected=true]:text-phos",
-          cursor: "h-0.5 w-full bg-phos",
+          tabList: "flex-wrap gap-1 rounded-full bg-surface-1 p-1",
+          tab: "h-9",
+          tabContent: "text-[15px] text-ink-muted group-data-[selected=true]:text-ink",
+          cursor: "bg-surface shadow-none",
           panel: "px-0 pt-6",
         }}
       >
         <Tab key="codes" title="驗證碼">
           <GroupCodes {...tabProps} />
         </Tab>
-        <Tab
-          key="members"
-          title={
-            <span>
-              成員 <span className="font-mono text-ink-dim">{detail.members.length}</span>
-            </span>
-          }
-        >
+        <Tab key="members" title={`成員 ${detail.members.length}`}>
           <GroupMembers {...tabProps} />
         </Tab>
         <Tab key="roles" title="身分組">
@@ -162,10 +151,7 @@ const GroupClient = () => {
         </Tab>
         {visible.audit && (
           <Tab key="audit" title="紀錄">
-            <div>
-              <p className="tech-label mb-4">06 // AUDIT LOG</p>
-              <AuditLogList load={(before) => loadGroupAuditLog(gid, before)} />
-            </div>
+            <AuditLogList load={(before) => loadGroupAuditLog(gid, before)} />
           </Tab>
         )}
       </Tabs>

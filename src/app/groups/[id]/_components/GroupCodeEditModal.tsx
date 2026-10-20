@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import {
-  Accordion,
-  AccordionItem,
   Autocomplete,
   AutocompleteItem,
   Button,
@@ -17,7 +15,8 @@ import {
   SelectItem,
 } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEye, faEyeSlash, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import { faChevronDown, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import { cn } from "@/lib/utils";
 import { isValidSecret, normalizeSecret } from "@/lib/totp/crud";
 import { TotpErrors } from "@/lib/totp/validate";
 import { TOTP_ALGORITHMS, TOTP_DEFAULTS, TOTP_DIGITS, TOTP_PERIODS, TotpAlgorithm, TotpInput } from "@/types/Totp/Totp";
@@ -53,6 +52,8 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
     (account.digits ?? TOTP_DEFAULTS.digits) !== TOTP_DEFAULTS.digits ||
     (account.period ?? TOTP_DEFAULTS.period) !== TOTP_DEFAULTS.period ||
     (account.algorithm ?? TOTP_DEFAULTS.algorithm) !== TOTP_DEFAULTS.algorithm;
+  // 進階設定：有改過預設值才預設展開
+  const [advancedOpen, setAdvancedOpen] = useState(advancedChanged);
 
   const validate = () => {
     const next: TotpErrors = {};
@@ -92,19 +93,13 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
   const algorithm = form.algorithm ?? TOTP_DEFAULTS.algorithm;
 
   return (
-    <Modal
-      isOpen
-      onOpenChange={(open) => !open && props.onClose()}
-      size="lg"
-      scrollBehavior="inside"
-      className="border border-line bg-surface-1 text-ink"
-    >
+    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} size="lg" scrollBehavior="inside" className="bg-surface text-ink">
       <ModalContent>
-        <ModalHeader className="border-b border-line font-display tracking-wide">編輯驗證碼</ModalHeader>
-        <ModalBody className="py-5">
+        <ModalHeader>編輯驗證碼</ModalHeader>
+        <ModalBody>
           <form
             id="group-code-edit-form"
-            className="flex flex-col gap-4"
+            className="flex flex-col gap-5"
             onSubmit={(e) => {
               e.preventDefault();
               handleSave();
@@ -113,7 +108,9 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
             <Input
               label="名稱"
               placeholder="例如：Google - me@example.com"
-              variant="bordered"
+              variant="flat"
+              labelPlacement="outside"
+              size="lg"
               isRequired
               value={form.name}
               onValueChange={(name) => set({ name })}
@@ -124,7 +121,9 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
             <Autocomplete
               label="類別"
               placeholder="例如：工作、個人、遊戲"
-              variant="bordered"
+              variant="flat"
+              labelPlacement="outside"
+              size="lg"
               allowsCustomValue
               inputValue={form.category}
               onInputChange={(category) => set({ category })}
@@ -134,9 +133,11 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
             </Autocomplete>
 
             <Input
-              label="金鑰（Secret）"
+              label="金鑰"
               placeholder={secretKnown ? "JBSWY3DPEHPK3PXP" : "不修改請留空"}
-              variant="bordered"
+              variant="flat"
+              labelPlacement="outside"
+              size="lg"
               isRequired={secretKnown}
               type={showSecret ? "text" : "password"}
               autoComplete="off"
@@ -145,7 +146,6 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
               onValueChange={(secret) => set({ secret })}
               isInvalid={!!errors.secret}
               errorMessage={errors.secret}
-              classNames={{ input: "font-mono" }}
               description={
                 secretKnown
                   ? "Base32 格式（A-Z、2-7），空白與小寫會自動轉換"
@@ -156,67 +156,77 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
                   type="button"
                   onClick={() => setShowSecret((prev) => !prev)}
                   aria-label={showSecret ? "隱藏金鑰" : "顯示金鑰"}
-                  className="text-ink-dim transition-colors hover:text-phos"
+                  className="text-ink-muted transition-colors hover:text-ink"
                 >
                   <FontAwesomeIcon icon={showSecret ? faEyeSlash : faEye} className="w-4" />
                 </button>
               }
             />
 
-            <Accordion variant="bordered" className="border-line" defaultExpandedKeys={advancedChanged ? ["advanced"] : []}>
-              <AccordionItem
-                key="advanced"
-                title="進階設定"
-                subtitle={`${digits} 位數 · ${period} 秒 · ${algorithm}`}
-                classNames={{ title: "font-display text-sm tracking-wide text-ink", subtitle: "font-mono text-xs text-ink-dim" }}
+            {/* 進階設定：點一列展開 */}
+            <div className="overflow-hidden rounded-[12px] bg-surface-1">
+              <button
+                type="button"
+                onClick={() => setAdvancedOpen((open) => !open)}
+                aria-expanded={advancedOpen}
+                className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
               >
-                <p className="mb-3 text-sm text-ink-muted">
-                  大多數服務使用預設值（6 位數、30 秒、SHA-1），除非服務另有說明否則不需更改。
-                </p>
-                <div className="grid gap-3 pb-2 sm:grid-cols-3">
-                  <Select
-                    label="位數"
-                    variant="bordered"
-                    selectedKeys={[String(digits)]}
-                    disallowEmptySelection
-                    onChange={(e) => e.target.value && set({ digits: Number(e.target.value) })}
-                  >
-                    {TOTP_DIGITS.map((d) => <SelectItem key={String(d)}>{`${d} 位數`}</SelectItem>)}
-                  </Select>
-                  <Select
-                    label="週期"
-                    variant="bordered"
-                    selectedKeys={[String(period)]}
-                    disallowEmptySelection
-                    onChange={(e) => e.target.value && set({ period: Number(e.target.value) })}
-                  >
-                    {TOTP_PERIODS.map((p) => <SelectItem key={String(p)}>{`${p} 秒`}</SelectItem>)}
-                  </Select>
-                  <Select
-                    label="演算法"
-                    variant="bordered"
-                    selectedKeys={[algorithm]}
-                    disallowEmptySelection
-                    onChange={(e) => e.target.value && set({ algorithm: e.target.value as TotpAlgorithm })}
-                  >
-                    {TOTP_ALGORITHMS.map((a) => <SelectItem key={a}>{a}</SelectItem>)}
-                  </Select>
+                <span className="text-[17px]">進階設定</span>
+                <span className="flex items-center gap-2 text-[15px] text-ink-muted tabular-nums">
+                  {digits} 位數 · {period} 秒 · {algorithm}
+                  <FontAwesomeIcon icon={faChevronDown} className={cn("w-3 transition-transform", advancedOpen && "rotate-180")} />
+                </span>
+              </button>
+              {advancedOpen && (
+                <div className="border-t border-line/60 px-4 py-4">
+                  <p className="mb-3 text-[13px] text-ink-muted">大多數服務使用預設值（6 位數、30 秒、SHA-1），除非服務另有說明否則不需更改</p>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Select
+                      label="位數"
+                      variant="flat"
+                      labelPlacement="outside"
+                      selectedKeys={[String(digits)]}
+                      disallowEmptySelection
+                      onChange={(e) => e.target.value && set({ digits: Number(e.target.value) })}
+                    >
+                      {TOTP_DIGITS.map((d) => <SelectItem key={String(d)}>{`${d} 位數`}</SelectItem>)}
+                    </Select>
+                    <Select
+                      label="週期"
+                      variant="flat"
+                      labelPlacement="outside"
+                      selectedKeys={[String(period)]}
+                      disallowEmptySelection
+                      onChange={(e) => e.target.value && set({ period: Number(e.target.value) })}
+                    >
+                      {TOTP_PERIODS.map((p) => <SelectItem key={String(p)}>{`${p} 秒`}</SelectItem>)}
+                    </Select>
+                    <Select
+                      label="演算法"
+                      variant="flat"
+                      labelPlacement="outside"
+                      selectedKeys={[algorithm]}
+                      disallowEmptySelection
+                      onChange={(e) => e.target.value && set({ algorithm: e.target.value as TotpAlgorithm })}
+                    >
+                      {TOTP_ALGORITHMS.map((a) => <SelectItem key={a}>{a}</SelectItem>)}
+                    </Select>
+                  </div>
                 </div>
-              </AccordionItem>
-            </Accordion>
+              )}
+            </div>
           </form>
           {secretChanged && (
-            <div className="flex gap-2 border border-alarm bg-alarm/10 p-3 text-sm text-ink">
-              <FontAwesomeIcon icon={faTriangleExclamation} className="mt-0.5 w-4 text-alarm" />
-              <p>更換金鑰後會產生完全不同的驗證碼，群組裡所有成員看到的驗證碼都會跟著改變。</p>
-            </div>
+            <p className="rounded-[12px] bg-surface-1 px-4 py-3 text-[15px] text-alarm">
+              更換金鑰後會產生完全不同的驗證碼，群組裡所有成員看到的驗證碼都會跟著改變
+            </p>
           )}
         </ModalBody>
-        <ModalFooter className="border-t border-line">
-          <Button variant="bordered" className="font-display tracking-[0.08em]" onPress={props.onClose} isDisabled={saving}>
+        <ModalFooter>
+          <Button variant="light" onPress={props.onClose} isDisabled={saving}>
             取消
           </Button>
-          <Button color="primary" className="font-display tracking-[0.08em]" type="submit" form="group-code-edit-form" isLoading={saving}>
+          <Button color="primary" type="submit" form="group-code-edit-form" isLoading={saving}>
             儲存
           </Button>
         </ModalFooter>

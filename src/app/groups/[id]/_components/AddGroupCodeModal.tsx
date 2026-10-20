@@ -39,62 +39,52 @@ const AddGroupCodeModal = (props: AddGroupCodeModalProps) => {
   };
 
   return (
-    <Modal
-      isOpen
-      onOpenChange={(open) => !open && props.onClose()}
-      size="lg"
-      scrollBehavior="inside"
-      className="border border-line bg-surface-1 text-ink"
-    >
+    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} size="lg" scrollBehavior="inside" className="bg-surface text-ink">
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-1 border-b border-line font-display tracking-wide">
-          新增驗證碼到群組
-          <span className="text-sm font-normal tracking-normal text-ink-muted">
-            新增後群組成員會依身分組權限看到這筆驗證碼
-          </span>
-        </ModalHeader>
-        <ModalBody className="py-5">
-          <p className="tech-label">01 // IMPORT</p>
-          <QrImport
-            onImport={(input) => {
-              setForm({ ...input, category: form.category || input.category });
-              setErrors({});
-              setFormKey((key) => key + 1);
-            }}
-            onImportMany={props.onImportMany}
-          />
+        <ModalHeader>新增驗證碼</ModalHeader>
+        <ModalBody className="gap-5">
+          <p className="text-[13px] text-ink-muted">新增後群組成員會依身分組權限看到這筆驗證碼</p>
 
-          <div className="my-2 flex items-center gap-3">
-            <div className="rule flex-1" />
-            <span className="tech-label">02 // MANUAL</span>
-            <div className="rule flex-1" />
-          </div>
-
-          <form
-            id="group-code-add-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleAdd();
-            }}
-          >
-            <TotpForm
-              key={formKey}
-              value={form}
-              onChange={(value) => {
-                setForm(value);
+          <section>
+            <h3 className="mb-2 text-[13px] font-normal text-ink-muted">匯入</h3>
+            <QrImport
+              onImport={(input) => {
+                setForm({ ...input, category: form.category || input.category });
                 setErrors({});
+                setFormKey((key) => key + 1);
               }}
-              categories={props.categories}
-              errors={errors}
-              advancedOpen={!isDefaultAdvanced(form)}
+              onImportMany={props.onImportMany}
             />
-          </form>
+          </section>
+
+          <section>
+            <h3 className="mb-2 text-[13px] font-normal text-ink-muted">或手動輸入</h3>
+            <form
+              id="group-code-add-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleAdd();
+              }}
+            >
+              <TotpForm
+                key={formKey}
+                value={form}
+                onChange={(value) => {
+                  setForm(value);
+                  setErrors({});
+                }}
+                categories={props.categories}
+                errors={errors}
+                advancedOpen={!isDefaultAdvanced(form)}
+              />
+            </form>
+          </section>
         </ModalBody>
-        <ModalFooter className="border-t border-line">
-          <Button variant="bordered" className="font-display tracking-[0.08em]" onPress={props.onClose} isDisabled={saving}>
+        <ModalFooter>
+          <Button variant="light" onPress={props.onClose} isDisabled={saving}>
             完成
           </Button>
-          <Button color="primary" className="font-display tracking-[0.08em]" type="submit" form="group-code-add-form" isLoading={saving}>
+          <Button color="primary" type="submit" form="group-code-add-form" isLoading={saving}>
             新增
           </Button>
         </ModalFooter>

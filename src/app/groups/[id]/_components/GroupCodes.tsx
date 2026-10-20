@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Button, Input, Switch } from "@heroui/react";
+import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowsUpDown, faCheck, faMagnifyingGlass, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faArrowsUpDown, faEllipsis, faEye, faEyeSlash, faMagnifyingGlass, faPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
 import Spinner from "@/components/ui/Loading/Spinner";
 import useAuth from "@/components/auth/useAuth";
 import OverwriteEditor from "@/components/permissions/OverwriteEditor";
@@ -50,6 +50,13 @@ interface ServerState {
   at: number;
   codes: GroupCodesResult["codes"];
 }
+
+// 類別篩選：藥丸，同 CodeClient
+const pillClass = (active: boolean) =>
+  cn(
+    "shrink-0 rounded-full px-3.5 py-1.5 text-[15px] transition-colors",
+    active ? "bg-ink text-surface" : "bg-surface-1 text-ink hover:bg-line/60"
+  );
 
 // 群組的驗證碼分頁
 const GroupCodes = ({ detail, actor }: GroupCodesProps) => {
@@ -219,7 +226,7 @@ const GroupCodes = ({ detail, actor }: GroupCodesProps) => {
       return false;
     }
     toast.success(
-      inputs.length === 1 ? `已新增「${inputs[0].name.trim()}」！` : `已新增 ${inputs.length} 筆驗證碼！`,
+      inputs.length === 1 ? `已新增「${inputs[0].name.trim()}」` : `已新增 ${inputs.length} 筆驗證碼`,
       { position: "top-right" }
     );
     await fetchAccounts(true);
@@ -232,7 +239,7 @@ const GroupCodes = ({ detail, actor }: GroupCodesProps) => {
       showError("儲存驗證碼失敗", result.message);
       return false;
     }
-    toast.success("已儲存驗證碼！", { position: "top-right" });
+    toast.success("已儲存", { position: "top-right" });
     const secretChanged = patch.secret !== undefined;
     await fetchAccounts(secretChanged && secrets[account.id] !== undefined);
     if (secretChanged) setServerNonce((n) => n + 1);
@@ -245,7 +252,7 @@ const GroupCodes = ({ detail, actor }: GroupCodesProps) => {
       showError("刪除驗證碼失敗", result.message);
       return;
     }
-    toast.success("已刪除驗證碼！", { position: "top-right" });
+    toast.success("已刪除", { position: "top-right" });
     setAccounts((list) => list?.filter((item) => item.id !== account.id));
   };
 
@@ -289,96 +296,100 @@ const GroupCodes = ({ detail, actor }: GroupCodesProps) => {
 
   if (accounts === undefined) return <Spinner block label="載入驗證碼…" />;
 
-  // 類別篩選用的方形標籤按鈕
-  const filterClass = (active: boolean) =>
-    cn(
-      "tech-label border px-2 py-1 transition-colors",
-      active ? "border-phos bg-phos/10 text-phos" : "border-line hover:border-line-strong hover:text-ink"
-    );
-
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="tech-label">01 // CODES</p>
-          <h2 className="font-display text-lg font-bold text-ink">
-            驗證碼 <span className="font-mono text-sm font-normal text-ink-dim">{accounts.length}</span>
-          </h2>
+      {/* 標題列：右邊放新增與「…」 */}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-[22px] font-semibold">驗證碼</h2>
+        <div className="flex items-center gap-3">
+          {sorting ? (
+            <button type="button" onClick={() => setSorting(false)} className="text-[17px] font-semibold text-accent">完成</button>
+          ) : (
+            <>
+              {canAdd && (
+                <button type="button" onClick={() => setAddOpen(true)} className="flex items-center gap-1.5 text-[17px] text-accent hover:underline">
+                  <FontAwesomeIcon icon={faPlus} className="w-3.5" />
+                  新增
+                </button>
+              )}
+              {accounts.length > 0 && (
+                <Dropdown placement="bottom-end" className="bg-surface text-ink">
+                  <DropdownTrigger>
+                    <button aria-label="更多" className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-1 text-accent transition-colors hover:bg-line/60">
+                      <FontAwesomeIcon icon={faEllipsis} className="w-4" />
+                    </button>
+                  </DropdownTrigger>
+                  <DropdownMenu
+                    aria-label="列表操作"
+                    disabledKeys={!canAdd || accounts.length < 2 ? ["sort"] : []}
+                    onAction={(key) => {
+                      if (key === "hide") toggleHideCodes(!hideCodes);
+                      if (key === "sort") setSorting(true);
+                    }}
+                  >
+                    <DropdownItem key="hide" startContent={<FontAwesomeIcon icon={hideCodes ? faEye : faEyeSlash} className="w-3.5" />}>
+                      {hideCodes ? "顯示驗證碼" : "隱藏驗證碼"}
+                    </DropdownItem>
+                    <DropdownItem key="sort" startContent={<FontAwesomeIcon icon={faArrowsUpDown} className="w-3.5" />}>調整順序</DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
+              )}
+            </>
+          )}
         </div>
-        {(canAdd || accounts.length > 1) && (
-          <div className="flex flex-wrap gap-2">
-            {canAdd && accounts.length > 1 && (
-              <Button
-                variant={sorting ? "solid" : "bordered"}
-                color="primary"
-                className="font-display tracking-[0.08em]"
-                startContent={<FontAwesomeIcon icon={sorting ? faCheck : faArrowsUpDown} className="w-3.5" />}
-                onPress={() => setSorting(!sorting)}
-              >
-                {sorting ? "完成排序" : "排序"}
-              </Button>
-            )}
-            {canAdd && !sorting && (
-              <Button
-                color="primary"
-                className="font-display tracking-[0.08em]"
-                startContent={<FontAwesomeIcon icon={faPlus} className="w-3.5" />}
-                onPress={() => setAddOpen(true)}
-              >
-                新增驗證碼
-              </Button>
-            )}
-          </div>
-        )}
       </div>
 
       {accounts.length === 0 ? (
-        <div className="hatch border border-line p-10 text-center">
-          <p className="tech-label">NO DATA</p>
-          <p className="mt-2 text-ink-muted">
-            {canAdd
-              ? "群組還沒有驗證碼，按「新增驗證碼」加入第一筆。"
-              : "目前沒有你能查看的驗證碼。如果需要，請群組管理者調整你的身分組權限。"}
+        <div className="rounded-[18px] bg-surface-1 px-6 py-16 text-center">
+          <p className="text-[19px] font-semibold">還沒有驗證碼</p>
+          <p className="mt-1 text-ink-muted">
+            {canAdd ? "新增第一筆，群組成員就能依身分組權限看到" : "目前沒有你能查看的驗證碼，需要時請群組管理者調整你的身分組權限"}
           </p>
+          {canAdd && (
+            <button type="button" onClick={() => setAddOpen(true)} className="link-arrow mt-4 inline-block">
+              新增第一筆
+            </button>
+          )}
         </div>
       ) : (
         <>
           {sorting ? (
-            <p className="mb-4 border-l-2 border-phos pl-3 text-sm text-ink-muted">
-              用箭頭調整順序，釘選的項目固定排在最上面。順序對所有成員都一樣，調整完按「完成排序」。
-            </p>
+            <p className="mb-3 text-[15px] text-ink-muted">用箭頭調整順序，釘選的固定排在最上面；順序對所有成員都一樣</p>
           ) : (
-            <div className="mb-4 flex flex-col gap-3">
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                <Input
+            <div className="mb-3 flex flex-col gap-3">
+              {/* 搜尋 */}
+              <label className="flex items-center gap-2 rounded-[12px] bg-surface-1 px-3.5 py-2 text-[17px] text-ink-muted focus-within:ring-2 focus-within:ring-accent/40">
+                <FontAwesomeIcon icon={faMagnifyingGlass} className="w-4 shrink-0" />
+                <input
+                  type="search"
                   aria-label="搜尋驗證碼"
-                  placeholder="搜尋名稱或類別"
-                  variant="bordered"
+                  placeholder="搜尋"
                   value={keyword}
-                  onValueChange={setKeyword}
-                  isClearable
-                  onClear={() => setKeyword("")}
-                  startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="w-3.5 text-ink-dim" />}
-                  className="sm:max-w-sm"
+                  onChange={(e) => setKeyword(e.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-muted"
                 />
-                <Switch size="sm" isSelected={hideCodes} onValueChange={toggleHideCodes} classNames={{ label: "text-sm text-ink-muted" }}>
-                  隱藏驗證碼（點一下才顯示）
-                </Switch>
-              </div>
+                {keyword && (
+                  <button type="button" onClick={() => setKeyword("")} aria-label="清除" className="hover:text-ink">
+                    <FontAwesomeIcon icon={faXmark} className="w-3.5" />
+                  </button>
+                )}
+              </label>
+
+              {/* 類別 */}
               {categories.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" className={filterClass(!activeCategory)} onClick={() => setCategory(undefined)}>
-                    全部 <span className="font-mono">{accounts.length}</span>
+                <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+                  <button type="button" aria-pressed={!activeCategory} className={pillClass(!activeCategory)} onClick={() => setCategory(undefined)}>
+                    全部
                   </button>
                   {categories.map((name) => (
                     <button
                       key={name}
                       type="button"
-                      className={filterClass(activeCategory === name)}
+                      aria-pressed={activeCategory === name}
+                      className={pillClass(activeCategory === name)}
                       onClick={() => setCategory(activeCategory === name ? undefined : name)}
                     >
-                      {name}{" "}
-                      <span className="font-mono">{accounts.filter((account) => account.category === name).length}</span>
+                      {name}
                     </button>
                   ))}
                 </div>
@@ -387,44 +398,44 @@ const GroupCodes = ({ detail, actor }: GroupCodesProps) => {
           )}
 
           {filtered.length === 0 ? (
-            <div className="hatch border border-line p-10 text-center">
-              <p className="tech-label">NO MATCH</p>
-              <p className="mt-2 text-ink-muted">沒有符合條件的驗證碼</p>
-            </div>
+            <div className="rounded-[18px] bg-surface-1 px-6 py-12 text-center text-ink-muted">沒有符合的驗證碼</div>
           ) : (
-            <div className="panel px-4 sm:px-6">
-              <ul role="list">
-                {filtered.map((account, index) => {
-                  // 單筆的有效權限（已套用覆寫）
-                  const canManage = has(account.permissions, GROUP.MANAGE_CODES);
-                  return (
-                    <GroupCodeCard
-                      key={account.id}
-                      account={account}
-                      secret={secrets[account.id]}
-                      server={serverCode(account)}
-                      clockOffset={server?.offset ?? 0}
-                      hidden={hideCodes}
-                      onEdit={canManage ? () => setEditing(account) : undefined}
-                      onDelete={canManage ? () => handleDelete(account) : undefined}
-                      onTogglePin={canManage ? () => handleTogglePin(account) : undefined}
-                      onPermissions={canOverwrite ? () => setOverwriting(account) : undefined}
-                      sort={
-                        sorting
-                          ? {
-                              canUp: canSwap(index, -1),
-                              canDown: canSwap(index, 1),
-                              onUp: () => handleMove(index, -1),
-                              onDown: () => handleMove(index, 1),
-                            }
-                          : undefined
-                      }
-                    />
-                  );
-                })}
-              </ul>
-            </div>
+            <ul role="list" className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
+              {filtered.map((account, index) => {
+                // 單筆的有效權限（已套用覆寫）
+                const canManage = has(account.permissions, GROUP.MANAGE_CODES);
+                return (
+                  <GroupCodeCard
+                    key={account.id}
+                    account={account}
+                    secret={secrets[account.id]}
+                    server={serverCode(account)}
+                    clockOffset={server?.offset ?? 0}
+                    hidden={hideCodes}
+                    onEdit={canManage ? () => setEditing(account) : undefined}
+                    onDelete={canManage ? () => handleDelete(account) : undefined}
+                    onTogglePin={canManage ? () => handleTogglePin(account) : undefined}
+                    onPermissions={canOverwrite ? () => setOverwriting(account) : undefined}
+                    sort={
+                      sorting
+                        ? {
+                            canUp: canSwap(index, -1),
+                            canDown: canSwap(index, 1),
+                            onUp: () => handleMove(index, -1),
+                            onDown: () => handleMove(index, 1),
+                          }
+                        : undefined
+                    }
+                  />
+                );
+              })}
+            </ul>
           )}
+
+          <p className="mt-3 px-1 text-[13px] text-ink-muted">
+            {filtered.length === accounts.length ? `共 ${accounts.length} 筆` : `顯示 ${filtered.length} 筆，共 ${accounts.length} 筆`}
+            {hideCodes && "，驗證碼已隱藏，點一下才會顯示"}
+          </p>
         </>
       )}
 

@@ -27,24 +27,11 @@ const DeleteGroupModal = (props: DeleteGroupModalProps) => {
   };
 
   return (
-    <Modal
-      isOpen={props.isOpen}
-      onOpenChange={(open) => !open && cancel()}
-      className="border border-alarm bg-surface-1 text-ink"
-    >
+    <Modal isOpen={props.isOpen} onOpenChange={(open) => !open && cancel()} className="bg-surface text-ink">
       <ModalContent>
-        <ModalHeader className="flex items-center gap-3 border-b border-line font-display tracking-wide">
-          <span className="led led-alarm" aria-hidden />
-          刪除群組
-        </ModalHeader>
-        <ModalBody className="py-5">
-          <p className="text-ink-muted">
-            刪除後群組的所有驗證碼、金鑰、身分組、成員與邀請都會一併刪除，
-            <b className="text-alarm">無法恢復</b>。
-          </p>
-          <p className="text-sm text-ink-muted">
-            請輸入群組名稱 <span className="font-display font-semibold text-ink">「{props.groupName}」</span> 確認：
-          </p>
+        <ModalHeader>刪除群組</ModalHeader>
+        <ModalBody className="gap-5">
+          <p className="text-ink-muted">刪除後群組的所有驗證碼、金鑰、身分組、成員與邀請都會一併刪除，無法恢復。</p>
           <form
             id="delete-group-form"
             onSubmit={(e) => {
@@ -53,8 +40,10 @@ const DeleteGroupModal = (props: DeleteGroupModalProps) => {
             }}
           >
             <Input
-              aria-label="群組名稱"
-              variant="bordered"
+              label={`輸入群組名稱「${props.groupName}」確認`}
+              variant="flat"
+              labelPlacement="outside"
+              size="lg"
               placeholder={props.groupName}
               value={typed}
               onValueChange={setTyped}
@@ -63,18 +52,11 @@ const DeleteGroupModal = (props: DeleteGroupModalProps) => {
             />
           </form>
         </ModalBody>
-        <ModalFooter className="border-t border-line">
-          <Button variant="bordered" className="font-display tracking-[0.08em]" onPress={cancel} isDisabled={pending}>
+        <ModalFooter>
+          <Button variant="light" onPress={cancel} isDisabled={pending}>
             取消
           </Button>
-          <Button
-            color="danger"
-            className="font-display tracking-[0.08em]"
-            type="submit"
-            form="delete-group-form"
-            isDisabled={!matched}
-            isLoading={pending}
-          >
+          <Button color="danger" type="submit" form="delete-group-form" isDisabled={!matched} isLoading={pending}>
             刪除群組
           </Button>
         </ModalFooter>

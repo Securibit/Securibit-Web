@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Button } from "@heroui/react";
+import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faRightLeft, faTags, faUserMinus } from "@fortawesome/free-solid-svg-icons";
+import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { faEllipsis, faRightLeft, faTags, faUserMinus } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import UserChip from "@/components/permissions/UserChip";
 import RoleChip from "@/components/permissions/RoleChip";
@@ -17,6 +18,8 @@ import { showError } from "@/lib/errorDialog";
 import { formatDateTime } from "@/lib/utils";
 import { GroupMember } from "@/types/Group/Group";
 import { GroupMembersProps } from "@/types/Group/GroupMembers";
+
+type MenuKey = "roles" | "transfer" | "kick";
 
 const displayName = (member: GroupMember) =>
   member.name || (member.username ? `@${member.username}` : member.email || "這位成員");
@@ -68,79 +71,71 @@ const GroupMembers = ({ detail, actor, onChanged }: GroupMembersProps) => {
   };
 
   return (
-    <div>
-      <div className="mb-4">
-        <p className="tech-label">02 // MEMBERS</p>
-        <h2 className="font-display text-lg font-bold text-ink">
-          成員 <span className="font-mono text-sm font-normal text-ink-dim">{members.length}</span>
-        </h2>
-      </div>
-
-      <ul className="border-t border-line">
+    <section>
+      <h2 className="mb-2 px-5 text-[13px] font-normal text-ink-muted">共 {members.length} 位成員</h2>
+      <ul role="list" className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
         {members.map((member) => {
           const manageable = canManageMember(actor, member);
           const isSelf = member.id === user?.uid;
           const memberRoles = roles.filter((role) => !role.is_default && member.role_ids.includes(role.id));
+
+          // 依權限組出「更多」選單
+          const menu: { key: MenuKey; label: string; icon: IconDefinition; danger?: boolean }[] = [];
+          if (canAssign && manageable) menu.push({ key: "roles", label: "指派身分組", icon: faTags });
+          if (detail.is_owner && !member.is_owner) menu.push({ key: "transfer", label: "轉移擁有權", icon: faRightLeft });
+          if (canKick && manageable && !isSelf) menu.push({ key: "kick", label: "移出群組", icon: faUserMinus, danger: true });
+
           return (
-            <li
-              key={member.id}
-              className="flex flex-col gap-3 border-b border-line py-3 transition-colors hover:bg-ink/5 sm:flex-row sm:items-center"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <UserChip user={member} />
-                  {member.is_owner && (
-                    <span className="tech-label border border-phos px-1.5 py-0.5 text-phos" title="群組擁有者">
-                      OWNER
-                    </span>
-                  )}
-                  {isSelf && <span className="tech-label border border-line px-1.5 py-0.5">YOU</span>}
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                  {memberRoles.map((role) => (
-                    <RoleChip key={role.id} role={role} />
-                  ))}
-                  <span className="font-mono text-[11px] tracking-[0.04em] text-ink-dim">
-                    JOINED {formatDateTime(member.joined_at)}
-                  </span>
-                </div>
+            <li key={member.id} className="flex items-center gap-3 px-5 py-3">
+              <UserChip user={member} className="min-w-0 flex-1" />
+
+              {/* 身分 */}
+              <div className="flex min-w-0 shrink flex-wrap items-center justify-end gap-1.5">
+                {member.is_owner && (
+                  <span className="rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-accent" title="群組擁有者">擁有者</span>
+                )}
+                {isSelf && <span className="rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-ink-muted">你</span>}
+                {memberRoles.map((role) => (
+                  <RoleChip key={role.id} role={role} />
+                ))}
               </div>
-              <div className="flex flex-shrink-0 flex-wrap gap-2">
-                {canAssign && manageable && (
-                  <Button
-                    size="sm"
-                    variant="bordered"
-                    className="font-display tracking-[0.08em]"
-                    startContent={<FontAwesomeIcon icon={faTags} className="w-3" />}
-                    onPress={() => setAssigning(member)}
+
+              <span className="hidden shrink-0 text-[13px] text-ink-muted sm:block" title="加入時間">
+                {formatDateTime(member.joined_at)}
+              </span>
+
+              {menu.length > 0 ? (
+                <Dropdown placement="bottom-end" className="bg-surface text-ink">
+                  <DropdownTrigger>
+                    <button aria-label="更多" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-surface-1 hover:text-ink">
+                      <FontAwesomeIcon icon={faEllipsis} className="w-4" />
+                    </button>
+                  </DropdownTrigger>
+                  <DropdownMenu
+                    aria-label="成員操作"
+                    items={menu}
+                    onAction={(key) => {
+                      if (key === "roles") setAssigning(member);
+                      if (key === "transfer") setTransferring(member);
+                      if (key === "kick") setKicking(member);
+                    }}
                   >
-                    身分組
-                  </Button>
-                )}
-                {detail.is_owner && !member.is_owner && (
-                  <Button
-                    size="sm"
-                    variant="bordered"
-                    className="font-display tracking-[0.08em]"
-                    startContent={<FontAwesomeIcon icon={faRightLeft} className="w-3" />}
-                    onPress={() => setTransferring(member)}
-                  >
-                    轉移擁有權
-                  </Button>
-                )}
-                {canKick && manageable && !isSelf && (
-                  <Button
-                    size="sm"
-                    variant="bordered"
-                    color="danger"
-                    className="font-display tracking-[0.08em]"
-                    startContent={<FontAwesomeIcon icon={faUserMinus} className="w-3" />}
-                    onPress={() => setKicking(member)}
-                  >
-                    移除
-                  </Button>
-                )}
-              </div>
+                    {(entry) => (
+                      <DropdownItem
+                        key={entry.key}
+                        className={entry.danger ? "text-danger" : undefined}
+                        color={entry.danger ? "danger" : "default"}
+                        startContent={<FontAwesomeIcon icon={entry.icon} className="w-3.5" />}
+                      >
+                        {entry.label}
+                      </DropdownItem>
+                    )}
+                  </DropdownMenu>
+                </Dropdown>
+              ) : (
+                // 沒有可做的事時留一樣的寬度，讓每列對齊
+                <span className="h-8 w-8 shrink-0" aria-hidden />
+              )}
             </li>
           );
         })}
@@ -165,9 +160,9 @@ const GroupMembers = ({ detail, actor, onChanged }: GroupMembersProps) => {
       <ConfirmModal
         isOpen={!!kicking}
         danger
-        title="移除成員"
+        title="移出群組"
         description={`確定要將 ${kicking ? displayName(kicking) : ""} 移出群組嗎？對方之後要重新受邀才能再加入。`}
-        confirmLabel="移除"
+        confirmLabel="移出"
         onCancel={() => setKicking(undefined)}
         onConfirm={async () => {
           const member = kicking;
@@ -183,7 +178,7 @@ const GroupMembers = ({ detail, actor, onChanged }: GroupMembersProps) => {
         description={
           <div className="flex flex-col gap-2">
             <p className="text-ink">確定要把群組擁有權轉移給 {transferring ? displayName(transferring) : ""} 嗎？</p>
-            <p className="text-sm text-ink-muted">
+            <p className="text-[15px] text-ink-muted">
               轉移後你會變成一般成員（保留目前的身分組），不能再刪除群組或轉移擁有權，也可能失去部分權限。這個動作只有新的擁有者能再轉回來。
             </p>
           </div>
@@ -196,7 +191,7 @@ const GroupMembers = ({ detail, actor, onChanged }: GroupMembersProps) => {
           if (member) await handleTransfer(member);
         }}
       />
-    </div>
+    </section>
   );
 };
 

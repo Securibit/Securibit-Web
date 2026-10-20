@@ -12,18 +12,11 @@ const GroupRoles = ({ detail, actor, onChanged }: GroupRolesProps) => {
 
   return (
     <div>
-      <div className="mb-4">
-        <p className="tech-label">03 // ROLES</p>
-        <h2 className="font-display text-lg font-bold text-ink">
-          身分組 <span className="font-mono text-sm font-normal text-ink-dim">{detail.roles.length}</span>
-        </h2>
-        {!canManage && (
-          <p className="mt-1 flex items-center gap-2 text-sm text-ink-muted">
-            <span className="led led-off" aria-hidden />
-            你沒有「管理身分組」權限，只能查看。
-          </p>
-        )}
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h2 className="text-[22px] font-semibold">身分組</h2>
+        <span className="text-[13px] text-ink-muted tabular-nums">共 {detail.roles.length} 個</span>
       </div>
+      {!canManage && <p className="mb-3 text-[13px] text-ink-muted">你沒有「管理身分組」權限，只能查看</p>}
       <RoleEditor
         roles={detail.roles}
         definitions={GROUP_PERMISSIONS}
