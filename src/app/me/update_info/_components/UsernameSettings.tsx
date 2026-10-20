@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Button, Input } from "@heroui/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faAt } from "@fortawesome/free-solid-svg-icons";
 import useAuth from "@/components/auth/useAuth";
 import { USERNAME_PATTERN, isUsernameAvailable, setUsername } from "@/lib/totp/account";
 import { showError } from "@/lib/errorDialog";
@@ -60,7 +58,10 @@ const UsernameSettings = () => {
   ) : name === "" ? (
     "儲存後會清除 @ID"
   ) : checked?.available ? (
-    <span className="text-emerald-600 dark:text-emerald-400">可以使用</span>
+    <span className="inline-flex items-center gap-2 text-phos">
+      <span className="led" aria-hidden />
+      可以使用
+    </span>
   ) : (
     "檢查中…"
   );
@@ -83,47 +84,63 @@ const UsernameSettings = () => {
   };
 
   return (
-    <div className="mt-6 rounded-lg border border-gray-blue-200 bg-white p-4 shadow sm:p-6 dark:border-gray-blue-700 dark:bg-gray-blue-800">
-      <h2 className="flex items-center gap-2 font-semibold">
-        <FontAwesomeIcon icon={faAt} className="w-4 text-tpp" />
-        @ID
-      </h2>
-      <p className="mt-1 mb-4 text-sm text-gray-blue-500 dark:text-gray-blue-400">
-        @ID 是別人找到你的名字，例如邀請你加入群組時可以輸入 @ID。
-        {current ? `目前是 @${current}。` : "你還沒有設定 @ID。"}
-      </p>
+    <section className="grid grid-cols-12 gap-6 border-t border-line py-10">
+      <div className="col-span-12 md:col-span-5">
+        <p className="tech-label">02 // HANDLE</p>
+        <h2 className="mt-2 font-display text-xl font-bold text-ink">@ID</h2>
+        <p className="mt-2 max-w-xs text-sm text-ink-muted">
+          @ID 是別人找到你的名字，例如邀請你加入群組時可以輸入 @ID。
+        </p>
+        <p className="mt-2 font-mono text-xs text-ink-dim">
+          {current ? `目前是 @${current}` : "你還沒有設定 @ID"}
+        </p>
+      </div>
 
       <form
-        className="flex flex-col gap-3"
+        className="col-span-12 flex flex-col gap-4 border border-line bg-surface-1 p-4 sm:p-6 md:col-span-7"
         onSubmit={(e) => {
           e.preventDefault();
           if (canSave) save(name);
         }}
       >
         <Input
+          variant="bordered"
           label="@ID"
           placeholder="your.id"
           autoComplete="off"
           spellCheck="false"
-          startContent={<span className="text-gray-blue-400">@</span>}
+          startContent={<span className="font-mono text-ink-dim">@</span>}
+          classNames={{ input: 'font-mono' }}
           value={value}
           onValueChange={(next) => setValue(next.replace(/\s/g, "").replace(/^@/, "").toLowerCase())}
           isInvalid={invalid}
           errorMessage={errorMessage}
           description={description}
         />
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" color="primary" isLoading={saving} isDisabled={!canSave}>
+        <div className="flex flex-wrap gap-2 border-t border-line pt-4">
+          <Button
+            type="submit"
+            color="primary"
+            className="font-display tracking-[0.08em]"
+            isLoading={saving}
+            isDisabled={!canSave}
+          >
             儲存 @ID
           </Button>
           {current && (
-            <Button variant="flat" color="danger" isDisabled={saving} onPress={() => save("")}>
+            <Button
+              variant="bordered"
+              color="danger"
+              className="font-display tracking-[0.08em]"
+              isDisabled={saving}
+              onPress={() => save("")}
+            >
               清除 @ID
             </Button>
           )}
         </div>
       </form>
-    </div>
+    </section>
   );
 };
 

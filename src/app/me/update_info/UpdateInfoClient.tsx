@@ -34,6 +34,7 @@ const isUrl = (value: string) => {
   }
 };
 
+// 管理帳戶：每個區塊左邊 5 欄說明、右邊 7 欄表單，手機堆疊
 const UpdateInfoClient = () => {
   const { user, profile, refresh } = useAuth();
   const router = useRouter();
@@ -98,13 +99,15 @@ const UpdateInfoClient = () => {
   };
 
   return (
-    <PageContent className="max-w-2xl">
+    <PageContent className="max-w-4xl">
       <PageHeader
+        index="00 // ACCOUNT"
         title="管理帳戶"
         subtitle="修改顯示在個人頁面的資料"
         right={
           <Button
-            variant="light"
+            variant="bordered"
+            className="font-display tracking-[0.08em]"
             startContent={<FontAwesomeIcon icon={faArrowLeft} className="w-3.5" />}
             onPress={() => router.push('/me/MyPage')}
           >
@@ -113,82 +116,121 @@ const UpdateInfoClient = () => {
         }
       />
 
-      <form
-        className="flex flex-col gap-4 rounded-lg border border-gray-blue-200 bg-white p-4 shadow sm:p-6 dark:border-gray-blue-700 dark:bg-gray-blue-800"
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSubmit();
-        }}
-      >
-        <Input label="電子郵件" description="Email 來自 Google 帳號，無法修改" value={profile?.email ?? ''} isDisabled />
-        <div className="grid gap-4 md:grid-cols-2">
-          <Input
-            label="姓名"
-            isRequired
-            value={form.name}
-            onValueChange={(name) => set({ name })}
-            isInvalid={nameInvalid}
-            errorMessage="請輸入姓名"
-          />
-          <Input
-            label="電話號碼"
-            type="tel"
-            placeholder="0912-345-678"
-            value={form.phoneNumber}
-            onValueChange={(phoneNumber) => set({ phoneNumber })}
-          />
-        </div>
-        <Input
-          label="大頭照網址"
-          type="url"
-          placeholder="https://..."
-          value={form.photoURL}
-          onValueChange={(photoURL) => set({ photoURL })}
-          isInvalid={photoInvalid}
-          errorMessage="請輸入 http(s):// 開頭的網址"
-        />
-        <Input
-          label="背景圖片網址"
-          type="url"
-          placeholder="https://..."
-          value={form.bgPhotoURL}
-          onValueChange={(bgPhotoURL) => set({ bgPhotoURL })}
-          isInvalid={bgInvalid}
-          errorMessage="請輸入 http(s):// 開頭的網址"
-        />
+      <div className="boot">
+        {/* 01 基本資料 */}
+        <section className="grid grid-cols-12 gap-6 pb-10">
+          <div className="col-span-12 md:col-span-5">
+            <p className="tech-label">01 // PROFILE</p>
+            <h2 className="mt-2 font-display text-xl font-bold text-ink">基本資料</h2>
+            <p className="mt-2 max-w-xs text-sm text-ink-muted">
+              名稱與大頭照會顯示在導覽列、個人頁面與群組成員列表。Email 來自 Google 帳號，無法修改。
+            </p>
+          </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" color="primary" isLoading={saving}>
-            儲存
-          </Button>
-          <Button
-            variant="bordered"
-            startContent={!syncing && <FontAwesomeIcon icon={faRotate} className="w-3.5" />}
-            isLoading={syncing}
-            onPress={handleSync}
+          <form
+            className="col-span-12 flex flex-col gap-4 border border-line bg-surface-1 p-4 sm:p-6 md:col-span-7"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmit();
+            }}
           >
-            同步 Google 資料
-          </Button>
-        </div>
-      </form>
+            <Input
+              variant="bordered"
+              label="電子郵件"
+              description="Email 來自 Google 帳號，無法修改"
+              value={profile?.email ?? ''}
+              classNames={{ input: 'font-mono' }}
+              isDisabled
+            />
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                variant="bordered"
+                label="姓名"
+                isRequired
+                value={form.name}
+                onValueChange={(name) => set({ name })}
+                isInvalid={nameInvalid}
+                errorMessage="請輸入姓名"
+              />
+              <Input
+                variant="bordered"
+                label="電話號碼"
+                type="tel"
+                placeholder="0912-345-678"
+                value={form.phoneNumber}
+                onValueChange={(phoneNumber) => set({ phoneNumber })}
+                classNames={{ input: 'font-mono' }}
+              />
+            </div>
+            <Input
+              variant="bordered"
+              label="大頭照網址"
+              type="url"
+              placeholder="https://..."
+              value={form.photoURL}
+              onValueChange={(photoURL) => set({ photoURL })}
+              isInvalid={photoInvalid}
+              errorMessage="請輸入 http(s):// 開頭的網址"
+              classNames={{ input: 'font-mono' }}
+            />
+            <Input
+              variant="bordered"
+              label="背景圖片網址"
+              type="url"
+              placeholder="https://..."
+              value={form.bgPhotoURL}
+              onValueChange={(bgPhotoURL) => set({ bgPhotoURL })}
+              isInvalid={bgInvalid}
+              errorMessage="請輸入 http(s):// 開頭的網址"
+              classNames={{ input: 'font-mono' }}
+            />
 
-      <UsernameSettings />
+            <div className="flex flex-wrap gap-2 border-t border-line pt-4">
+              <Button type="submit" color="primary" className="font-display tracking-[0.08em]" isLoading={saving}>
+                儲存
+              </Button>
+              <Button
+                variant="bordered"
+                className="font-display tracking-[0.08em]"
+                startContent={!syncing && <FontAwesomeIcon icon={faRotate} className="w-3.5" />}
+                isLoading={syncing}
+                onPress={handleSync}
+              >
+                同步 Google 資料
+              </Button>
+            </div>
+          </form>
+        </section>
 
-      <VaultSettings />
+        <UsernameSettings />
 
-      <div className="mt-6 rounded-lg border border-red-300 p-4 sm:p-6 dark:border-red-800">
-        <h2 className="font-semibold text-red-600 dark:text-red-400">刪除帳戶</h2>
-        <p className="mt-1 mb-3 text-sm text-gray-blue-500 dark:text-gray-blue-400">
-          帳戶與所有驗證碼金鑰會永久刪除。刪除前請確認已在各服務關閉兩步驟驗證或改用其他驗證器。
-        </p>
-        <Button
-          color="danger"
-          variant="flat"
-          startContent={<FontAwesomeIcon icon={faTrashCan} className="w-3.5" />}
-          onPress={() => setConfirmDeleteOpen(true)}
-        >
-          刪除帳戶
-        </Button>
+        <VaultSettings />
+
+        {/* 04 危險區 */}
+        <section className="grid grid-cols-12 gap-6 border-t border-line py-10">
+          <div className="col-span-12 md:col-span-5">
+            <p className="tech-label flex items-center gap-2 text-alarm">
+              <span className="led led-alarm" aria-hidden />
+              04 // DANGER ZONE
+            </p>
+            <h2 className="mt-2 font-display text-xl font-bold text-ink">刪除帳戶</h2>
+            <p className="mt-2 max-w-xs text-sm text-ink-muted">
+              帳戶與所有驗證碼金鑰會永久刪除。刪除前請確認已在各服務關閉兩步驟驗證或改用其他驗證器。
+            </p>
+          </div>
+
+          <div className="hatch col-span-12 flex items-center border border-alarm p-4 sm:p-6 md:col-span-7">
+            <Button
+              color="danger"
+              variant="bordered"
+              className="bg-surface-1 font-display tracking-[0.08em]"
+              startContent={<FontAwesomeIcon icon={faTrashCan} className="w-3.5" />}
+              onPress={() => setConfirmDeleteOpen(true)}
+            >
+              刪除帳戶
+            </Button>
+          </div>
+        </section>
       </div>
 
       <ConfirmModal

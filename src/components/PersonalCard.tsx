@@ -7,12 +7,12 @@ import toast from "react-hot-toast";
 import { Button } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCopy } from "@fortawesome/free-solid-svg-icons";
-import RoleChip from "@/components/permissions/RoleChip";
-import { formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import { showError } from "@/lib/errorDialog";
 import { PersonalCardProps } from "@/types/Profile/PersonalCard";
 import useAuth from "./auth/useAuth";
 
+// 身分證／儀表卡：上方是身分（大頭照、名稱、@ID、使用者 ID、身分組），下方是一列一列的規格
 const PersonalCard = (props: PersonalCardProps) => {
   const { profile } = props;
   const router = useRouter();
@@ -28,95 +28,129 @@ const PersonalCard = (props: PersonalCardProps) => {
     }
   };
 
+  // 規格列：欄位名用 tech-label，值一律等寬
   const rows: [string, ReactNode][] = [
+    ['EMAIL', profile.email || '無'],
     [
-      '@ID',
-      profile.username ? (
-        `@${profile.username}`
-      ) : (
-        <Link href="/me/update_info" className="text-tpp underline underline-offset-4">
-          尚未設定 @ID
-        </Link>
-      ),
+      'VERIFIED',
+      <span key="verified" className="inline-flex items-center gap-2">
+        <span className={cn("led", !profile.emailVerified && "led-off")} aria-hidden />
+        {profile.emailVerified ? '已驗證' : '未驗證'}
+      </span>,
     ],
-    [
-      '使用者 ID',
-      <button
-        key="uid"
-        onClick={copyUid}
-        title="點擊複製"
-        className="inline-flex items-start gap-1.5 text-left font-mono text-xs break-all hover:text-tpp transition-colors"
-      >
-        {profile.uid}
-        <FontAwesomeIcon icon={faCopy} className="mt-0.5 w-3 shrink-0" />
-      </button>,
-    ],
-    ['Email', profile.email || '無'],
-    ['手機號碼', profile.phoneNumber || '無'],
-    ['Email 是否驗證', profile.emailVerified ? '是' : '否'],
-    ['創建時間', formatDateTime(profile.metadata.creationTime)],
-    ['最後登入時間', formatDateTime(profile.lastLoginAt)],
-    ['最後登入 IP', profile.lastLoginIp || '無'],
-    ['最後登入裝置', profile.lastLoginDevice || '無'],
+    ['PHONE', profile.phoneNumber || '無'],
+    ['CREATED', formatDateTime(profile.metadata.creationTime)],
+    ['LAST LOGIN', formatDateTime(profile.lastLoginAt)],
+    ['LAST IP', profile.lastLoginIp || '無'],
+    ['LAST DEVICE', profile.lastLoginDevice || '無'],
   ];
 
   return (
-    <div className="w-full overflow-hidden bg-white border border-gray-blue-200 rounded-lg shadow dark:bg-gray-blue-800 dark:border-gray-blue-700">
-      {/* 背景圖 */}
-      <div className="h-32 sm:h-44 bg-gradient-to-r from-tpp/40 to-bityo/30">
-        {profile.bgPhotoURL && (
-          <img className="h-full w-full object-cover" src={profile.bgPhotoURL} alt="" />
-        )}
+    <section className="panel boot">
+      {/* 卡片頂列：卡別與登入狀態 */}
+      <div className="flex items-center justify-between border-b border-line px-5 py-3">
+        <p className="tech-label">ID CARD // SECURIBIT</p>
+        <p className="tech-label flex items-center gap-2">
+          <span className="led" aria-hidden />
+          SIGNED IN
+        </p>
       </div>
 
-      <div className="flex flex-col items-center px-4 pb-8">
-        <div className="relative -mt-12 mb-3">
-          {profile.photoURL ? (
-            <img
-              className="w-24 h-24 rounded-full object-cover ring-4 ring-white shadow-lg dark:ring-gray-blue-800"
-              src={profile.photoURL}
-              referrerPolicy="no-referrer"
-              alt={`${profile.name} 的大頭照`}
-            />
-          ) : (
-            <div className="flex w-24 h-24 items-center justify-center rounded-full bg-tpp text-3xl font-bold text-white ring-4 ring-white dark:ring-gray-blue-800">
-              {profile.name.slice(0, 1) || '?'}
-            </div>
-          )}
-          <span className="right-1 bottom-1 absolute w-5 h-5 bg-green-400 border-2 border-white dark:border-gray-blue-800 rounded-full"></span>
+      {/* 背景圖：有設定才顯示，當成卡片上的一條帶子 */}
+      {profile.bgPhotoURL && (
+        <div className="h-24 border-b border-line sm:h-32">
+          <img className="h-full w-full object-cover" src={profile.bgPhotoURL} alt="" />
         </div>
+      )}
 
-        <h5 className="mb-1 text-xl font-medium text-gray-blue-900 dark:text-white">{profile.name}</h5>
-        {profile.username && (
-          <p className="text-sm text-gray-blue-500 dark:text-gray-blue-400">@{profile.username}</p>
-        )}
-
-        {/* 全站身分組 */}
-        {siteRoles.length > 0 && (
-          <div className="mt-2 flex flex-wrap justify-center gap-1.5">
-            {siteRoles.map((role) => (
-              <RoleChip key={role.id} role={role} />
-            ))}
+      {/* 身分區 */}
+      <div className="flex flex-col gap-5 p-5 sm:flex-row sm:p-6">
+        {profile.photoURL ? (
+          <img
+            className="h-24 w-24 shrink-0 border border-line-strong object-cover"
+            src={profile.photoURL}
+            referrerPolicy="no-referrer"
+            alt={`${profile.name} 的大頭照`}
+          />
+        ) : (
+          // 沒有大頭照時顯示名字的第一個字
+          <div className="flex h-24 w-24 shrink-0 items-center justify-center border border-line-strong bg-phos font-display text-4xl font-bold text-phos-ink">
+            {profile.name.slice(0, 1) || '?'}
           </div>
         )}
 
-        <table className="text-sm my-3 w-full max-w-lg table-fixed">
-          <tbody>
-            {rows.map(([label, value]) => (
-              <tr key={label}>
-                <td className="w-32 px-2 py-2 align-top text-gray-blue-500 font-semibold">{label}</td>
-                <td className="px-2 py-2 break-all text-gray-blue-900 dark:text-white">{value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="min-w-0 flex-1">
+          <h2 className="break-words font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+            {profile.name}
+          </h2>
 
-        <div className="flex mt-4 gap-3">
-          <Button color="primary" onPress={() => router.push('/me/update_info')}>管理帳戶</Button>
-          <Button variant="bordered" onPress={logout}>登出帳戶</Button>
+          {profile.username ? (
+            <p className="mt-1 font-mono text-sm text-phos">@{profile.username}</p>
+          ) : (
+            <Link
+              href="/me/update_info"
+              className="mt-1 inline-block font-mono text-sm text-ink-muted underline underline-offset-4 transition-colors hover:text-phos"
+            >
+              尚未設定 @ID
+            </Link>
+          )}
+
+          {/* 使用者 ID：點一下複製 */}
+          <button
+            type="button"
+            onClick={copyUid}
+            title="點擊複製"
+            className="mt-2 inline-flex max-w-full items-start gap-1.5 text-left font-mono text-xs break-all text-ink-dim transition-colors hover:text-phos"
+          >
+            <span className="shrink-0">UID</span>
+            <span>{profile.uid}</span>
+            <FontAwesomeIcon icon={faCopy} className="mt-0.5 w-3 shrink-0" />
+          </button>
+
+          {/* 全站身分組：方形小標籤 + 身分組顏色的方點 */}
+          {siteRoles.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {siteRoles.map((role) => (
+                <span
+                  key={role.id}
+                  className="tech-label inline-flex max-w-full items-center gap-1.5 border border-line px-1.5 py-0.5 text-ink"
+                >
+                  <span
+                    className={cn("h-2 w-2 shrink-0", !role.color && "bg-ink-dim")}
+                    style={role.color ? { backgroundColor: role.color } : undefined}
+                    aria-hidden
+                  />
+                  <span className="truncate">{role.name}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-    </div>
+
+      {/* 規格列 */}
+      <dl className="border-t border-line">
+        {rows.map(([label, value]) => (
+          <div
+            key={label}
+            className="grid grid-cols-[7rem_1fr] gap-x-4 border-b border-line px-5 py-2.5 transition-colors hover:bg-ink/5 sm:grid-cols-[9rem_1fr] sm:px-6"
+          >
+            <dt className="tech-label pt-0.5">{label}</dt>
+            <dd className="min-w-0 break-all font-mono text-sm text-ink">{value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {/* 操作 */}
+      <div className="flex flex-wrap gap-2 p-5 sm:p-6">
+        <Button color="primary" className="font-display tracking-[0.08em]" onPress={() => router.push('/me/update_info')}>
+          管理帳戶
+        </Button>
+        <Button variant="bordered" className="font-display tracking-[0.08em]" onPress={logout}>
+          登出帳戶
+        </Button>
+      </div>
+    </section>
   );
 };
 

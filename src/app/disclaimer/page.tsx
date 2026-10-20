@@ -31,18 +31,36 @@ const sections = [
   },
 ];
 
+// 條款：左邊標題欄，右邊一條一條的規格列，編號用方形等寬標籤
 const Disclaimer = () => {
   return (
-    <PageContent className="max-w-3xl">
-      <PageHeader title="免責聲明" subtitle={SEO.Disclaimer.description} />
-      <div className="flex flex-col gap-6 leading-relaxed">
-        {sections.map((section) => (
-          <section key={section.title}>
-            <h2 className="mb-2 text-lg font-semibold">{section.title}</h2>
-            <p className="text-gray-blue-600 dark:text-gray-blue-300">{section.text}</p>
-          </section>
-        ))}
-      </div>
+    <PageContent className="max-w-4xl">
+      <PageHeader index="LEGAL // DISCLAIMER" title="免責聲明" subtitle={SEO.Disclaimer.description} />
+
+      <section className="boot grid grid-cols-12 gap-6">
+        <div className="col-span-12 md:col-span-4">
+          <p className="tech-label">01 // TERMS</p>
+          <h2 className="mt-2 font-display text-2xl font-bold text-ink">使用本服務前</h2>
+          <p className="mt-3 max-w-xs text-sm text-ink-muted">
+            繼續使用本網站，即表示您已閱讀並同意以下各條。
+          </p>
+        </div>
+
+        <ol className="col-span-12 border-t border-line md:col-span-8">
+          {sections.map((section, index) => (
+            <li
+              key={section.title}
+              className="grid grid-cols-[3rem_1fr] gap-x-4 gap-y-2 border-b border-line py-5"
+            >
+              <span className="inline-flex h-7 min-w-7 items-center justify-center justify-self-start self-start border border-line-strong px-1.5 font-mono text-xs tracking-[0.08em] text-ink">
+                {String(index + 1).padStart(2, '0')}
+              </span>
+              <h3 className="font-display text-lg font-semibold text-ink">{section.title}</h3>
+              <p className="col-start-2 leading-relaxed text-ink-muted">{section.text}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
     </PageContent>
   );
 };

@@ -24,53 +24,93 @@ const steps = [
   },
 ];
 
+const features = [
+  { title: '匯入', text: '支援 otpauth:// 連結、QR Code 圖片與相機掃描匯入' },
+  { title: '參數', text: '可編輯名稱、類別與金鑰，並支援 6 / 8 位數、30 / 60 秒週期與 SHA-1、SHA-256、SHA-512 演算法' },
+  { title: '搜尋', text: '依名稱或類別搜尋、篩選驗證碼' },
+  { title: '主題', text: '亮色 / 暗色模式' },
+];
+
+// 兩位數編號的方形標籤
+const Index = ({ n }: { n: number }) => (
+  <span className="inline-flex h-7 min-w-7 items-center justify-center justify-self-start border border-line-strong px-1.5 font-mono text-xs tracking-[0.08em] text-ink">
+    {String(n).padStart(2, '0')}
+  </span>
+);
+
 const About = () => {
   return (
-    <PageContent className="max-w-3xl">
-      <PageHeader title="關於我們" subtitle="TOTP 2FA 二步驟驗證器" />
+    <PageContent className="max-w-4xl">
+      <PageHeader index="ABOUT // TOTP 2FA" title="關於我們" subtitle="TOTP 2FA 二步驟驗證器" />
 
-      <div className="flex flex-col gap-8 leading-relaxed">
-        <section>
-          <p>
+      <div className="boot flex flex-col">
+        {/* 01 簡介 */}
+        <section className="grid grid-cols-12 gap-6 pb-10">
+          <div className="col-span-12 md:col-span-4">
+            <p className="tech-label">01 // OVERVIEW</p>
+            <h2 className="mt-2 font-display text-2xl font-bold text-ink">這是什麼</h2>
+          </div>
+          <p className="col-span-12 leading-relaxed text-ink-muted md:col-span-8">
             TOTP 2FA 是由 Bityo 團隊打造的網頁版兩步驟驗證器。它使用與 Google Authenticator
             相同的 TOTP 演算法（RFC 6238），可以取代手機上的驗證器 App，產生各大網站登入時需要的 6 或 8 位數驗證碼。
           </p>
         </section>
 
-        <section>
-          <h2 className="mb-3 text-xl font-semibold">怎麼使用</h2>
-          <ol className="flex flex-col gap-3">
+        {/* 02 步驟 */}
+        <section className="grid grid-cols-12 gap-6 border-t border-line py-10">
+          <div className="col-span-12 md:col-span-4">
+            <p className="tech-label">02 // HOW TO</p>
+            <h2 className="mt-2 font-display text-2xl font-bold text-ink">怎麼使用</h2>
+            <p className="mt-3 max-w-xs text-sm text-ink-muted">三步，和手機上的驗證器一樣。</p>
+          </div>
+          <ol className="col-span-12 border-t border-line md:col-span-8">
             {steps.map((step, index) => (
-              <li key={step.title} className="flex gap-3">
-                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-tpp font-semibold text-white">
-                  {index + 1}
-                </span>
-                <div>
-                  <p className="font-semibold">{step.title}</p>
-                  <p className="text-gray-blue-600 dark:text-gray-blue-300">{step.text}</p>
-                </div>
+              <li key={step.title} className="grid grid-cols-[3rem_1fr] gap-x-4 gap-y-1 border-b border-line py-5">
+                <Index n={index + 1} />
+                <h3 className="font-display text-lg font-semibold text-ink">{step.title}</h3>
+                <p className="col-start-2 text-ink-muted">{step.text}</p>
               </li>
             ))}
           </ol>
         </section>
 
-        <section>
-          <h2 className="mb-3 text-xl font-semibold">功能</h2>
-          <ul className="list-disc pl-6 text-gray-blue-600 dark:text-gray-blue-300">
-            <li>支援 otpauth:// 連結、QR Code 圖片與相機掃描匯入</li>
-            <li>可編輯名稱、類別與金鑰，並支援 6 / 8 位數、30 / 60 秒週期與 SHA-1、SHA-256、SHA-512 演算法</li>
-            <li>依名稱或類別搜尋、篩選驗證碼</li>
-            <li>亮色 / 暗色模式</li>
-          </ul>
+        {/* 03 功能規格表 */}
+        <section className="grid grid-cols-12 gap-6 border-t border-line py-10">
+          <div className="col-span-12 md:col-span-4">
+            <p className="tech-label">03 // SPEC SHEET</p>
+            <h2 className="mt-2 font-display text-2xl font-bold text-ink">功能</h2>
+          </div>
+          <ol className="col-span-12 border-t border-line md:col-span-8">
+            {features.map((feature, index) => (
+              <li
+                key={feature.title}
+                className="grid grid-cols-[3rem_1fr] gap-x-4 gap-y-1 border-b border-line py-4 sm:grid-cols-[3rem_6rem_1fr]"
+              >
+                <Index n={index + 1} />
+                <h3 className="font-display text-base font-semibold text-ink">{feature.title}</h3>
+                <p className="col-start-2 text-sm text-ink-muted sm:col-start-3">{feature.text}</p>
+              </li>
+            ))}
+          </ol>
         </section>
 
-        <section>
-          <h2 className="mb-3 text-xl font-semibold">資料與安全</h2>
-          <p className="text-gray-blue-600 dark:text-gray-blue-300">
-            驗證碼金鑰儲存在本服務的雲端資料庫，資料庫權限設定為只有登入的帳戶本人能讀寫自己的資料。
-            驗證碼在您的瀏覽器中計算產生。請務必另外保存各服務提供的備用碼（Recovery Codes），以免帳號無法登入時無法救回。
-            詳細說明請參閱<Link href="/disclaimer" className="text-tpp underline underline-offset-4">免責聲明</Link>。
-          </p>
+        {/* 04 資料與安全 */}
+        <section className="grid grid-cols-12 gap-6 border-t border-line py-10">
+          <div className="col-span-12 md:col-span-4">
+            <p className="tech-label">04 // SECURITY</p>
+            <h2 className="mt-2 font-display text-2xl font-bold text-ink">資料與安全</h2>
+          </div>
+          <div className="panel col-span-12 p-5 sm:p-6 md:col-span-8">
+            <p className="leading-relaxed text-ink-muted">
+              驗證碼金鑰儲存在本服務的雲端資料庫，資料庫權限設定為只有登入的帳戶本人能讀寫自己的資料。
+              驗證碼在您的瀏覽器中計算產生。請務必另外保存各服務提供的備用碼（Recovery Codes），以免帳號無法登入時無法救回。
+              詳細說明請參閱
+              <Link href="/disclaimer" className="text-phos underline underline-offset-4 transition-colors hover:text-ink">
+                免責聲明
+              </Link>
+              。
+            </p>
+          </div>
         </section>
       </div>
     </PageContent>

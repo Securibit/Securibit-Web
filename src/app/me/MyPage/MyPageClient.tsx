@@ -11,11 +11,14 @@ const MyPageClient = () => {
 
   return (
     <PageContent className="max-w-3xl">
-      <PageHeader title="個人頁面" />
+      <PageHeader index="00 // PROFILE" title="個人頁面" subtitle="你的帳戶資料與登入紀錄" />
       {profile ? (
         <PersonalCard profile={profile} siteRoles={siteRoles} />
       ) : (
-        <p className="text-gray-blue-500">找不到使用者資料，請重新登入。</p>
+        <div className="hatch border border-line p-10 text-center">
+          <p className="tech-label">NO PROFILE</p>
+          <p className="mt-2 text-ink-muted">找不到使用者資料，請重新登入。</p>
+        </div>
       )}
     </PageContent>
   );
