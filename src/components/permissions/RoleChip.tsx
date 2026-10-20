@@ -7,16 +7,15 @@ import { RoleChipProps } from "@/types/Permission/RoleChip";
 // 沒設定顏色的身分組用的灰（給 <input type="color"> 當預設值）
 export const ROLE_FALLBACK_COLOR = "#6E6E73";
 
-// 身分組標籤：灰底圓角藥丸，有顏色就拿來當文字色；有 onRemove 時多一個移除鈕
+// 身分組標籤：灰底圓角藥丸，有顏色就在前面放一個色點；有 onRemove 時多一個移除鈕
 const RoleChip = (props: RoleChipProps) => {
   const { role } = props;
   const color = role.color || null;
 
   return (
-    <span
-      className="inline-flex max-w-full items-center gap-1 rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px]"
-      style={color ? { color } : undefined}
-    >
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-ink">
+      {/* 顏色用圓點表示：像幣友綠這種亮色直接當文字色，在白底上會看不清楚 */}
+      {color && <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden />}
       <span className="truncate">{role.name}</span>
       {props.onRemove && (
         <button

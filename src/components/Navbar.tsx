@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable @next/next/no-img-element */
 
 import { useState } from "react";
 import Image from "next/image";
@@ -12,6 +11,7 @@ import { SITE } from "@/lib/permissions/bits";
 import Themes from "./Themes";
 import Sidebar from "./Sidebar/Sidebar";
 import useAuth from "./auth/useAuth";
+import UserMenu from "./UserMenu";
 
 // 登入後才出現的主選單；perm 有值的還要有對應權限
 const NAV_ITEMS = [
@@ -24,10 +24,7 @@ const NAV_ITEMS = [
 // 像 Apple 官網那條窄窄的導覽列：小字、很淡的分隔線
 const Navbar = () => {
   const pathname = usePathname();
-  const { user, profile, can, login, logout } = useAuth();
-  // 優先顯示使用者在個人頁面改過的名稱與大頭照
-  const displayName = profile?.name || user?.displayName;
-  const photoURL = profile?.photoURL || user?.photoURL;
+  const { user, can, login } = useAuth();
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -62,22 +59,7 @@ const Navbar = () => {
           </div>
 
           {user ? (
-            <>
-              <Link href="/me/MyPage" className={cn("hidden items-center gap-2 md:flex", isActive('/me') ? "text-ink" : "text-ink/70 hover:text-ink")}>
-                {photoURL ? (
-                  <img src={photoURL} alt="" referrerPolicy="no-referrer" className="h-8 w-8 rounded-full object-cover" />
-                ) : (
-                  // 沒有大頭照時顯示名字的第一個字
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-1 text-[13px] font-semibold">
-                    {displayName?.slice(0, 1) || '?'}
-                  </span>
-                )}
-                <span className="max-w-[10rem] truncate">{displayName}</span>
-              </Link>
-              <button onClick={logout} className="hidden text-ink/70 hover:text-ink md:block">
-                登出
-              </button>
-            </>
+            <UserMenu />
           ) : (
             <Button onPress={login} color="primary" radius="full" className="hidden h-9 px-5 text-[15px] font-medium md:flex">
               登入

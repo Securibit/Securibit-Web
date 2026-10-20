@@ -19,6 +19,8 @@ const ADMIN_BIT = 1;
 
 // 預設色票（存小寫 #rrggbb）
 const PRESET_COLORS = [
+  // 幣友品牌色排第一
+  "#17ffac",
   "#ef4444",
   "#f97316",
   "#eab308",

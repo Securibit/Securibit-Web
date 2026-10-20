@@ -20,6 +20,7 @@ import { SITE } from "@/lib/permissions/bits";
 import { SidebarListItemProps, SidebarProps } from "@/types/Sidebar/Sidebar";
 import useAuth from "../auth/useAuth";
 import Themes from "../Themes";
+import RoleChip from "../permissions/RoleChip";
 
 const SidebarListItem = (props: SidebarListItemProps) => {
   const router = useRouter();
@@ -44,7 +45,7 @@ const SidebarListItem = (props: SidebarListItemProps) => {
 // 手機版側欄：依登入狀態顯示可用項目
 const Sidebar = (props: SidebarProps) => {
   const pathname = usePathname();
-  const { user, profile, can, login, logout } = useAuth();
+  const { user, profile, siteRoles, can, login, logout } = useAuth();
 
   const closeDrawer = () => props.setIsDrawerOpen(false);
 
@@ -78,7 +79,12 @@ const Sidebar = (props: SidebarProps) => {
       <DrawerContent>
         <DrawerHeader className="flex flex-col gap-0.5">
           <span className="text-[17px] font-semibold">Securibit</span>
-          {user && <span className="text-[15px] font-normal text-ink-muted">{profile?.name || user.displayName}</span>}
+          {user && (
+            <span className="flex items-center gap-2 text-[15px] font-normal text-ink-muted">
+              {siteRoles[0] && <RoleChip role={siteRoles[0]} />}
+              {profile?.name || user.displayName}
+            </span>
+          )}
         </DrawerHeader>
         <DrawerBody className="gap-0.5 px-3">
           {links.map((item) => (
