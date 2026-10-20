@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+import { authenticate, serverError } from '@/lib/server/supabaseAdmin';
 
 // 從 user-agent 粗略解析出「OS · 瀏覽器」
 function parseDevice(ua: string): string {
@@ -24,41 +21,30 @@ function parseDevice(ua: string): string {
   return `${os} · ${browser}`;
 }
 
+// 用戶端 IP：優先用 Vercel 設定的 x-real-ip（可信）；沒有時取 x-forwarded-for 的「最後」一段
+// （最前面幾段是用戶端自己可以塞的，最後一段才是離我們最近的 proxy 加上的）
+function clientIp(req: NextRequest): string {
+  const realIp = req.headers.get('x-real-ip')?.trim();
+  if (realIp) return realIp;
+  const hops = (req.headers.get('x-forwarded-for') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  return hops[hops.length - 1] ?? '';
+}
+
 export async function POST(req: NextRequest) {
-  if (!supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json({ message: '伺服器未設定 Supabase service role' }, { status: 500 });
-  }
+  const auth = await authenticate(req);
+  if (auth instanceof NextResponse) return auth;
 
-  const authHeader = req.headers.get('authorization') ?? '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  if (!token) {
-    return NextResponse.json({ message: '未提供授權憑證' }, { status: 401 });
-  }
-
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  const { data: userResult, error: userError } = await admin.auth.getUser(token);
-  if (userError || !userResult?.user) {
-    return NextResponse.json({ message: '無效的授權憑證' }, { status: 401 });
-  }
-
-  const fwd = req.headers.get('x-forwarded-for') ?? '';
-  const ip = fwd.split(',')[0].trim() || req.headers.get('x-real-ip') || '';
   const ua = req.headers.get('user-agent') ?? '';
 
-  const { error } = await admin
+  const { error } = await auth.admin
     .from('profiles')
     .update({
       last_login_at: new Date().toISOString(),
-      last_login_ip: ip,
+      last_login_ip: clientIp(req),
       last_login_device: parseDevice(ua),
     })
-    .eq('id', userResult.user.id);
+    .eq('id', auth.user.id);
 
-  if (error) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
-  }
+  if (error) return serverError('記錄登入失敗', error);
   return NextResponse.json({ success: true });
 }

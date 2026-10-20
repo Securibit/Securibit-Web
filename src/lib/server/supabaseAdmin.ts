@@ -19,6 +19,25 @@ export interface AuthedRequest {
 
 export const jsonError = (message: string, status: number) => NextResponse.json({ message }, { status });
 
+export const GENERIC_ERROR = '伺服器發生錯誤，請稍後再試';
+
+/**
+ * 非預期錯誤：原始內容只記在伺服器 log，前端只拿到一般訊息（避免外洩資料表、欄位或 SQL 細節）
+ */
+export const serverError = (context: string, error: unknown) => {
+  console.error(`${context}:`, error);
+  return jsonError(GENERIC_ERROR, 500);
+};
+
+/**
+ * RPC / PostgREST 錯誤：只有函式主動 raise 的業務訊息（code 'P0001'，例如「你還是群組擁有者」）
+ * 才以 status 回給前端；其他錯誤一律當成伺服器錯誤
+ */
+export const rpcError = (context: string, error: { code?: string; message: string }, status: number) => {
+  if (error.code === 'P0001') return jsonError(error.message, status);
+  return serverError(context, error);
+};
+
 /**
  * 驗證 Authorization: Bearer <access_token>，回傳呼叫者與兩種 client；失敗時回傳要直接回給前端的 NextResponse
  */

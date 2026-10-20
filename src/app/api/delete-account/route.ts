@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticate, jsonError } from '@/lib/server/supabaseAdmin';
+import { authenticate, rpcError, serverError } from '@/lib/server/supabaseAdmin';
 
 // 刪除自己的帳戶：需要 service_role 金鑰（僅後端，切勿外洩）才能刪除 auth 使用者
 export async function POST(req: NextRequest) {
@@ -14,19 +14,13 @@ export async function POST(req: NextRequest) {
   // （PGRST202 = 函式不存在，代表 0009 還沒執行、也就不會有群組與身分組）
   const { error: checkError } = await asUser.rpc('can_delete_self');
   if (checkError && checkError.code !== 'PGRST202') {
-    return jsonError(checkError.message, 400);
+    return rpcError('can_delete_self 失敗', checkError, 400);
   }
 
-  // 先刪 profile（auth 使用者刪除時亦會 cascade，這裡先行確保乾淨）
-  const { error: profileError } = await admin.from('profiles').delete().eq('id', uid);
-  if (profileError) {
-    return jsonError(profileError.message, 500);
-  }
-
+  // 直接刪 auth 使用者：profiles.id references auth.users on delete cascade，
+  // profile 與底下資料會在同一個交易裡一起刪掉；失敗時整筆回滾，不會留下沒有 profile 的帳號
   const { error: deleteError } = await admin.auth.admin.deleteUser(uid);
-  if (deleteError) {
-    return jsonError(deleteError.message, 500);
-  }
+  if (deleteError) return serverError('刪除帳戶失敗', deleteError);
 
   return NextResponse.json({ success: true });
 }

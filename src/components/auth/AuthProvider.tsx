@@ -84,10 +84,20 @@ const AuthProvider = (props: AuthProviderProps) => {
       loadedUid.current = sUser.id;
 
       setTimeout(async () => {
-        await loadProfile(sUser.id);
-        setLoading(false);
+        // 載入丟例外（例如網路斷線）也要結束 loading，否則整站會一直卡在載入畫面
+        try {
+          await loadProfile(sUser.id);
+        } catch (error) {
+          console.error('載入使用者資料失敗:', error);
+          // 清掉，下次 SIGNED_IN（例如切回分頁）會再試一次
+          loadedUid.current = null;
+          showError('載入使用者資料失敗', '請檢查網路連線後重新整理頁面');
+          return;
+        } finally {
+          setLoading(false);
+        }
 
-        if (await notifyMigrationOnce(sUser.id)) {
+        if (await notifyMigrationOnce(sUser.id).catch(() => false)) {
           toast.success('已將您的資料遷移至新資料庫！', { position: 'top-right', duration: 6000 });
         }
       }, 0);
@@ -102,9 +112,12 @@ const AuthProvider = (props: AuthProviderProps) => {
 
     const channel = new BroadcastChannel(AUTH_CHANNEL);
     channel.onmessage = async (event: MessageEvent<AuthPopupMessage>) => {
-      const message = event.data;
-      const initiated = popupPending.current;
+      // 只接受「這個分頁自己開了登入彈窗」之後的結果；沒發起過就忽略，
+      // 避免別的頁面送來的 session 把這個分頁換成別人的帳號（登入 CSRF）。
+      // 其他分頁不需要這則訊息：Supabase 自己會跨分頁同步登入狀態
+      if (!popupPending.current) return;
       popupPending.current = false;
+      const message = event.data;
 
       if (message.type === 'signed-in') {
         // 把彈窗拿到的 session 套到這個分頁，會觸發 onAuthStateChange 載入 profile
@@ -113,14 +126,12 @@ const AuthProvider = (props: AuthProviderProps) => {
           refresh_token: message.refreshToken,
         });
         if (error) {
-          if (initiated) showError('登入失敗', error.message);
+          showError('登入失敗', error.message);
           return;
         }
-        if (initiated) {
-          toast.success('登入成功！', { position: 'top-right' });
-          recordLogin();
-        }
-      } else if (message.type === 'error' && initiated) {
+        toast.success('登入成功！', { position: 'top-right' });
+        recordLogin();
+      } else if (message.type === 'error') {
         showError('登入失敗', message.message);
       }
     };

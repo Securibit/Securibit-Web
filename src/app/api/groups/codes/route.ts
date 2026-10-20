@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TOTP } from 'totp-generator';
-import { authenticate, jsonError } from '@/lib/server/supabaseAdmin';
+import { authenticate, jsonError, rpcError, serverError } from '@/lib/server/supabaseAdmin';
 import { TOTP_DEFAULTS, TotpAlgorithm } from '@/types/Totp/Totp';
 import { GroupCodes } from '@/types/Group/Group';
 
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
   // 以呼叫者身分查詢看得到哪些驗證碼（權限檢查在資料庫）
   const { data: permitted, error: permittedError } = await auth.asUser.rpc('group_codes_permitted', { gid: groupId });
-  if (permittedError) return jsonError(permittedError.message, 403);
+  if (permittedError) return rpcError('group_codes_permitted 失敗', permittedError, 403);
 
   const ids = ((permitted ?? []) as string[]).filter(Boolean);
   const now = Date.now();
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     auth.admin.from('totp_accounts').select('id, digits, period, algorithm').in('id', ids),
   ]);
   if (secretsResult.error || accountsResult.error) {
-    return jsonError('讀取驗證碼失敗', 500);
+    return serverError('讀取驗證碼失敗', secretsResult.error ?? accountsResult.error);
   }
 
   const params = new Map(((accountsResult.data ?? []) as AccountParams[]).map((row) => [row.id, row]));
