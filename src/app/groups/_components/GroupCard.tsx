@@ -24,7 +24,9 @@ const GroupCard = (props: GroupCardProps) => {
           <span className="shrink-0 rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-ink-muted">擁有者</span>
         )}
       </p>
-      <p className="truncate text-[15px] text-ink-muted tabular-nums">
+      {/* 群組說明只顯示一行，太長就截斷 */}
+      {group.description && <p className="truncate text-[15px] text-ink-muted">{group.description}</p>}
+      <p className="truncate text-[13px] text-ink-muted tabular-nums">
         {group.member_count} 位成員 · {group.account_count} 筆驗證碼
       </p>
     </div>

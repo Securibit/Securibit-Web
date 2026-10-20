@@ -437,6 +437,10 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
             <p className="mb-3 text-[15px] text-ink-muted">用箭頭調整順序，釘選的固定排在最上面；順序對所有成員都一樣</p>
           ) : (
             <div className="mb-3 flex flex-col gap-3">
+              {/* 群組說明（只在驗證碼頁顯示，群組內頁的標題下已經有了）：放在搜尋上面，一行截斷 */}
+              {heading && detail.group.description && (
+                <p className="truncate text-[15px] text-ink-muted" title={detail.group.description}>說明：{detail.group.description}</p>
+              )}
               {/* 搜尋 */}
               <label className="flex items-center gap-2 rounded-[12px] bg-surface-1 px-3.5 py-2 text-[17px] text-ink-muted focus-within:ring-2 focus-within:ring-accent/40">
                 <FontAwesomeIcon icon={faMagnifyingGlass} className="w-4 shrink-0" />
