@@ -75,14 +75,15 @@ const UserMenu = () => {
     closeTimer.current = setTimeout(() => setOpen(false), CLOSE_DELAY);
   };
 
-  const copyUid = async () => {
+  const copyText = async (text: string, label: string) => {
     try {
-      await navigator.clipboard.writeText(user.uid);
+      await navigator.clipboard.writeText(text);
       toast.success("已複製", { position: "top-right" });
     } catch {
-      showError("無法複製", "瀏覽器不允許存取剪貼簿，請手動複製使用者 ID。");
+      showError("無法複製", `瀏覽器不允許存取剪貼簿，請手動複製${label}。`);
     }
   };
+  const copyUid = () => copyText(user.uid, "使用者 ID");
 
   const avatar = (size: string, text: string) =>
     photoURL ? (
@@ -137,10 +138,19 @@ const UserMenu = () => {
                   <span className="truncate tabular-nums">UID: {user.uid.slice(0, 8)}</span>
                   <FontAwesomeIcon icon={faCopy} className="w-3 shrink-0" />
                 </button>
+                {/* 使用者自己設的 @ID 放在 UID 下面 */}
+                {profile?.username ? (
+                  <button type="button" onClick={() => copyText(`@${profile.username}`, "@ID")} title="點一下複製" className="flex max-w-full items-center gap-1.5 text-[13px] text-ink-muted hover:text-ink">
+                    <span className="truncate">@{profile.username}</span>
+                    <FontAwesomeIcon icon={faCopy} className="w-3 shrink-0" />
+                  </button>
+                ) : (
+                  <Link href="/me/update_info" className="block truncate text-[13px] text-accent hover:underline">設定你的 @ID</Link>
+                )}
               </div>
             </div>
 
-            {/* 身分組與 @ID */}
+            {/* 身分組 */}
             <div className="mx-4 mt-3 rounded-[12px] bg-surface-1 px-3 py-2.5">
               <div className="flex flex-wrap items-center gap-1.5">
                 {siteRoles.length > 0 ? (
@@ -149,13 +159,6 @@ const UserMenu = () => {
                   <span className="text-[13px] text-ink-muted">一般使用者</span>
                 )}
               </div>
-              <p className="mt-1.5 truncate text-[13px] text-ink-muted">
-                {profile?.username ? (
-                  <>@{profile.username}</>
-                ) : (
-                  <Link href="/me/update_info" className="text-accent hover:underline">設定你的 @ID</Link>
-                )}
-              </p>
             </div>
 
             {/* 選單 */}

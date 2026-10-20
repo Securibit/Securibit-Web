@@ -12,6 +12,7 @@ import Themes from "./Themes";
 import Sidebar from "./Sidebar/Sidebar";
 import useAuth from "./auth/useAuth";
 import UserMenu from "./UserMenu";
+import NotificationBell from "./NotificationBell";
 
 // 登入後才出現的主選單；perm 有值的還要有對應權限
 const NAV_ITEMS = [
@@ -57,6 +58,7 @@ const Navbar = () => {
           <div className="hidden md:flex">
             <Themes />
           </div>
+          <NotificationBell />
 
           {user ? (
             <UserMenu />
