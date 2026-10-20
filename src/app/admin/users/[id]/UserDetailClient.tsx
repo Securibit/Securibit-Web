@@ -165,7 +165,7 @@ const UserDetailClient = (props: UserDetailClientProps) => {
               </button>
             </InfoRow>
             <InfoRow label="電子郵件">{detail.email || "無"}</InfoRow>
-            <InfoRow label="個人加密">{detail.vault_enabled ? "已啟用" : "未啟用"}</InfoRow>
+            <InfoRow label="加密密碼">{detail.vault_enabled ? "已設定" : "未設定"}</InfoRow>
             <InfoRow label="群組">
               {detail.groups.length === 0 ? (
                 "無"
@@ -237,7 +237,7 @@ const UserDetailClient = (props: UserDetailClientProps) => {
               刪除使用者
             </button>
             <p className="mt-2 px-5 text-[13px] text-ink-muted">
-              會刪除帳號、所有驗證碼與群組成員資格，無法恢復；擁有群組的使用者要先轉移或刪除群組
+              會刪除帳號、只有他一個人的群組（含預設群組）與群組成員資格，無法恢復；擁有有其他成員的群組時要先轉移或刪除群組
             </p>
           </section>
         )}

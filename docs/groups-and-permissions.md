@@ -502,3 +502,61 @@ src/app/admin/                     後台（總覽、使用者、使用者詳情
     成員離開或被踢時，撤銷他建立的邀請連結並刪除他送出的 Email / @ID 邀請。
   - **成員 email**：`group_detail` 的成員、邀請建立者、Email 邀請者，以及 `group_invite_info` 的邀請者，只有擁有者 / 全站管理、
     或有 KICK_MEMBERS / MANAGE_ROLES 的人拿得到 email（`group_sees_emails`），其他成員是 null。
+
+## 7. 預設群組與加密群組（0011）
+
+### 7.1 預設群組
+
+- 「我的驗證碼」改成一個群組：每個使用者都有一個**預設群組**（`profiles.default_group_id`，只能指向**自己擁有**的群組，
+  由觸發器 `profiles_default_group_guard` 擋下其他值；使用者不能直接改這個欄位）。
+- 新使用者建立 profile 時（`handle_new_user` / `ensure_profile` 的 insert）由觸發器自動建立「我的」並設為預設；
+  `ensure_profile` 每次登入也會確認預設群組還在（`ensure_default_group`），無效時補建「我的」。
+- 執行 0011 時：每個既有使用者建立「我的」，把個人驗證碼（`totp_accounts.owner_id` = 他）改成 `group_id` = 新群組、`owner_id` = null，
+  金鑰（`totp_secrets`）、順序、釘選、類別不動。之後加上 check 約束 `totp_accounts_group_only (owner_id is null)`，個人路徑不能再寫入。
+- 預設群組和一般群組一樣：可以邀請、設身分組、覆寫（加密時例外，見 7.2）。
+- `group_set_default(gid)`：把自己擁有的群組設為預設，否則 raise「只能把自己擁有的群組設為預設」。
+- `group_delete`：擁有者不能刪自己的預設群組（「這是你的預設群組，請先把其他群組設為預設再刪除」），
+  也不能刪唯一擁有的群組（「你至少要擁有一個群組，不能刪除唯一的群組」）。全站 ADMINISTRATOR 可以刪別人的預設群組，
+  刪除後擁有者的預設改到他擁有的另一個群組（最早建立的），沒有就建立新的「我的」。
+- `group_transfer`：轉移自己的預設群組時，預設自動改到自己擁有的另一個群組（最早建立的），沒有就 raise
+  「這是你唯一擁有的群組，請先建立另一個群組再轉移」；新擁有者的預設不受影響。觸發器 `groups_owner_guard` 也擋下直接改預設群組的擁有者。
+- `my_groups()` 多了 `is_default`、`encrypted`，預設群組排第一；`group_detail()` 的 `group` 多了 `encrypted`，另外回傳
+  `is_default`（是不是我的預設群組）與 `owned_count`（我擁有幾個群組）。
+- 相容用的 `totp_list / totp_add / totp_update / totp_delete / totp_clear / totp_reorder`：名稱、參數、回傳格式不變，
+  改成操作自己的預設群組（沒有就建立）。新版前端不再使用，一律走 `group_*` RPC。
+- `group_accounts_clear(gid)`（群組層級 MANAGE_CODES）：刪除群組裡呼叫者在該筆有 MANAGE_CODES 的驗證碼，回傳筆數，記錄 `group.account.clear`。
+- 後台的使用者 2FA（`admin_user_totp` / `admin_update_user_totp` / `admin_delete_user_totp`、`admin_user_json.totp_count`）改看使用者的預設群組。
+- 接回 Firebase 舊資料（`legacy_import` → `profiles.totp` → 觸發器）直接放進預設群組；預設群組已加密時（舊資料是明文）另外建立一個沒加密的「舊版驗證碼」群組。
+- 刪除帳號：`can_delete_self` / `admin_can_delete_user` 只擋「還擁有有其他成員的群組」。刪除 profile 前，
+  觸發器 `profiles_delete_owned_groups` 先刪掉只有他一個成員的群組（含預設群組與裡面的驗證碼）；還有其他成員的群組由 `groups.owner_id` 的 FK 擋下整筆刪除。
+
+### 7.2 加密群組
+
+- 加密沿用每人一組的加密密碼（`profiles.vault`、`VaultProvider`），改成**套用在群組上**：`groups.encrypted = true` 的群組，
+  金鑰是擁有者用自己的 vault 金鑰在瀏覽器加密的 `enc:v1:` 密文。只有擁有者能切換。
+- 加密的群組只能有擁有者一個成員：`group_invite_create`、`group_invite_user`、`group_join`、`respond_invitation`（接受）
+  一律 raise「加密的群組不能邀請其他人加入」；有其他成員時不能開啟加密（「群組還有其他成員，請先移除成員再開啟加密」）；
+  開啟時撤銷所有邀請連結、刪除 Email / @ID 邀請。加密的群組不能轉移擁有權。
+- 金鑰格式和加密狀態一致（`group_assert_secret_format`，`group_account_add` / `group_account_update` / `totp_add` / `totp_update` / `admin_update_user_totp`）：
+  加密的群組只收 `enc:v1:`（「這個群組已加密，請重新整理並解鎖後再試」），沒加密的群組不收 `enc:v1:`。
+  檢查時對群組列取共享鎖，和切換加密互斥。
+- `group_set_encrypted(gid, encrypted, secrets, expected_check)`（只有擁有者，全站管理員也不行）：
+  已設定加密密碼、`expected_check` 等於目前的 `vault.check`、secrets 涵蓋群組全部驗證碼，開啟時都是 `enc:v1:`、關閉時都是明文。
+  鎖的順序：先 profile 再群組（和 `totp_set_vault` 相同，避免死結）。記錄 `group.encryption.enable` / `group.encryption.disable`。
+- `totp_set_vault(new_vault, secrets, expected_check)`：作用範圍改成「自己擁有且 encrypted 的群組」，沿用 0010 的保護——
+  比對 `expected_check`；加密設定有變（改密碼、停用）時 secrets 要涵蓋那些群組的全部驗證碼；有加密時都是 `enc:v1:`、停用時都是明文。
+  停用時那些群組一起改成沒加密。第一次設定密碼時還沒有加密的群組，只存加密設定；前端接著在預設群組只有自己一個成員時呼叫 `group_set_encrypted` 加密它。
+- `vault_reset()`（忘記密碼）：刪除自己擁有且已加密的群組裡的驗證碼，這些群組改成沒加密，`vault` 設為 null。沒加密的群組不受影響。
+- `group_codes_permitted` 對加密群組回傳空陣列，`/api/groups/codes` 不產碼；擁有者用 `group_account_secrets` 拿到密文，解鎖後在瀏覽器解密再產碼。
+  非擁有者（例如全站管理員）看得到清單但解不開，前端只顯示說明。
+- 執行 0011 時，原本有 `vault` 的使用者，新建的預設群組直接標成 encrypted（金鑰本來就是密文）；重複執行不會把之後關掉的加密又打開。
+
+### 7.3 前端
+
+- 驗證碼頁（`CodeClient`）：沒有獨立的「我的」，切換列出所有群組（預設群組排第一、標示「預設」、加密的有鎖頭），
+  選擇記在 `codeScope`（沒有記住或已不在時用預設群組），一律用 `GroupCodes` 顯示。`GroupCodes` 的「…」選單有隱藏、排序、匯出、清空（群組層級 MANAGE_CODES）；
+  每筆的選單多了「複製到其他群組」。加密群組鎖定時在原地顯示解鎖表單（不再整頁 `VaultGate`）。
+- 新增頁：「放到」預設選預設群組；加密的群組要先解鎖，送出前在瀏覽器加密。
+- 群組設定：擁有者多一組「預設與加密」——「設為預設群組」與「加密」開關（沒設定密碼、有其他成員、鎖定中時說明原因）；
+  預設群組 / 唯一擁有的群組的「刪除群組」停用並說明；加密的群組停用「轉移擁有權」。加密的群組不顯示「邀請」分頁。
+- 帳戶設定的「金鑰加密」：說明加密套用在自己擁有、已開啟加密的群組，列出這些群組；設定密碼時順便加密預設群組（只有自己一個成員時）。

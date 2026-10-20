@@ -6,7 +6,7 @@ import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Tooltip } from "
 import { toast } from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
-import { faChevronDown, faChevronUp, faEllipsis, faLock, faPen, faQrcode, faShieldHalved, faThumbtack, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faChevronDown, faChevronUp, faCopy, faEllipsis, faLock, faPen, faQrcode, faShieldHalved, faThumbtack, faTrash } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import ExportItemModal from "@/app/code/_components/ExportItemModal";
 import { cn } from "@/lib/utils";
@@ -23,7 +23,7 @@ const formatOtp = (otp: string) =>
 
 const RING = 2 * Math.PI * 16;
 
-type MenuKey = "edit" | "pin" | "export" | "permissions" | "delete";
+type MenuKey = "edit" | "pin" | "export" | "share" | "permissions" | "delete";
 
 // 排序模式的上下移小圓鈕
 const moveButtonClass =
@@ -114,6 +114,7 @@ const GroupCodeCard = (props: GroupCodeCardProps) => {
     menu.push({ key: "pin", label: account.pinned ? "取消釘選" : "釘選到最上面", icon: faThumbtack });
   }
   if (exportItem) menu.push({ key: "export", label: "匯出 QR Code", icon: faQrcode });
+  if (exportItem && props.onShare) menu.push({ key: "share", label: "複製到其他群組", icon: faCopy });
   if (props.onPermissions) menu.push({ key: "permissions", label: "權限", icon: faShieldHalved });
   if (props.onDelete) menu.push({ key: "delete", label: "刪除", icon: faTrash, danger: true });
 
@@ -121,6 +122,7 @@ const GroupCodeCard = (props: GroupCodeCardProps) => {
     if (key === "edit") props.onEdit?.();
     if (key === "pin") props.onTogglePin?.();
     if (key === "export") setExportOpen(true);
+    if (key === "share" && exportItem) props.onShare?.(exportItem);
     if (key === "permissions") props.onPermissions?.();
     if (key === "delete") setConfirmOpen(true);
   };

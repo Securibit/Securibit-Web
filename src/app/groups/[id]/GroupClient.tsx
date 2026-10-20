@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "nextjs-toploader/app";
 import { Tab, Tabs } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronLeft } from "@fortawesome/free-solid-svg-icons";
+import { faChevronLeft, faLock } from "@fortawesome/free-solid-svg-icons";
 import PageContent from "@/components/layout/PageContent";
 import PageHeader from "@/components/layout/PageHeader";
 import Spinner from "@/components/ui/Loading/Spinner";
@@ -85,7 +85,8 @@ const GroupClient = () => {
     codes: true,
     members: true,
     roles: true,
-    invites: hasAny(permissions, [GROUP.CREATE_INVITE, GROUP.MANAGE_GROUP]),
+    // 加密的群組不能邀請其他人
+    invites: hasAny(permissions, [GROUP.CREATE_INVITE, GROUP.MANAGE_GROUP]) && !detail.group.encrypted,
     settings: true,
     audit: has(permissions, GROUP.VIEW_AUDIT_LOG),
   };
@@ -118,6 +119,13 @@ const GroupClient = () => {
           <span className="rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-ink">@everyone</span>
         )}
         {!me && <span className="rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-ink">非成員，以全站管理權限檢視</span>}
+        {detail.is_default && <span className="rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-accent">我的預設群組</span>}
+        {detail.group.encrypted && (
+          <span className="flex items-center gap-1 rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-ink">
+            <FontAwesomeIcon icon={faLock} className="w-2.5" />
+            已加密
+          </span>
+        )}
       </div>
 
       <Tabs

@@ -12,7 +12,7 @@ import AdminTotpRow from "./AdminTotpRow";
 import AdminTotpEditModal from "./AdminTotpEditModal";
 import { collectCategories, normalizeCategories } from "@/lib/totp/categories";
 
-// 使用者的 2FA：按「顯示」才載入（每次載入都會寫一筆操作紀錄）
+// 使用者的 2FA（他的預設群組，也就是「我的」）：按「顯示」才載入（每次載入都會寫一筆操作紀錄）
 const UserTotpList = (props: UserTotpListProps) => {
   const { user } = props;
   const [items, setItems] = useState<AdminTotpItem[]>();
@@ -65,6 +65,8 @@ const UserTotpList = (props: UserTotpListProps) => {
   };
 
   const count = items ? items.length : user.totp_count;
+  // 預設群組已加密時金鑰是密文，管理員看不到也不能改
+  const encrypted = !!items?.some((item) => item.encrypted);
 
   return (
     <section>
@@ -101,15 +103,16 @@ const UserTotpList = (props: UserTotpListProps) => {
         </ul>
       )}
 
-      {user.vault_enabled && (
-        <p className="mt-2 px-5 text-[13px] text-ink-muted">此使用者啟用了個人加密，管理員無法查看金鑰</p>
-      )}
+      <p className="mt-2 px-5 text-[13px] text-ink-muted">
+        這裡是使用者預設群組（「我的」）的驗證碼；其他群組請到「群組」管理
+        {encrypted && "。這個群組已加密，管理員無法查看或修改金鑰"}
+      </p>
 
       {editing && (
         <AdminTotpEditModal
           key={editing.id}
           item={editing}
-          secretLocked={user.vault_enabled || editing.encrypted}
+          secretLocked={encrypted || editing.encrypted}
           categories={categories}
           onClose={() => setEditing(undefined)}
           onSave={(patch) => handleSave(editing, patch)}

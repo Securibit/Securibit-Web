@@ -1,4 +1,4 @@
-// 驗證碼頁目前看的是「我的」還是哪個群組，記在這個瀏覽器；空字串代表我的
+// 驗證碼頁目前看的是哪個群組，記在這個瀏覽器；空字串（或記住的群組已不在）代表用預設群組
 const SCOPE_KEY = 'securibit:codeScope';
 
 export const readCodeScope = () => {

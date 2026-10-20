@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     return jsonError('群組 ID 格式錯誤', 400);
   }
 
-  // 以呼叫者身分查詢看得到哪些驗證碼（權限檢查在資料庫）
+  // 以呼叫者身分查詢看得到哪些驗證碼（權限檢查在資料庫）；加密的群組回傳空陣列，不在伺服器產碼
   const { data: permitted, error: permittedError } = await auth.asUser.rpc('group_codes_permitted', { gid: groupId });
   if (permittedError) return rpcError('group_codes_permitted 失敗', permittedError, 403);
 

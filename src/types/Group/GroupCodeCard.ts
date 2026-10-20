@@ -1,5 +1,6 @@
 import { CodeCardSort } from "@/types/Code/CodeCard";
 import { GroupAccount } from "@/types/Group/Group";
+import { TotpItem } from "@/types/Totp/Totp";
 
 // 伺服器產生的動態碼（只有「查看驗證碼」、沒有「查看金鑰」時）
 export interface GroupServerCode {
@@ -24,6 +25,8 @@ export interface GroupCodeCardProps {
   onDelete?: () => void;
   onTogglePin?: () => void;
   onPermissions?: () => void;
+  // 複製到其他群組（要拿得到正確的金鑰）
+  onShare?: (item: TotpItem) => void;
   // 排序模式：顯示上下移動按鈕，取代其他操作
   sort?: CodeCardSort;
 }

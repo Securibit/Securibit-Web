@@ -125,7 +125,7 @@ const UsersClient = () => {
                     )}
                     <div className="shrink-0 text-right">
                       <p className="flex items-center justify-end gap-1.5 text-[17px] tabular-nums text-ink-muted">
-                        {user.vault_enabled && <FontAwesomeIcon icon={faLock} className="w-3" aria-label="已啟用個人加密" />}
+                        {user.vault_enabled && <FontAwesomeIcon icon={faLock} className="w-3" aria-label="已設定加密密碼" />}
                         {user.totp_count} 筆
                       </p>
                       <p className="text-[13px] tabular-nums text-ink-muted">{formatDateTime(user.last_login_at)}</p>

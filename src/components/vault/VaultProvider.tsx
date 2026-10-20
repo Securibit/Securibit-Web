@@ -2,7 +2,8 @@
 
 import { createContext, useCallback, useEffect, useState } from "react";
 import useAuth from "@/components/auth/useAuth";
-import { clearTotp, loadRawTotp, saveVault } from "@/lib/totp/crud";
+import { resetVault, saveVault } from "@/lib/totp/crud";
+import { loadGroupAccountSecrets, loadMyGroups, setGroupEncrypted } from "@/lib/groups/groups";
 import { createVault, decryptText, encryptText, isEncrypted, unlockVault, verifyKey } from "@/lib/vault/crypto";
 import { deleteDeviceKey, loadDeviceKey, saveDeviceKey } from "@/lib/vault/keyStore";
 import { VaultActionResult, VaultContextValue, VaultInfo, VaultStatus } from "@/types/Vault/Vault";
@@ -19,8 +20,39 @@ interface KeyState {
   key: CryptoKey | null;
 }
 
+// 我擁有且已加密的群組裡全部驗證碼的金鑰（資料庫裡的原始值：enc:v1 密文）
+const loadEncryptedSecrets = async (): Promise<{ success: true; data: Record<string, string> } | { success: false; message: string }> => {
+  const groups = await loadMyGroups();
+  if (!groups.success) return groups;
+  const data: Record<string, string> = {};
+  for (const group of groups.data.filter((g) => g.is_owner && g.encrypted)) {
+    const loaded = await loadGroupAccountSecrets(group.id);
+    if (!loaded.success) return loaded;
+    Object.assign(data, loaded.data);
+  }
+  return { success: true, data };
+};
+
+// 開啟 / 關閉一個群組的加密：把群組裡的金鑰用 key 加密（或解密）後整批寫回
+const rewriteGroup = async (gid: string, encrypted: boolean, key: CryptoKey, check: string): Promise<VaultActionResult> => {
+  const loaded = await loadGroupAccountSecrets(gid);
+  if (!loaded.success) return loaded;
+  const secrets: Record<string, string> = {};
+  try {
+    for (const [id, secret] of Object.entries(loaded.data)) {
+      if (encrypted) secrets[id] = isEncrypted(secret) ? secret : await encryptText(key, secret);
+      else secrets[id] = isEncrypted(secret) ? await decryptText(key, secret) : secret;
+    }
+  } catch {
+    return { success: false, message: "有金鑰無法解密，可能是在其他裝置用舊密碼新增的。請先刪除顯示「金鑰錯誤」的項目再試一次。" };
+  }
+  const saved = await setGroupEncrypted(gid, encrypted, secrets, check);
+  return saved.success ? { success: true } : saved;
+};
+
 /**
  * 金鑰加密的狀態。掛在 AuthProvider 底下，加密設定來自 profile.vault。
+ * 0011 起加密套用在群組上：只有「我擁有且已開啟加密」的群組，金鑰會用這組密碼加密。
  * 解開的 CryptoKey 只存在記憶體；勾選「在這台裝置記住」才會存進 IndexedDB（無法被讀出內容）。
  */
 const VaultProvider = (props: VaultProviderProps) => {
@@ -32,19 +64,6 @@ const VaultProvider = (props: VaultProviderProps) => {
   const current = uid && vault && keyState?.uid === uid && keyState.check === vault.check ? keyState : undefined;
   const status: VaultStatus = !vault ? "off" : !current ? "loading" : current.key ? "unlocked" : "locked";
 
-  // 把還是明文的金鑰補加密（例如別的裝置在啟用加密前新增的）
-  const sealPlaintext = useCallback(async (userId: string, info: VaultInfo, key: CryptoKey) => {
-    const result = await loadRawTotp(userId);
-    if (!result.success) return;
-    const plain = result.data.filter((item) => item.id && !isEncrypted(item.secret));
-    if (plain.length === 0) return;
-
-    const secrets: Record<string, string> = {};
-    for (const item of plain) secrets[item.id] = await encryptText(key, item.secret);
-    // 加密設定不變，只補加密這幾筆
-    await saveVault(info, secrets, info.check);
-  }, []);
-
   // 有啟用加密時，先看這台裝置有沒有記住金鑰
   useEffect(() => {
     if (!uid || !vault || current) return;
@@ -54,12 +73,11 @@ const VaultProvider = (props: VaultProviderProps) => {
       const key = stored && (await verifyKey(vault, stored)) ? stored : null;
       if (cancelled) return;
       setKeyState({ uid, check: vault.check, key });
-      if (key) sealPlaintext(uid, vault, key);
     });
     return () => {
       cancelled = true;
     };
-  }, [uid, vault, current, sealPlaintext]);
+  }, [uid, vault, current]);
 
   // 登出時忘記這台裝置記住的金鑰
   useEffect(() => {
@@ -80,10 +98,9 @@ const VaultProvider = (props: VaultProviderProps) => {
 
       await remember(uid, key, keep);
       setKeyState({ uid, check: vault.check, key });
-      sealPlaintext(uid, vault, key);
       return { success: true };
     },
-    [uid, vault, sealPlaintext]
+    [uid, vault]
   );
 
   const lock = useCallback(async () => {
@@ -92,7 +109,7 @@ const VaultProvider = (props: VaultProviderProps) => {
     setKeyState({ uid, check: vault.check, key: null });
   }, [uid, vault]);
 
-  // 用新的加密設定重新寫入所有金鑰；decrypt 把目前存的值轉回明文。
+  // 用新的加密設定重新寫入「我擁有且已加密的群組」的所有金鑰；decrypt 把目前存的值轉回明文、next 為 null 代表停用。
   // 送出時附上目前的 vault.check，別的裝置先改過密碼或新增了驗證碼，資料庫會拒絕（請使用者重新整理）。
   // 呼叫端要先更新 keyState 再 refresh profile，否則新設定進來時會被當成「還沒確認」而先鎖住
   const rewrite = useCallback(
@@ -101,14 +118,14 @@ const VaultProvider = (props: VaultProviderProps) => {
       decrypt: (secret: string) => Promise<string>
     ): Promise<VaultActionResult> => {
       if (!uid) return { success: false, message: "尚未登入" };
-      const loaded = await loadRawTotp(uid);
+      const loaded = await loadEncryptedSecrets();
       if (!loaded.success) return loaded;
 
       const secrets: Record<string, string> = {};
       try {
-        for (const item of loaded.data) {
-          const plain = await decrypt(item.secret);
-          secrets[item.id] = next ? await encryptText(next.key, plain) : plain;
+        for (const [id, secret] of Object.entries(loaded.data)) {
+          const plain = await decrypt(secret);
+          secrets[id] = next ? await encryptText(next.key, plain) : plain;
         }
       } catch {
         return { success: false, message: "有金鑰無法解密，可能是在其他裝置用舊密碼新增的。請先刪除顯示「金鑰錯誤」的項目再試一次。" };
@@ -120,20 +137,33 @@ const VaultProvider = (props: VaultProviderProps) => {
     [uid, vault]
   );
 
+  // 設定加密密碼；預設群組只有自己一個成員時順便開啟它的加密
   const enable = useCallback(
     async (passphrase: string, keep: boolean): Promise<VaultActionResult> => {
       if (!uid) return { success: false, message: "尚未登入" };
       const next = await createVault(passphrase);
-      // 目前的金鑰都是明文（未啟用加密）
-      const result = await rewrite(next, async (secret) => secret);
-      if (!result.success) return result;
+      // 還沒有加密的群組，只需要存加密設定
+      const saved = await saveVault(next.info, {}, vault?.check ?? null);
+      if (!saved.success) return saved;
 
       await remember(uid, next.key, keep);
       setKeyState({ uid, check: next.info.check, key: next.key });
+
+      let note: string | undefined;
+      const groups = await loadMyGroups();
+      const home = groups.success ? groups.data.find((group) => group.is_default && group.is_owner) : undefined;
+      if (home && !home.encrypted) {
+        if (home.member_count > 1) {
+          note = `「${home.name}」還有其他成員，沒有加密；移除成員後可以在群組設定開啟`;
+        } else {
+          const encrypted = await rewriteGroup(home.id, true, next.key, next.info.check);
+          note = encrypted.success ? `已加密「${home.name}」` : `加密「${home.name}」失敗：${encrypted.message}`;
+        }
+      }
       await refresh();
-      return result;
+      return { success: true, note };
     },
-    [uid, rewrite, refresh]
+    [uid, vault, refresh]
   );
 
   const decryptWith = (key: CryptoKey) => async (secret: string) =>
@@ -176,14 +206,22 @@ const VaultProvider = (props: VaultProviderProps) => {
 
   const reset = useCallback(async (): Promise<VaultActionResult> => {
     if (!uid) return { success: false, message: "尚未登入" };
-    const cleared = await clearTotp(uid);
+    const cleared = await resetVault();
     if (!cleared.success) return cleared;
-    const saved = await saveVault(null, {}, vault?.check ?? null);
-    if (!saved.success) return saved;
     await deleteDeviceKey(uid);
     await refresh();
     return { success: true };
-  }, [uid, vault, refresh]);
+  }, [uid, refresh]);
+
+  // 在群組設定切換加密：要先設定密碼並解鎖
+  const setGroupEncryption = useCallback(
+    async (gid: string, encrypted: boolean): Promise<VaultActionResult> => {
+      if (!vault) return { success: false, message: "請先到「帳戶設定」設定加密密碼" };
+      if (!current?.key) return { success: false, message: "請先輸入加密密碼解鎖" };
+      return rewriteGroup(gid, encrypted, current.key, vault.check);
+    },
+    [vault, current]
+  );
 
   return (
     <VaultContext.Provider
@@ -196,6 +234,7 @@ const VaultProvider = (props: VaultProviderProps) => {
         changePassphrase,
         disable,
         reset,
+        setGroupEncryption,
       }}
     >
       {props.children}

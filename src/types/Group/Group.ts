@@ -8,6 +8,10 @@ export interface GroupSummary {
   description: string;
   owner_id: string;
   is_owner: boolean;
+  // 是不是我的預設群組（「我的驗證碼」）
+  is_default: boolean;
+  // 已開啟加密（金鑰用擁有者的加密密碼加密，只有擁有者一個成員）
+  encrypted: boolean;
   member_count: number;
   // 我看得到的驗證碼數
   account_count: number;
@@ -21,6 +25,7 @@ export interface GroupInfo {
   description: string;
   owner_id: string;
   created_at: string;
+  encrypted: boolean;
 }
 
 export interface GroupMember extends UserBrief {
@@ -50,6 +55,10 @@ export interface GroupEmailInvite {
 export interface GroupDetail {
   group: GroupInfo;
   is_owner: boolean;
+  // 是不是我的預設群組
+  is_default: boolean;
+  // 我擁有幾個群組（只剩一個時不能刪除）
+  owned_count: number;
   permissions: number;
   top_position: number;
   // 由高到低，@everyone 在最後

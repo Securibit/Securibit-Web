@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { VaultUnlockProps } from "@/types/Vault/VaultUnlock";
 import useVault from "./useVault";
 
-// 輸入加密密碼解鎖；忘記密碼只能清空重來
+// 輸入加密密碼解鎖（加密群組要解鎖才能使用）；忘記密碼只能清空加密群組重來
 const VaultUnlock = (props: VaultUnlockProps) => {
   const { unlock, reset } = useVault();
   const [passphrase, setPassphrase] = useState("");
@@ -29,7 +29,7 @@ const VaultUnlock = (props: VaultUnlockProps) => {
   const handleReset = async () => {
     const result = await reset();
     if (result.success) {
-      toast.success("已清空驗證碼並停用加密", { position: "top-right" });
+      toast.success("已清空加密群組的驗證碼並停用加密", { position: "top-right" });
     } else {
       showError("重設失敗", result.message);
     }
@@ -39,7 +39,7 @@ const VaultUnlock = (props: VaultUnlockProps) => {
     <div className={cn(!props.compact && "mx-auto max-w-sm py-10")}>
       {!props.compact && (
         <div className="mb-6 text-center">
-          <h1 className="text-[22px] font-semibold text-ink">驗證碼已加密</h1>
+          <h1 className="text-[22px] font-semibold text-ink">群組已加密</h1>
           <p className="mt-1 text-[15px] text-ink-muted">輸入你設定的加密密碼來解鎖</p>
         </div>
       )}
@@ -85,7 +85,7 @@ const VaultUnlock = (props: VaultUnlockProps) => {
         isOpen={confirmReset}
         danger
         title="忘記加密密碼"
-        description="密碼沒有辦法找回，也沒有人能幫你解開。只能清空所有驗證碼並停用加密，之後要到各服務重新綁定兩步驟驗證。確定要清空嗎？"
+        description="密碼沒有辦法找回，也沒有人能幫你解開。只能清空所有加密群組裡的驗證碼並停用加密（沒加密的群組不受影響），之後要到各服務重新綁定兩步驟驗證。確定要清空嗎？"
         confirmLabel="清空並停用加密"
         onCancel={() => setConfirmReset(false)}
         onConfirm={async () => {

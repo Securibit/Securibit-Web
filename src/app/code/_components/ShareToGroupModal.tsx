@@ -6,16 +6,19 @@ import toast from "react-hot-toast";
 import { useRouter } from "nextjs-toploader/app";
 import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader, Radio, RadioGroup } from "@heroui/react";
 import Spinner from "@/components/ui/Loading/Spinner";
+import useVault from "@/components/vault/useVault";
 import { addGroupAccounts, loadMyGroups } from "@/lib/groups/groups";
 import { GROUP, has } from "@/lib/permissions/bits";
 import { showError } from "@/lib/errorDialog";
 import { GroupSummary } from "@/types/Group/Group";
 import { ShareToGroupModalProps } from "@/types/Code/ShareToGroupModal";
 
-// 把一筆個人驗證碼複製一份到群組（只列出我有「管理驗證碼」的群組）
+// 把一筆驗證碼複製一份到其他群組（只列出我有「管理驗證碼」的群組）。
+// 目標是加密群組時，要先解鎖加密密碼才能把金鑰加密後放進去
 const ShareToGroupModal = (props: ShareToGroupModalProps) => {
-  const { item } = props;
+  const { item, excludeGroupId } = props;
   const router = useRouter();
+  const { key } = useVault();
   // undefined 代表載入中
   const [groups, setGroups] = useState<GroupSummary[]>();
   const [selected, setSelected] = useState("");
@@ -26,7 +29,7 @@ const ShareToGroupModal = (props: ShareToGroupModalProps) => {
     loadMyGroups().then((result) => {
       if (cancelled) return;
       if (result.success) {
-        const manageable = result.data.filter((group) => has(group.permissions, GROUP.MANAGE_CODES));
+        const manageable = result.data.filter((group) => has(group.permissions, GROUP.MANAGE_CODES) && group.id !== excludeGroupId);
         setGroups(manageable);
         // 只有一個群組時直接選好
         if (manageable.length === 1) setSelected(manageable[0].id);
@@ -38,11 +41,11 @@ const ShareToGroupModal = (props: ShareToGroupModalProps) => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [excludeGroupId]);
 
   const handleShare = async () => {
     const group = groups?.find((g) => g.id === selected);
-    if (!group) return;
+    if (!group || (group.encrypted && !key)) return;
 
     setSharing(true);
     const result = await addGroupAccounts(group.id, [
@@ -54,7 +57,7 @@ const ShareToGroupModal = (props: ShareToGroupModalProps) => {
         period: item.period,
         algorithm: item.algorithm,
       },
-    ]);
+    ], group.encrypted ? key : undefined);
     setSharing(false);
 
     if (!result.success) {
@@ -87,7 +90,7 @@ const ShareToGroupModal = (props: ShareToGroupModalProps) => {
         <ModalHeader className="truncate">分享「{item.name}」到群組</ModalHeader>
         <ModalBody className="gap-4">
           <p className="text-[15px] text-ink-muted">
-            會複製一份到群組，之後兩邊各自獨立；群組的驗證碼不會套用你的個人加密
+            會複製一份到群組，之後兩邊各自獨立；放進加密的群組時，金鑰會用你的加密密碼加密
           </p>
 
           {groups === undefined ? (
@@ -110,7 +113,12 @@ const ShareToGroupModal = (props: ShareToGroupModalProps) => {
               classNames={{ label: "text-[13px] text-ink-muted" }}
             >
               {groups.map((group) => (
-                <Radio key={group.id} value={group.id} description={group.description || undefined}>
+                <Radio
+                  key={group.id}
+                  value={group.id}
+                  isDisabled={group.encrypted && !key}
+                  description={group.encrypted && !key ? "已加密，先輸入加密密碼解鎖才能放進去" : group.description || undefined}
+                >
                   {group.name}
                 </Radio>
               ))}

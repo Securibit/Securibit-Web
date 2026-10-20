@@ -10,7 +10,8 @@ export async function POST(req: NextRequest) {
   const { admin, asUser } = auth;
   const uid = auth.user.id;
 
-  // 還擁有群組（groups.owner_id 沒有 cascade）或是最後一位管理員時不能刪，訊息由資料庫給
+  // 還擁有「有其他成員」的群組或是最後一位管理員時不能刪，訊息由資料庫給；
+  // 只有自己一個人的群組（含預設群組）會在刪除 profile 時由 0011 的觸發器一起刪掉
   // （PGRST202 = 函式不存在，代表 0009 還沒執行、也就不會有群組與身分組）
   const { error: checkError } = await asUser.rpc('can_delete_self');
   if (checkError && checkError.code !== 'PGRST202') {

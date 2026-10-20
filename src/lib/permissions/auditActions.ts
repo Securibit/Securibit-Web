@@ -29,6 +29,9 @@ export const AUDIT_ACTION_TEXT: Record<string, string> = {
   'group.account.delete': '刪除驗證碼',
   'group.account.overwrite': '變更驗證碼權限',
   'group.account.secret.view': '查看金鑰',
+  'group.account.clear': '清空驗證碼',
+  'group.encryption.enable': '開啟加密',
+  'group.encryption.disable': '關閉加密',
 };
 
 export const auditActionText = (action: string) => AUDIT_ACTION_TEXT[action] ?? action;

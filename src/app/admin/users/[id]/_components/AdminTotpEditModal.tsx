@@ -22,7 +22,7 @@ import CategoryInput from "@/components/totp/CategoryInput";
 
 /*
  * 管理員編輯使用者的一筆 2FA。
- * 欄位同 TotpForm，但使用者啟用個人加密時金鑰欄位要停用（TotpForm 沒有這個選項，所以這裡自己排）。
+ * 欄位同 TotpForm，但使用者的預設群組已加密時金鑰欄位要停用（TotpForm 沒有這個選項，所以這裡自己排）。
  * 只送出有變動的欄位。
  */
 const AdminTotpEditModal = (props: AdminTotpEditModalProps) => {
@@ -106,7 +106,7 @@ const AdminTotpEditModal = (props: AdminTotpEditModalProps) => {
                 isDisabled
                 value=""
                 placeholder="已加密，無法修改"
-                description="此使用者啟用了個人加密，管理員不能查看或修改金鑰"
+                description="這位使用者的預設群組已加密，管理員不能查看或修改金鑰"
               />
             ) : (
               <Input

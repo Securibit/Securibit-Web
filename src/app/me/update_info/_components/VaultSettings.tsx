@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Checkbox, Input } from "@heroui/react";
 import Spinner from "@/components/ui/Loading/Spinner";
 import useVault from "@/components/vault/useVault";
 import VaultUnlock from "@/components/vault/VaultUnlock";
 import { showError } from "@/lib/errorDialog";
-import { VaultStatus } from "@/types/Vault/Vault";
+import { loadMyGroups } from "@/lib/groups/groups";
+import { VaultActionResult, VaultStatus } from "@/types/Vault/Vault";
 
 const MIN_LENGTH = 8;
 
@@ -16,9 +17,9 @@ type Mode = "idle" | "change" | "disable";
 // 「加密」那一列右邊的狀態文字
 const STATUS_TEXT: Record<VaultStatus, string> = {
   loading: "檢查中…",
-  off: "未啟用",
-  locked: "已啟用",
-  unlocked: "已啟用",
+  off: "未設定",
+  locked: "已設定，鎖定中",
+  unlocked: "已設定，已解鎖",
 };
 
 // 列裡的文字按鈕：藍字是動作、紅字是停用，停用時變灰
@@ -26,9 +27,12 @@ const actionClass = "w-full py-3 text-center text-[17px] text-accent hover:bg-su
 const dangerClass = "w-full py-3 text-center text-[17px] text-alarm hover:bg-surface-1 disabled:text-ink-muted disabled:hover:bg-transparent";
 const cancelClass = "w-full py-3 text-center text-[17px] text-ink-muted hover:bg-surface-1";
 
-// 帳戶設定頁的「金鑰加密」群組：啟用、改密碼、停用、立即鎖定
+// 帳戶設定頁的「金鑰加密」：設定加密密碼、改密碼、停用、立即鎖定。
+// 加密套用在「我擁有且已開啟加密」的群組；個別群組在群組設定的「加密」開關切換
 const VaultSettings = () => {
   const vault = useVault();
+  // 我擁有且已加密的群組名稱（undefined 代表載入中）
+  const [encryptedGroups, setEncryptedGroups] = useState<string[]>();
   const [mode, setMode] = useState<Mode>("idle");
   const [current, setCurrent] = useState("");
   const [passphrase, setPassphrase] = useState("");
@@ -41,6 +45,18 @@ const VaultSettings = () => {
   const mismatch = confirm.length > 0 && confirm !== passphrase;
   const newPassphraseOk = passphrase.length >= MIN_LENGTH && confirm === passphrase;
 
+  // 加密狀態變了（啟用、停用、改密碼）就重新讀取
+  useEffect(() => {
+    let cancelled = false;
+    loadMyGroups().then((result) => {
+      if (cancelled) return;
+      setEncryptedGroups(result.success ? result.data.filter((g) => g.is_owner && g.encrypted).map((g) => g.name) : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [vault.status]);
+
   const resetForm = (next: Mode = "idle") => {
     setMode(next);
     setCurrent("");
@@ -49,17 +65,16 @@ const VaultSettings = () => {
     setUnderstood(false);
   };
 
-  const run = async (
-    action: () => Promise<{ success: boolean; message?: string }>,
-    successText: string,
-    failText: string
-  ) => {
+  const run = async (action: () => Promise<VaultActionResult>, successText: string, failText: string) => {
     setPending(true);
     const result = await action();
     setPending(false);
     if (result.success) {
-      toast.success(successText, { position: "top-right" });
+      toast.success(result.note ? `${successText}，${result.note}` : successText, { position: "top-right" });
       resetForm();
+      // 群組的加密狀態可能變了
+      const groups = await loadMyGroups();
+      if (groups.success) setEncryptedGroups(groups.data.filter((g) => g.is_owner && g.encrypted).map((g) => g.name));
     } else {
       showError(failText, result.message);
     }
@@ -105,9 +120,17 @@ const VaultSettings = () => {
       <div className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
         {/* 狀態列 */}
         <div className="flex items-center justify-between gap-6 px-5 py-3">
-          <span className="text-[17px]">加密</span>
+          <span className="text-[17px]">加密密碼</span>
           <span className="text-[17px] text-ink-muted">{STATUS_TEXT[vault.status]}</span>
         </div>
+        {vault.status !== "off" && (
+          <div className="flex items-center justify-between gap-6 px-5 py-3">
+            <span className="shrink-0 text-[17px]">已加密的群組</span>
+            <span className="min-w-0 truncate text-[17px] text-ink-muted">
+              {encryptedGroups === undefined ? "…" : encryptedGroups.length > 0 ? encryptedGroups.join("、") : "沒有"}
+            </span>
+          </div>
+        )}
 
         {vault.status === "loading" && (
           <div className="flex justify-center px-5 py-4">
@@ -121,7 +144,7 @@ const VaultSettings = () => {
             onSubmit={(e) => {
               e.preventDefault();
               if (!newPassphraseOk || !understood) return;
-              run(() => vault.enable(passphrase, remember), "已啟用金鑰加密", "啟用加密失敗");
+              run(() => vault.enable(passphrase, remember), "已設定加密密碼", "設定加密密碼失敗");
             }}
           >
             {newPassphraseFields}
@@ -134,7 +157,7 @@ const VaultSettings = () => {
               </Checkbox>
             </div>
             <button type="submit" className={actionClass} disabled={pending || !newPassphraseOk || !understood}>
-              {pending ? "啟用中…" : "啟用加密"}
+              {pending ? "設定中…" : "設定密碼並啟用加密"}
             </button>
           </form>
         )}
@@ -184,7 +207,7 @@ const VaultSettings = () => {
                 autoComplete="current-password"
                 value={current}
                 onValueChange={setCurrent}
-                description={mode === "disable" ? "停用後金鑰會改回明文存放在伺服器" : undefined}
+                description={mode === "disable" ? "停用後所有加密群組的金鑰會改回明文存放在伺服器，群組也會改成沒加密" : undefined}
               />
             </div>
             {mode === "change" && newPassphraseFields}
@@ -202,8 +225,9 @@ const VaultSettings = () => {
         )}
       </div>
       <p className="mt-2 px-5 text-[13px] text-ink-muted">
-        啟用後，驗證碼的金鑰會先在你的瀏覽器用密碼加密才存到伺服器，資料庫裡只剩密文，網站管理員也看不到。
-        名稱與類別不會加密，分享到群組的驗證碼也不會加密。每次在新的裝置或登出後都要輸入密碼
+        加密套用在你擁有、已開啟加密的群組：金鑰會先在你的瀏覽器用這組密碼加密才存到伺服器，資料庫裡只剩密文，網站管理員也看不到。
+        設定密碼時會順便加密你的預設群組（只有你一個成員時），其他群組到群組設定的「加密」開關切換；加密的群組只能有你一個成員，不能邀請其他人。
+        名稱與類別不會加密。每次在新的裝置或登出後都要輸入密碼
       </p>
     </section>
   );

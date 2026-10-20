@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import SEO from "@/config/SEO.json";
-import VaultGate from "@/components/vault/VaultGate";
 import CodeClient from "./CodeClient";
 
 export const metadata: Metadata = {
@@ -8,11 +7,7 @@ export const metadata: Metadata = {
   description: SEO.Code.description,
 };
 
-// 有啟用金鑰加密時，先解鎖才顯示
-const Page = () => (
-  <VaultGate>
-    <CodeClient />
-  </VaultGate>
-);
+// 加密群組要解鎖才能使用，由頁面裡看的群組各自處理（沒加密的群組不用解鎖）
+const Page = () => <CodeClient />;
 
 export default Page;

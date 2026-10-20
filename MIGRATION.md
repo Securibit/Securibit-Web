@@ -21,7 +21,7 @@ Supabase 會配一個全新的 uuid，所以無法用 uid 對應舊資料。
 ## 1. 建立 Supabase 專案與資料表
 
 1. 在 https://supabase.com 建立專案
-2. 進 SQL Editor，依序貼上並執行 `supabase/migrations/` 裡的每個檔案（0001 → 0010，都可重複執行）：
+2. 進 SQL Editor，依序貼上並執行 `supabase/migrations/` 裡的每個檔案（0001 → 0011，都可重複執行）：
    - `0001_init.sql`：`profiles`、`legacy_import`、RLS 政策與 `handle_new_user` 觸發器
    - `0002_migration_notice.sql`：舊使用者第一次登入的遷移提示
    - `0003_ensure_profile.sql`：登入時自動建立 profile、接回舊資料
@@ -43,10 +43,22 @@ Supabase 會配一個全新的 uuid，所以無法用 uid 對應舊資料。
      - 邀請碼改成 16 碼安全亂數、有效時間預設 7 天且最長 30 天；成員離開或被踢時撤銷他建立的邀請
      - 群組成員的 email 只給有「移除成員」或「管理身分組」的人看
      - 會嘗試啟用 `pgcrypto`（Supabase 預設已安裝在 `extensions` schema）
+   - `0011_default_group.sql`：「我的驗證碼」改成**預設群組**、加密改成套用在群組上（規則見 `docs/groups-and-permissions.md` 第 7 節）：
+     - 每個使用者建立一個名為「我的」的預設群組（`profiles.default_group_id`），原本的個人驗證碼整批搬進去
+       （順序、釘選、類別、金鑰都不動）；之後 `totp_accounts.owner_id` 一律為 null（加 check 約束）
+     - 原本有啟用加密（`profiles.vault`）的使用者，預設群組標成「已加密」（金鑰本來就是密文，直接搬）
+     - 新使用者建立 profile 時自動建立「我的」；從 Firebase 接回的舊資料直接放進預設群組
+     - 加密的群組只能有擁有者一個成員，不能邀請；刪除帳號時只有自己一個人的群組會一起刪除
 
 > **部署新版前端前，必須先執行 0008、0009**，否則驗證碼頁會顯示錯誤
 > （「資料庫還沒更新，請先在 Supabase 執行 0008_accounts.sql。」），群組與後台也無法使用。
 > 0008、0009 會自己補上 0002 / 0004 / 0007 加的 profiles 欄位，所以就算中間幾個檔案漏跑，也能直接執行。
+
+> **0011 會搬資料而且不可逆**（之後沒有「個人驗證碼」這條路徑），執行前請先在 Supabase 後台備份資料庫
+> （Database → Backups，或 `pg_dump` 至少備份 `profiles`、`totp_accounts`、`totp_secrets`、`groups`）。
+> **0011 要和新版前端一起部署**：舊版前端的驗證碼頁仍可透過相容的 `totp_*` RPC 讀寫預設群組，
+> 但舊版的「啟用加密」不會加密任何群組（加密改由群組設定切換），請盡快換上新版前端。
+> 建議順序：備份 → 執行 0011 → 部署前端（中間空窗越短越好）。
 
 > **0010 之後請到 Supabase 後台確認**：Authentication → Providers → Email。
 > 網站只用 Google 登入，建議直接**關閉 Email provider**；若要保留，務必開啟 **Confirm email**。

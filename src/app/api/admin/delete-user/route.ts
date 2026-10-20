@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   const userId = typeof body?.userId === 'string' ? body.userId : '';
   if (!userId) return jsonError('缺少使用者 ID', 400);
 
-  // 權限、階層、不是自己、不是最後一位管理員、沒有擁有群組；不通過時資料庫會 raise 說明原因
+  // 權限、階層、不是自己、不是最後一位管理員、沒有擁有「有其他成員」的群組；不通過時資料庫會 raise 說明原因
   const { error: checkError } = await asUser.rpc('admin_can_delete_user', { user_id: userId });
   if (checkError) return rpcError('admin_can_delete_user 失敗', checkError, 403);
 

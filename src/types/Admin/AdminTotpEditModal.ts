@@ -4,7 +4,7 @@ import { TotpInput } from "@/types/Totp/Totp";
 // 管理員編輯使用者的一筆 2FA
 export interface AdminTotpEditModalProps {
   item: AdminTotpItem;
-  // 使用者啟用個人加密（或這筆已加密）時不能改金鑰
+  // 使用者的預設群組已加密（或這筆已加密）時不能改金鑰
   secretLocked: boolean;
   categories: string[];
   onClose: () => void;

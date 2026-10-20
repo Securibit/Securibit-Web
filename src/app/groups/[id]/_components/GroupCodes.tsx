@@ -4,13 +4,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowsUpDown, faEllipsis, faEye, faEyeSlash, faMagnifyingGlass, faPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faArrowsUpDown, faEllipsis, faEye, faEyeSlash, faFileExport, faLock, faMagnifyingGlass, faPlus, faTrashCan, faXmark } from "@fortawesome/free-solid-svg-icons";
 import Spinner from "@/components/ui/Loading/Spinner";
+import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import useAuth from "@/components/auth/useAuth";
+import useVault from "@/components/vault/useVault";
+import VaultUnlock from "@/components/vault/VaultUnlock";
 import OverwriteEditor from "@/components/permissions/OverwriteEditor";
 import BulkImportModal from "@/app/addCode/_components/BulkImportModal";
+import ExportModal from "@/app/code/_components/ExportModal";
+import ShareToGroupModal from "@/app/code/_components/ShareToGroupModal";
 import {
   addGroupAccounts,
+  clearGroupAccounts,
   deleteGroupAccount,
   loadGroupAccounts,
   loadGroupAccountSecrets,
@@ -25,12 +31,13 @@ import { cn } from "@/lib/utils";
 import { GroupAccount, GroupCodes as GroupCodesResult } from "@/types/Group/Group";
 import { GroupCodesProps } from "@/types/Group/GroupCodes";
 import { TotpInput, TotpItem } from "@/types/Totp/Totp";
+import { isValidSecret } from "@/lib/totp/crud";
 import GroupCodeCard from "./GroupCodeCard";
 import GroupCodeEditModal from "./GroupCodeEditModal";
 import AddGroupCodeModal from "./AddGroupCodeModal";
 import { collectCategories, hasCategory, parseCategories } from "@/lib/totp/categories";
 
-// 「隱藏驗證碼」偏好和個人驗證碼頁共用
+// 「隱藏驗證碼」偏好所有群組共用
 const HIDE_KEY = "securibit:hideCodes";
 const readHidePref = () => {
   try {
@@ -59,12 +66,19 @@ const pillClass = (active: boolean) =>
     active ? "bg-ink text-surface" : "bg-surface-1 text-ink hover:bg-line/60"
   );
 
-// 群組的驗證碼分頁
+// 群組的驗證碼分頁（驗證碼頁也用這個顯示選中的群組，含預設群組）
 const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
   const gid = detail.group.id;
-  // 群組層級的權限：新增、排序要群組層級的「管理驗證碼」；覆寫要「管理身分組」
+  // 群組層級的權限：新增、排序、清空要群組層級的「管理驗證碼」；覆寫要「管理身分組」
   const canAdd = has(detail.permissions, GROUP.MANAGE_CODES);
   const canOverwrite = has(detail.permissions, GROUP.MANAGE_ROLES);
+
+  // 加密群組：金鑰是用擁有者的加密密碼加密的 enc:v1 密文，擁有者解鎖後在瀏覽器解密、產碼；
+  // 寫入時也先加密。其他人（例如全站管理員）解不開，只顯示說明
+  const encrypted = detail.group.encrypted;
+  const vault = useVault();
+  const key = encrypted ? vault.key : undefined;
+  const locked = encrypted && (!detail.is_owner || !key);
 
   const [accounts, setAccounts] = useState<GroupAccount[]>();
   // 我有「查看金鑰」的金鑰 { id: secret }
@@ -81,6 +95,9 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
   const [overwriting, setOverwriting] = useState<GroupAccount>();
   const [addOpen, setAddOpen] = useState(false);
   const [bulk, setBulk] = useState<ImportTextResult>();
+  const [exportOpen, setExportOpen] = useState(false);
+  const [clearOpen, setClearOpen] = useState(false);
+  const [shareTarget, setShareTarget] = useState<TotpItem>();
   const reorderSeq = useRef(0);
 
   const toggleHideCodes = (hide: boolean) => {
@@ -107,14 +124,14 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
       if (withSecrets) {
         nextSecrets = {};
         if (result.data.some((account) => has(account.permissions, GROUP.VIEW_SECRETS))) {
-          const secretsResult = await loadGroupAccountSecrets(gid);
+          const secretsResult = await loadGroupAccountSecrets(gid, key);
           if (secretsResult.success) nextSecrets = secretsResult.data;
           else showError("載入金鑰失敗", secretsResult.message);
         }
       }
       return { accounts: result.data, secrets: nextSecrets };
     },
-    [gid]
+    [gid, key]
   );
 
   // 金鑰和清單一起換上，避免有金鑰的卡片先短暫變成「等伺服器產碼」
@@ -136,8 +153,9 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
     return [detail.permissions, ...detail.roles.map((role) => `${role.id}:${role.permissions}`), ...myRoles].join("|");
   }, [detail.permissions, detail.roles, detail.members, user?.uid]);
 
-  // 第一次載入與權限變動時：清單和金鑰一起讀
+  // 第一次載入、權限變動與解鎖時：清單和金鑰一起讀（加密群組鎖定中先不讀）
   useEffect(() => {
+    if (locked) return;
     let cancelled = false;
     fetchData(true).then((data) => {
       if (!cancelled) applyData(data);
@@ -145,12 +163,15 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
     return () => {
       cancelled = true;
     };
-  }, [fetchData, permissionKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchData, permissionKey, locked]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 沒有金鑰的（只有「查看驗證碼」）才需要伺服器產碼
+  // 沒有金鑰的（只有「查看驗證碼」）才需要伺服器產碼；加密群組伺服器不產碼
   const serverIds = useMemo(
-    () => (accounts ?? []).filter((account) => secrets[account.id] === undefined).map((account) => account.id).join(","),
-    [accounts, secrets]
+    () =>
+      encrypted
+        ? ""
+        : (accounts ?? []).filter((account) => secrets[account.id] === undefined).map((account) => account.id).join(","),
+    [accounts, secrets, encrypted]
   );
 
   // 剛載入時、以及每個週期邊界向伺服器取碼；用伺服器回傳的 now 校正本機時間差
@@ -217,8 +238,17 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
 
   // ---------- 操作 ----------
 
+  // 匯出：拿得到正確金鑰的那些（依畫面順序）
+  const exportItems = useMemo<TotpItem[]>(
+    () =>
+      ordered
+        .filter((account) => secrets[account.id] !== undefined && isValidSecret(secrets[account.id]))
+        .map((account) => ({ ...account, secret: secrets[account.id] })),
+    [ordered, secrets]
+  );
+
   const handleAdd = async (inputs: TotpInput[]) => {
-    const result = await addGroupAccounts(gid, inputs);
+    const result = await addGroupAccounts(gid, inputs, key);
     if (!result.success) {
       showError("新增驗證碼失敗", result.message);
       return false;
@@ -232,7 +262,7 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
   };
 
   const handleUpdate = async (account: GroupAccount, patch: Partial<TotpInput>) => {
-    const result = await updateGroupAccount(account.id, patch);
+    const result = await updateGroupAccount(account.id, patch, key);
     if (!result.success) {
       showError("儲存驗證碼失敗", result.message);
       return false;
@@ -252,6 +282,16 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
     }
     toast.success("已刪除", { position: "top-right" });
     setAccounts((list) => list?.filter((item) => item.id !== account.id));
+  };
+
+  const handleClear = async () => {
+    const result = await clearGroupAccounts(gid);
+    if (!result.success) {
+      showError("清空驗證碼失敗", result.message);
+      return;
+    }
+    toast.success(`已清空 ${result.data} 筆驗證碼`, { position: "top-right" });
+    await fetchAccounts(false);
   };
 
   const handleTogglePin = async (account: GroupAccount) => {
@@ -292,13 +332,39 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
     return entry ? { at: server.at, code: entry.code, next: entry.next } : undefined;
   };
 
+  const headingRow = heading ?? <h2 className="text-[22px] font-semibold">驗證碼</h2>;
+
+  // 加密群組：擁有者還沒解鎖就先解鎖；不是擁有者看不到
+  if (locked) {
+    return (
+      <div>
+        <div className="mb-4">{headingRow}</div>
+        <div className="rounded-[18px] border border-line/70 bg-surface px-5 py-5">
+          <p className="mb-4 flex items-center gap-2 text-[15px] text-ink-muted">
+            <FontAwesomeIcon icon={faLock} className="w-3.5 shrink-0" />
+            {!detail.is_owner
+              ? "這個群組已由擁有者加密，只有擁有者能查看驗證碼"
+              : vault.status === "off"
+                ? "這個群組已加密，但找不到你的加密設定，請重新整理"
+                : "這個群組已加密，輸入加密密碼解鎖後才能查看"}
+          </p>
+          {detail.is_owner && vault.status === "loading" && <Spinner />}
+          {detail.is_owner && vault.status === "locked" && <VaultUnlock compact />}
+        </div>
+      </div>
+    );
+  }
+
   if (accounts === undefined) return <Spinner block label="載入驗證碼…" />;
+
+  // 只有自己一個人的群組（例如預設群組）用個人的說法
+  const solo = detail.members.length <= 1;
 
   return (
     <div>
       {/* 標題列：右邊放新增與「…」 */}
       <div className="mb-4 flex items-center justify-between gap-3">
-        {heading ?? <h2 className="text-[22px] font-semibold">驗證碼</h2>}
+        {headingRow}
         <div className="flex items-center gap-3">
           {sorting ? (
             <button type="button" onClick={() => setSorting(false)} className="text-[17px] font-semibold text-accent">完成</button>
@@ -319,16 +385,28 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
                   </DropdownTrigger>
                   <DropdownMenu
                     aria-label="列表操作"
-                    disabledKeys={!canAdd || accounts.length < 2 ? ["sort"] : []}
-                    onAction={(key) => {
-                      if (key === "hide") toggleHideCodes(!hideCodes);
-                      if (key === "sort") setSorting(true);
+                    disabledKeys={[
+                      ...(!canAdd || accounts.length < 2 ? ["sort"] : []),
+                      ...(exportItems.length === 0 ? ["export"] : []),
+                    ]}
+                    onAction={(action) => {
+                      if (action === "hide") toggleHideCodes(!hideCodes);
+                      if (action === "sort") setSorting(true);
+                      if (action === "export") setExportOpen(true);
+                      if (action === "clear") setClearOpen(true);
                     }}
                   >
                     <DropdownItem key="hide" startContent={<FontAwesomeIcon icon={hideCodes ? faEye : faEyeSlash} className="w-3.5" />}>
                       {hideCodes ? "顯示驗證碼" : "隱藏驗證碼"}
                     </DropdownItem>
                     <DropdownItem key="sort" startContent={<FontAwesomeIcon icon={faArrowsUpDown} className="w-3.5" />}>調整順序</DropdownItem>
+                    <DropdownItem key="export" startContent={<FontAwesomeIcon icon={faFileExport} className="w-3.5" />}>匯出</DropdownItem>
+                    {/* 清空要群組層級的「管理驗證碼」；沒有就不列出 */}
+                    {canAdd ? (
+                      <DropdownItem key="clear" className="text-danger" color="danger" startContent={<FontAwesomeIcon icon={faTrashCan} className="w-3.5" />}>
+                        清空全部
+                      </DropdownItem>
+                    ) : null}
                   </DropdownMenu>
                 </Dropdown>
               )}
@@ -341,7 +419,11 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
         <div className="rounded-[18px] bg-surface-1 px-6 py-16 text-center">
           <p className="text-[19px] font-semibold">還沒有驗證碼</p>
           <p className="mt-1 text-ink-muted">
-            {canAdd ? "新增第一筆，群組成員就能依身分組權限看到" : "目前沒有你能查看的驗證碼，需要時請群組管理者調整你的身分組權限"}
+            {!canAdd
+              ? "目前沒有你能查看的驗證碼，需要時請群組管理者調整你的身分組權限"
+              : solo
+                ? "到各服務的兩步驟驗證設定拿 QR Code，掃一下就加進來"
+                : "新增第一筆，群組成員就能依身分組權限看到"}
           </p>
           {canAdd && (
             <button type="button" onClick={() => setAddOpen(true)} className="link-arrow mt-4 inline-block">
@@ -414,6 +496,7 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
                     onDelete={canManage ? () => handleDelete(account) : undefined}
                     onTogglePin={canManage ? () => handleTogglePin(account) : undefined}
                     onPermissions={canOverwrite ? () => setOverwriting(account) : undefined}
+                    onShare={setShareTarget}
                     sort={
                       sorting
                         ? {
@@ -470,6 +553,29 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
           onConfirm={handleAdd}
         />
       )}
+
+      {exportOpen && <ExportModal items={exportItems} onClose={() => setExportOpen(false)} />}
+
+      {shareTarget && (
+        <ShareToGroupModal key={shareTarget.id} item={shareTarget} excludeGroupId={gid} onClose={() => setShareTarget(undefined)} />
+      )}
+
+      <ConfirmModal
+        isOpen={clearOpen}
+        danger
+        title="清空所有驗證碼"
+        description={
+          solo
+            ? `確定要清空「${detail.group.name}」的所有驗證碼嗎？刪除後無法恢復，所有金鑰都會遺失。`
+            : `確定要清空「${detail.group.name}」裡你能管理的驗證碼嗎？所有成員都會看不到，刪除後無法恢復。`
+        }
+        confirmLabel="全部清空"
+        onCancel={() => setClearOpen(false)}
+        onConfirm={async () => {
+          setClearOpen(false);
+          await handleClear();
+        }}
+      />
 
       {overwriting && (
         <OverwriteEditor

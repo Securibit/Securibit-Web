@@ -1,8 +1,6 @@
 import { supabase } from '@/config/supabase';
-import { TOTP_DEFAULTS, TotpInput, TotpItem } from '@/types/Totp/Totp';
+import { TotpItem } from '@/types/Totp/Totp';
 import { VaultInfo } from '@/types/Vault/Vault';
-import { decodeItems, encodeSecret } from '@/lib/vault/codec';
-import { normalizeCategories } from './categories';
 
 export type TotpResult =
   | { success: true; data: TotpItem[] }
@@ -21,106 +19,36 @@ export const isBase32 = (input: string) => {
 // 金鑰是否可用（正規化後為 Base32）
 export const isValidSecret = (secret: string) => isBase32(normalizeSecret(secret));
 
-// 存檔前整理欄位：去頭尾空白、正規化金鑰、沒填的進階參數補預設值
-const cleanInput = (input: TotpInput): TotpInput => ({
-  name: input.name.trim(),
-  secret: normalizeSecret(input.secret),
-  category: normalizeCategories(input.category),
-  digits: input.digits ?? TOTP_DEFAULTS.digits,
-  period: input.period ?? TOTP_DEFAULTS.period,
-  algorithm: input.algorithm ?? TOTP_DEFAULTS.algorithm,
-});
-
 /*
- * 以下函式的 key 是金鑰加密用的 CryptoKey（使用者有啟用加密才會有）：
- * 寫入前把金鑰加密，回傳的陣列解密後才交給畫面。沒有 key 就照原樣讀寫。
- * 資料存在 0008 migration 的 totp_accounts / totp_secrets，一律透過 RPC 讀寫（只動自己的資料）。
- * uid 參數保留是為了不改動呼叫端，實際身分以資料庫的 auth.uid() 為準。
+ * 0011 起「我的驗證碼」是一個群組（預設群組），新增、修改、刪除、排序一律走群組的 RPC（src/lib/groups/groups.ts）。
+ * 這裡只剩加密設定（profiles.vault）的 RPC；舊的 totp_* RPC 在資料庫保留給舊版頁面相容，前端不再使用。
  */
 
-const decodeResult = async (result: TotpResult, key?: CryptoKey): Promise<TotpResult> =>
-  result.success && key ? { success: true, data: await decodeItems(result.data, key) } : result;
-
-// RPC 回傳 null：totp_update 代表找不到該筆，其他代表找不到使用者資料（未登入）
-const NOT_FOUND_ITEM = '找不到這筆驗證碼，可能已在其他裝置刪除';
-const NOT_FOUND_USER = '找不到使用者資料';
-// 函式不存在（0008 migration 還沒執行）
-const MISSING_MIGRATION = '資料庫還沒更新，請先在 Supabase 執行 0008_accounts.sql。';
-
-/** 呼叫個人驗證碼的 RPC，在資料庫裡一次完成修改（兩個裝置同時操作也不會互蓋），回傳整個清單 */
-const callRpc = async (
-  fn: string,
-  args: Record<string, unknown> = {},
-  notFound = NOT_FOUND_USER
-): Promise<TotpResult> => {
-  const { data, error } = await supabase.rpc(fn, args);
-
-  if (error?.code === 'PGRST202') return { success: false, message: MISSING_MIGRATION };
-  if (error) return { success: false, message: error.message };
-  if (data === null) return { success: false, message: notFound };
-  return { success: true, data: data as TotpItem[] };
-};
-
-// 讀取資料庫裡的原始內容（金鑰可能是密文）
-export const loadRawTotp = async (uid: string): Promise<TotpResult> => callRpc('totp_list');
-
-// 讀取驗證碼
-export const loadTotp = async (uid: string, key?: CryptoKey) => decodeResult(await loadRawTotp(uid), key);
-
-// 修改時只整理有給的欄位（沒給的保留原值，例如編輯時不會動到釘選狀態）
-const cleanPatch = (patch: Partial<TotpInput>): Partial<TotpInput> => {
-  const cleaned: Partial<TotpInput> = { ...patch };
-  if (patch.name !== undefined) cleaned.name = patch.name.trim();
-  if (patch.secret !== undefined) cleaned.secret = normalizeSecret(patch.secret);
-  if (patch.category !== undefined) cleaned.category = normalizeCategories(patch.category);
-  return cleaned;
-};
-
-// 新增一或多筆 TOTP
-export const addTotps = async (uid: string, inputs: TotpInput[], key?: CryptoKey): Promise<TotpResult> => {
-  const items = await Promise.all(
-    inputs.map(async (input) => {
-      const cleaned = cleanInput(input);
-      return { id: crypto.randomUUID(), ...cleaned, secret: await encodeSecret(cleaned.secret, key) };
-    })
-  );
-  return decodeResult(await callRpc('totp_add', { items }), key);
-};
-
-export const addTotp = (uid: string, input: TotpInput, key?: CryptoKey) => addTotps(uid, [input], key);
-
-// 修改一筆 TOTP（只覆蓋 patch 裡有的欄位）
-export const updateTotp = async (
-  uid: string,
-  id: string,
-  patch: Partial<TotpInput>,
-  key?: CryptoKey
-): Promise<TotpResult> => {
-  const cleaned = cleanPatch(patch);
-  if (cleaned.secret !== undefined) cleaned.secret = await encodeSecret(cleaned.secret, key);
-
-  const result = await callRpc('totp_update', { item_id: id, patch: cleaned }, NOT_FOUND_ITEM);
-  return decodeResult(result, key);
-};
-
-// 刪除一筆 TOTP
-export const deleteTotp = async (uid: string, id: string, key?: CryptoKey): Promise<TotpResult> =>
-  decodeResult(await callRpc('totp_delete', { item_id: id }), key);
-
-// 清空所有 TOTP
-export const clearTotp = async (uid: string): Promise<TotpResult> => callRpc('totp_clear');
-
-// 依 ids 順序重新排列（ids 裡沒有的接在最後）
-export const reorderTotp = async (uid: string, ids: string[], key?: CryptoKey): Promise<TotpResult> =>
-  decodeResult(await callRpc('totp_reorder', { ids }), key);
+// 函式不存在（migration 還沒執行）
+const MISSING_MIGRATION = '資料庫還沒更新，請先在 Supabase 執行 0011_default_group.sql。';
 
 /**
- * 更新加密設定，並一次換掉多筆金鑰（啟用、改密碼、停用時用）。
- * secrets：{ 項目 id: 新的 secret }；加密設定有變時要涵蓋全部驗證碼。
+ * 更新加密設定，並一次換掉多筆金鑰（設定密碼、改密碼、停用時用）。
+ * secrets：{ 驗證碼 id: 新的 secret }；加密設定有變時要涵蓋「我擁有且已加密的群組」的全部驗證碼。
+ * 停用（vault 為 null）時那些群組一起改成沒加密。
  * expectedCheck：送出前畫面上的 vault.check（未啟用為 null）；和資料庫不同代表別的裝置改過，資料庫會拒絕。
  */
 export const saveVault = async (
   vault: VaultInfo | null,
   secrets: Record<string, string>,
   expectedCheck: string | null
-): Promise<TotpResult> => callRpc('totp_set_vault', { new_vault: vault, secrets, expected_check: expectedCheck });
+): Promise<TotpResult> => {
+  const { data, error } = await supabase.rpc('totp_set_vault', { new_vault: vault, secrets, expected_check: expectedCheck });
+  if (error?.code === 'PGRST202') return { success: false, message: MISSING_MIGRATION };
+  if (error) return { success: false, message: error.message };
+  if (data === null) return { success: false, message: '找不到使用者資料' };
+  return { success: true, data: data as TotpItem[] };
+};
+
+// 忘記加密密碼：清空我擁有且已加密的群組裡的驗證碼，那些群組改成沒加密，並停用加密
+export const resetVault = async (): Promise<{ success: true } | { success: false; message: string }> => {
+  const { error } = await supabase.rpc('vault_reset');
+  if (error?.code === 'PGRST202') return { success: false, message: MISSING_MIGRATION };
+  if (error) return { success: false, message: error.message };
+  return { success: true };
+};
