@@ -7,9 +7,12 @@ import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from '@heroui/r
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowsUpDown, faEllipsis, faEye, faEyeSlash, faFileExport, faMagnifyingGlass, faPlus, faTrashCan, faXmark } from '@fortawesome/free-solid-svg-icons';
 import CodeCard from './_components/CodeCard';
+import ScopePicker from './_components/ScopePicker';
 import TotpEditModal from './_components/TotpEditModal';
 import ExportModal from './_components/ExportModal';
 import ShareToGroupModal from './_components/ShareToGroupModal';
+import GroupCodes from '@/app/groups/[id]/_components/GroupCodes';
+import CreateGroupModal from '@/app/groups/_components/CreateGroupModal';
 import ConfirmModal from '@/components/ui/Modal/ConfirmModal';
 import Spinner from '@/components/ui/Loading/Spinner';
 import PageContent from '@/components/layout/PageContent';
@@ -17,7 +20,12 @@ import PageHeader from '@/components/layout/PageHeader';
 import useAuth from '@/components/auth/useAuth';
 import useVault from '@/components/vault/useVault';
 import { cn } from '@/lib/utils';
+import { readCodeScope, writeCodeScope } from '@/lib/codeScope';
+import { loadGroupDetail, loadMyGroups } from '@/lib/groups/groups';
+import { GROUP, SITE, hasAny } from '@/lib/permissions/bits';
+import { Actor } from '@/lib/permissions/hierarchy';
 import { TotpResult, clearTotp, deleteTotp, isValidSecret, loadTotp, reorderTotp, updateTotp } from '@/lib/totp/crud';
+import { GroupDetail, GroupSummary } from '@/types/Group/Group';
 import { TotpInput, TotpItem } from '@/types/Totp/Totp';
 import { showError } from "@/lib/errorDialog";
 
@@ -39,7 +47,7 @@ const pillClass = (active: boolean) =>
   );
 
 const CodeClient = () => {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   // 有啟用加密時的金鑰（VaultGate 確認解鎖後才會掛上這個元件）
   const { key } = useVault();
   const [items, setItems] = useState<TotpItem[]>();
@@ -52,6 +60,18 @@ const CodeClient = () => {
   const [category, setCategory] = useState<string>();
   // AuthGate 確認登入後才掛上這個元件，不會在伺服器端執行，可以直接讀 localStorage
   const [hideCodes, setHideCodes] = useState(readHidePref);
+
+  // 看的是「我的」（空字串）還是哪個群組
+  const [scope, setScope] = useState(readCodeScope);
+  const [groups, setGroups] = useState<GroupSummary[]>();
+  const [createOpen, setCreateOpen] = useState(false);
+  // 群組模式用的資料
+  const [loaded, setLoaded] = useState<{ gid: string; data: GroupDetail }>();
+
+  const selectScope = (gid: string) => {
+    setScope(gid);
+    writeCodeScope(gid);
+  };
 
   const toggleHideCodes = (hide: boolean) => {
     setHideCodes(hide);
@@ -105,6 +125,62 @@ const CodeClient = () => {
       }
     });
   }, [user?.uid, key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 我的群組（切換列用）；群組還沒跑 0009 migration 時就當沒有群組。
+  // 記住的群組已經不在（退出、被刪）就回到我的
+  const reloadGroups = async () => {
+    const result = await loadMyGroups();
+    const list = result.success ? result.data : [];
+    setGroups(list);
+    if (scope && !list.some((group) => group.id === scope)) selectScope('');
+    return list;
+  };
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    loadMyGroups().then((result) => {
+      if (cancelled) return;
+      const list = result.success ? result.data : [];
+      setGroups(list);
+      if (scope && !list.some((group) => group.id === scope)) selectScope('');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 群組模式：載入群組詳情（記著是哪個群組的，切換時舊的就不算數）
+  const detail = loaded?.gid === scope ? loaded.data : undefined;
+  const applyDetail = (gid: string, result: Awaited<ReturnType<typeof loadGroupDetail>>) => {
+    if (result.success && result.data) {
+      setLoaded({ gid, data: result.data });
+    } else {
+      showError('無法開啟群組', result.success ? '找不到這個群組。' : result.message);
+      selectScope('');
+    }
+  };
+  const reloadDetail = async () => {
+    if (scope) applyDetail(scope, await loadGroupDetail(scope));
+  };
+  useEffect(() => {
+    if (!user || !scope) return;
+    let cancelled = false;
+    loadGroupDetail(scope).then((result) => {
+      if (!cancelled) applyDetail(scope, result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid, scope]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 擁有者、全站管理員 / 管理所有群組：不受階層限制
+  const actor = useMemo<Actor>(
+    () => ({
+      unrestricted: !!detail?.is_owner || can(SITE.ADMINISTRATOR) || can(SITE.MANAGE_GROUPS),
+      topPosition: detail?.top_position ?? 0,
+    }),
+    [detail?.is_owner, detail?.top_position, can]
+  );
 
   // 資料層回傳最新陣列，成功就直接換掉畫面上的資料
   const applyResult = (result: TotpResult, successText: string, failText: string) => {
@@ -167,12 +243,29 @@ const CodeClient = () => {
     applyResult(await clearTotp(user.uid), '已清空', '清空驗證碼失敗');
   };
 
+  const selectedGroup = groups?.find((group) => group.id === scope);
+  const canShare = !!detail && hasAny(detail.permissions, [GROUP.CREATE_INVITE, GROUP.MANAGE_GROUP]);
+
+  // 群組模式的標題列：群組名、成員數、分享／管理
+  const groupHeading = selectedGroup && (
+    <div className="min-w-0">
+      <p className="truncate text-[22px] font-semibold">{selectedGroup.name}</p>
+      <p className="flex flex-wrap items-center gap-x-3 text-[15px] text-ink-muted">
+        <span>{selectedGroup.member_count} 位成員</span>
+        {canShare && (
+          <Link href={`/groups/${scope}?tab=invites`} className="text-accent hover:underline">分享給其他人</Link>
+        )}
+        <Link href={`/groups/${scope}`} className="text-accent hover:underline">管理</Link>
+      </p>
+    </div>
+  );
+
   return (
     <PageContent className="max-w-3xl">
       <PageHeader
         title="驗證碼"
         right={
-          sorting ? (
+          scope ? undefined : sorting ? (
             <button onClick={() => setSorting(false)} className="text-[17px] font-semibold text-accent">完成</button>
           ) : (
             <>
@@ -213,7 +306,25 @@ const CodeClient = () => {
         }
       />
 
-      {items === undefined ? (
+      {/* 我的 / 群組切換；有群組或能建群組才顯示 */}
+      {groups && (groups.length > 0 || can(SITE.CREATE_GROUPS)) && !sorting && (
+        <div className="mb-5">
+          <ScopePicker
+            groups={groups}
+            selected={scope}
+            onSelect={selectScope}
+            onCreate={can(SITE.CREATE_GROUPS) ? () => setCreateOpen(true) : undefined}
+          />
+        </div>
+      )}
+
+      {scope ? (
+        detail ? (
+          <GroupCodes key={scope} detail={detail} actor={actor} onChanged={reloadDetail} heading={groupHeading} />
+        ) : (
+          <Spinner block label="載入群組…" />
+        )
+      ) : items === undefined ? (
         <Spinner block label="載入驗證碼…" />
       ) : items.length === 0 ? (
         <div className="rounded-[18px] bg-surface-1 px-6 py-16 text-center">
@@ -318,6 +429,16 @@ const CodeClient = () => {
       {exportOpen && (
         <ExportModal items={ordered.filter((item) => isValidSecret(item.secret))} onClose={() => setExportOpen(false)} />
       )}
+
+      <CreateGroupModal
+        isOpen={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={async (gid) => {
+          setCreateOpen(false);
+          await reloadGroups();
+          selectScope(gid);
+        }}
+      />
 
       <ConfirmModal
         isOpen={confirmClearOpen}

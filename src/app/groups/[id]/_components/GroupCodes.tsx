@@ -59,7 +59,7 @@ const pillClass = (active: boolean) =>
   );
 
 // 群組的驗證碼分頁
-const GroupCodes = ({ detail, actor }: GroupCodesProps) => {
+const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
   const gid = detail.group.id;
   // 群組層級的權限：新增、排序要群組層級的「管理驗證碼」；覆寫要「管理身分組」
   const canAdd = has(detail.permissions, GROUP.MANAGE_CODES);
@@ -300,7 +300,7 @@ const GroupCodes = ({ detail, actor }: GroupCodesProps) => {
     <div>
       {/* 標題列：右邊放新增與「…」 */}
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-[22px] font-semibold">驗證碼</h2>
+        {heading ?? <h2 className="text-[22px] font-semibold">驗證碼</h2>}
         <div className="flex items-center gap-3">
           {sorting ? (
             <button type="button" onClick={() => setSorting(false)} className="text-[17px] font-semibold text-accent">完成</button>

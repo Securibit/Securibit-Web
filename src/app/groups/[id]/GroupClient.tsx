@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useRouter } from "nextjs-toploader/app";
 import { Tab, Tabs } from "@heroui/react";
@@ -33,7 +33,12 @@ const GroupClient = () => {
   const router = useRouter();
   const { user, can } = useAuth();
   const [detail, setDetail] = useState<GroupDetail>();
-  const [tab, setTab] = useState<TabKey>("codes");
+  // 驗證碼頁的「分享」會帶 ?tab=invites 進來
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<TabKey>(() => {
+    const initial = searchParams.get("tab");
+    return initial === "members" || initial === "roles" || initial === "invites" || initial === "settings" || initial === "audit" ? initial : "codes";
+  });
 
   // 載入失敗（不是成員、群組已刪除…）就跳錯誤並回到群組列表
   const applyDetail = (result: Awaited<ReturnType<typeof loadGroupDetail>>) => {

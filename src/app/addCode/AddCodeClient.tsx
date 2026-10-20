@@ -12,9 +12,14 @@ import PageContent from "@/components/layout/PageContent";
 import PageHeader from "@/components/layout/PageHeader";
 import TotpForm from "@/components/totp/TotpForm";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
+import ScopePicker from "@/app/code/_components/ScopePicker";
+import { readCodeScope, writeCodeScope } from "@/lib/codeScope";
+import { addGroupAccounts, loadMyGroups } from "@/lib/groups/groups";
+import { GROUP, has } from "@/lib/permissions/bits";
 import { addTotp, addTotps, loadTotp, normalizeSecret } from "@/lib/totp/crud";
 import { ImportTextResult } from "@/lib/totp/importText";
 import { TotpErrors, validateTotpInput } from "@/lib/totp/validate";
+import { GroupSummary } from "@/types/Group/Group";
 import { TOTP_DEFAULTS, TotpInput, TotpItem } from "@/types/Totp/Totp";
 import QrImport from "./_components/QrImport";
 import BulkImportModal from "./_components/BulkImportModal";
@@ -42,13 +47,28 @@ const AddCodeClient = () => {
   // 一次匯入多筆的解析結果；有值時開整批匯入對話框
   const [bulk, setBulk] = useState<ImportTextResult>();
 
-  // 讀取既有驗證碼，只用來提供類別建議
+  // 放到哪裡：我的（空字串）或群組；預設跟驗證碼頁目前看的一樣
+  const [scope, setScope] = useState(readCodeScope);
+  const [groups, setGroups] = useState<GroupSummary[]>([]);
+  const selectScope = (gid: string) => {
+    setScope(gid);
+    writeCodeScope(gid);
+  };
+
+  // 讀取既有驗證碼，只用來提供類別建議；群組只列我能新增驗證碼的
   useEffect(() => {
     if (!user) return;
     loadTotp(user.uid, key).then((result) => {
       if (result.success) setItems(result.data);
     });
+    loadMyGroups().then((result) => {
+      setGroups(result.success ? result.data.filter((group) => has(group.permissions, GROUP.MANAGE_CODES)) : []);
+    });
   }, [user?.uid, key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 記住的群組不能新增（或已不在）就回到我的
+  const targetGroup = groups.find((group) => group.id === scope);
+  const target = targetGroup ? scope : '';
 
   const categories = useMemo(
     () => [...new Set(items.map((item) => item.category).filter(Boolean))].sort(),
@@ -62,16 +82,27 @@ const AddCodeClient = () => {
     setFormKey((key) => key + 1);
   };
 
+  const describe = (inputs: TotpInput[]) =>
+    `${inputs.length === 1 ? `「${inputs[0].name.trim()}」` : ` ${inputs.length} 筆驗證碼`}${targetGroup ? `到「${targetGroup.name}」` : ''}`;
+
   const handleBulkImport = async (inputs: TotpInput[]) => {
     if (!user) return false;
-    const result = await addTotps(user.uid, inputs, key);
-    if (!result.success) {
-      showError('匯入驗證碼失敗', result.message);
-      return false;
+    if (target) {
+      const result = await addGroupAccounts(target, inputs);
+      if (!result.success) {
+        showError('匯入驗證碼失敗', result.message);
+        return false;
+      }
+    } else {
+      const result = await addTotps(user.uid, inputs, key);
+      if (!result.success) {
+        showError('匯入驗證碼失敗', result.message);
+        return false;
+      }
+      setItems(result.data);
     }
     toast.success(`已匯入 ${inputs.length} 筆驗證碼`, { position: 'top-right' });
-    setItems(result.data);
-    setLastAdded(inputs.length === 1 ? `「${inputs[0].name.trim()}」` : ` ${inputs.length} 筆驗證碼`);
+    setLastAdded(describe(inputs));
     return true;
   };
 
@@ -83,21 +114,22 @@ const AddCodeClient = () => {
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
+    // 重複金鑰只在「我的」檢查（群組的金鑰拿不到）
     const secret = normalizeSecret(totp.secret);
-    const existing = items.find((item) => normalizeSecret(item.secret) === secret);
+    const existing = target ? undefined : items.find((item) => normalizeSecret(item.secret) === secret);
     if (existing && !force) {
       setDuplicate(existing);
       return;
     }
 
     setSaving(true);
-    const result = await addTotp(user.uid, totp, key);
+    const result = target ? await addGroupAccounts(target, [totp]) : await addTotp(user.uid, totp, key);
     setSaving(false);
 
     if (result.success) {
       toast.success('已新增', { position: 'top-right' });
-      setItems(result.data);
-      setLastAdded(`「${totp.name.trim()}」`);
+      if (!target) setItems(result.data as TotpItem[]);
+      setLastAdded(describe([totp]));
       // 清空表單，類別保留方便連續新增同類
       setTotp({ ...EMPTY_FORM, category: totp.category });
       setFormKey((key) => key + 1);
@@ -124,6 +156,17 @@ const AddCodeClient = () => {
             <span className="flex-1">已新增{lastAdded}，可以繼續新增下一筆</span>
             <Link href="/code" className="link-arrow shrink-0">查看驗證碼</Link>
           </p>
+        )}
+
+        {/* 放到哪裡：有群組才需要選 */}
+        {groups.length > 0 && (
+          <section>
+            <h2 className="mb-2 px-5 text-[13px] font-normal text-ink-muted">放到</h2>
+            <ScopePicker groups={groups} selected={target} onSelect={selectScope} />
+            {targetGroup && (
+              <p className="mt-2 px-5 text-[13px] text-ink-muted">加到「{targetGroup.name}」的驗證碼，群組成員會依身分組權限看到</p>
+            )}
+          </section>
         )}
 
         {/* 匯入：貼連結、上傳圖片、開相機 */}
@@ -155,7 +198,7 @@ const AddCodeClient = () => {
               />
             </div>
             <Button type="submit" color="primary" radius="full" size="lg" className="mt-6 w-full" isLoading={saving}>
-              新增
+              {targetGroup ? `新增到「${targetGroup.name}」` : '新增'}
             </Button>
           </form>
         </section>
@@ -164,7 +207,7 @@ const AddCodeClient = () => {
       {bulk && (
         <BulkImportModal
           result={bulk}
-          existing={items}
+          existing={target ? [] : items}
           categories={categories}
           onClose={() => setBulk(undefined)}
           onConfirm={handleBulkImport}
