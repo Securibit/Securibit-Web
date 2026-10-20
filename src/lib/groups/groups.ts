@@ -1,6 +1,6 @@
 import { callApi, rpc, rpcVoid } from '@/lib/rpc';
-import { GroupAccount, GroupCodes, GroupDetail, GroupSummary } from '@/types/Group/Group';
-import { AuditLog, Overwrite, OverwriteTargetType, RoleInput } from '@/types/Permission/Permission';
+import { AddedMember, GroupAccount, GroupCodes, GroupDetail, GroupSummary } from '@/types/Group/Group';
+import { AuditLog, Overwrite, OverwriteTargetType, Result, RoleInput } from '@/types/Permission/Permission';
 import { TotpInput } from '@/types/Totp/Totp';
 import { normalizeSecret } from '@/lib/totp/crud';
 import { normalizeCategories } from '@/lib/totp/categories';
@@ -44,6 +44,18 @@ export const setGroupEncrypted = (gid: string, encrypted: boolean, secrets: Reco
 // ---------- 成員與身分組 ----------
 
 export const kickMember = (gid: string, userId: string) => rpcVoid('group_kick', { gid, user_id: userId });
+
+/**
+ * 全站管理員（MANAGE_GROUPS / ADMINISTRATOR）直接把使用者加進群組，不用邀請；加入後只有 @everyone 的權限。
+ * target：電子郵件、@ID（可帶 @）或使用者 ID
+ */
+export const addGroupMember = async (gid: string, target: string): Promise<Result<AddedMember>> => {
+  const result = await rpc<AddedMember>('group_add_member', { gid, target: target.trim() });
+  if (!result.success && result.message.includes('「group_add_member」')) {
+    return { success: false, message: '資料庫還沒更新，請先在 Supabase 執行 0017_admin_add_member.sql。' };
+  }
+  return result;
+};
 
 export const setMemberRoles = (gid: string, userId: string, roleIds: string[]) =>
   rpcVoid('group_set_member_roles', { gid, user_id: userId, role_ids: roleIds });

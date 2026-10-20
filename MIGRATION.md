@@ -21,7 +21,7 @@ Supabase 會配一個全新的 uuid，所以無法用 uid 對應舊資料。
 ## 1. 建立 Supabase 專案與資料表
 
 1. 在 https://supabase.com 建立專案
-2. 進 SQL Editor，依序貼上並執行 `supabase/migrations/` 裡的每個檔案（0001 → 0016，都可重複執行）：
+2. 進 SQL Editor，依序貼上並執行 `supabase/migrations/` 裡的每個檔案（0001 → 0017，都可重複執行）：
    - `0001_init.sql`：`profiles`、`legacy_import`、RLS 政策與 `handle_new_user` 觸發器
    - `0002_migration_notice.sql`：舊使用者第一次登入的遷移提示
    - `0003_ensure_profile.sql`：登入時自動建立 profile、接回舊資料
@@ -64,6 +64,11 @@ Supabase 會配一個全新的 uuid，所以無法用 uid 對應舊資料。
      - 既有的預設群組若名稱仍是「我的」，改成新規則的名稱（使用者自己改過名的不動），每個群組的操作紀錄記一筆「修改群組資料」（操作者為系統）；重複執行不會再改
      - 只改資料庫，前端不需要一起部署
    - `0016_group_order.sql`：每個人自己排群組順序（`group_members.position`，只影響自己看到的順序）：既有資料照原本順序編號（預設群組在最前）、新加入的群組排最後、`my_groups` 依此排序、新增 `my_groups_reorder`；沒執行前「調整順序」會失敗並復原，其他照常
+   - `0017_admin_add_member.sql`：全站管理員直接把使用者加進群組（不用邀請）：
+     - 新增 `group_add_member(gid, target)`：target 是電子郵件、@ID（可帶 @）或使用者 ID；只有全站「管理所有群組」或「管理員」能用，群組內的管理者照舊用邀請
+     - 擋下：找不到使用者、已經是成員、加密的群組、電子郵件還沒驗證的帳號
+     - 加入後只有 @everyone 的權限、群組排在對方清單最後，並刪掉對方在這個群組待回覆的 Email 邀請；群組操作紀錄記 `group.member.add`，對方的帳號操作紀錄也看得到「管理員 X 把你加入群組「…」」
+     - 沒執行前「新增成員」會提示先執行 0017，其他照常
 
 > **部署新版前端前，必須先執行 0008、0009**，否則驗證碼頁會顯示錯誤
 > （「資料庫還沒更新，請先在 Supabase 執行 0008_accounts.sql。」），群組與後台也無法使用。

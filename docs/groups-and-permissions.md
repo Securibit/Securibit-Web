@@ -272,7 +272,7 @@ alter table totp_accounts add foreign key (group_id) references groups(id) on de
 - 全站：`site.role.create/update/delete/reorder`、`site.user.roles`、`site.user.update`、`site.user.delete`、
   `site.user.totp.view`、`site.user.totp.update`、`site.user.totp.delete`
 - 群組：`group.create`、`group.update`、`group.transfer`、`group.role.create/update/delete/reorder`、
-  `group.member.roles`、`group.member.kick`、`group.member.join`、`group.member.leave`、
+  `group.member.roles`、`group.member.kick`、`group.member.join`、`group.member.add`（0017）、`group.member.leave`、
   `group.invite.create/revoke`、`group.invite.email`、`group.account.create/update/delete`、
   `group.account.overwrite`、`group.account.secret.view`（取得金鑰時）
 
@@ -356,6 +356,7 @@ alter table totp_accounts add foreign key (group_id) references groups(id) on de
 | `group_invite_info(code text)` | 登入 | `{ valid, reason, group: { id, name, description, member_count }, inviter: SiteUserBrief, already_member }`。reason：`not_found` / `revoked` / `expired` / `used_up`，有效時為 null |
 | `group_join(code text)` | 登入 | 群組 id；已是成員直接回傳 id 不扣次數；成功時 uses + 1 |
 | `group_invite_user(gid, target text)` | CREATE_INVITE | void。target 是 email 或 `@ID`（開頭 @，或不含 @ 的字串都當 @ID）。@ID 找不到使用者 → raise「找不到這個 @ID」；email 可以是還沒註冊的人。已是成員 → raise；已邀請過 → 不重複新增 |
+| `group_add_member(gid, target text)`（0017） | 全站 MANAGE_GROUPS / ADMINISTRATOR | `{ id, name }`。不用邀請直接加入，只有 @everyone 的權限。target 是 email、`@ID` 或使用者 UUID；找不到、已是成員、加密的群組、email 未驗證 → raise。刪除對方在此群組的 Email 邀請，記 `group.member.add`（也列進對方的帳號操作紀錄） |
 | `group_email_invite_cancel(invite_id uuid)` | 邀請者，或 CREATE_INVITE | void |
 | `my_invitations()` | 登入 | `[{ id, group: { id, name, description, member_count }, invited_by: SiteUserBrief, created_at }]`，比對 `auth.users.email`（小寫） |
 | `respond_invitation(invite_id uuid, accept boolean)` | 被邀請者本人 | 接受時回傳群組 id，拒絕回傳 null；兩者都刪除邀請 |

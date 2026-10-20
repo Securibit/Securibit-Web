@@ -126,6 +126,8 @@ export const describeActivity = (log: AccountActivity, subjectId: string, viewer
       return `${admin} 刪除了${you}的 2FA${str(d.item_name) ? `「${str(d.item_name)}」` : ''}`;
     case 'group.member.join':
       return `加入群組「${group}」`;
+    case 'group.member.add':
+      return `${admin} 把${you}加入群組「${group}」`;
     case 'group.member.leave':
       return `離開群組「${group}」`;
     case 'group.member.kick':

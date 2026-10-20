@@ -31,7 +31,7 @@ const dangerRowClass =
   "w-full py-3 text-center text-[17px] text-alarm hover:bg-surface-1 disabled:text-ink-muted disabled:hover:bg-transparent";
 
 // 設定分頁：名稱與說明、群組 ID、預設群組與加密（擁有者）、轉移擁有權、離開群組、刪除群組
-const GroupSettings = ({ detail, onChanged }: GroupSettingsProps) => {
+const GroupSettings = ({ detail, onChanged, exitHref }: GroupSettingsProps) => {
   const { user, can } = useAuth();
   const vault = useVault();
   const router = useRouter();
@@ -134,7 +134,7 @@ const GroupSettings = ({ detail, onChanged }: GroupSettingsProps) => {
       return;
     }
     toast.success(`已離開「${group.name}」`, { position: "top-right" });
-    router.replace("/groups");
+    router.replace(exitHref);
   };
 
   const handleDelete = async () => {
@@ -145,7 +145,7 @@ const GroupSettings = ({ detail, onChanged }: GroupSettingsProps) => {
     }
     setDeleteOpen(false);
     toast.success(`已刪除「${group.name}」`, { position: "top-right" });
-    router.replace("/groups");
+    router.replace(exitHref);
   };
 
   const closeTransfer = () => {

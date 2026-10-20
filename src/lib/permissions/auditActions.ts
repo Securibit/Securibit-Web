@@ -20,6 +20,7 @@ export const AUDIT_ACTION_TEXT: Record<string, string> = {
   'group.member.roles': '變更成員身分組',
   'group.member.kick': '移除成員',
   'group.member.join': '加入群組',
+  'group.member.add': '直接加入成員',
   'group.member.leave': '離開群組',
   'group.invite.create': '建立邀請連結',
   'group.invite.revoke': '撤銷邀請連結',

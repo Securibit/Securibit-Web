@@ -178,8 +178,9 @@ const UserDetailClient = (props: UserDetailClientProps) => {
                 "無"
               ) : (
                 <span className="flex flex-wrap justify-end gap-1.5">
+                  {/* 有「管理所有群組」就開後台的群組管理頁，否則開一般群組內頁 */}
                   {detail.groups.map((group) => (
-                    <Link key={group.id} href={`/groups/${group.id}`} className="inline-flex items-center gap-1.5 rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-ink hover:bg-line/60">
+                    <Link key={group.id} href={can(SITE.MANAGE_GROUPS) ? `/admin/groups/${group.id}` : `/groups/${group.id}`} className="inline-flex items-center gap-1.5 rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-ink hover:bg-line/60">
                       {group.is_owner && <FontAwesomeIcon icon={faCrown} className="w-3 text-ink-muted" aria-label="擁有者" />}
                       {group.name}
                     </Link>

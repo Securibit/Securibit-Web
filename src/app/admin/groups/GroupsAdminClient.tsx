@@ -16,7 +16,7 @@ import { cn, formatDateTime } from "@/lib/utils";
 import { AdminGroup } from "@/types/Admin/Admin";
 import NoPermission from "../_components/NoPermission";
 
-// 所有群組；點一列開群組內頁（全站「管理所有群組」在群組裡有全部權限）
+// 所有群組；點一列開後台的群組管理頁（全站「管理所有群組」在群組裡有全部權限）
 const GroupsAdminClient = () => {
   const { can } = useAuth();
   const allowed = can(SITE.MANAGE_GROUPS);
@@ -75,7 +75,7 @@ const GroupsAdminClient = () => {
           <ul className={cn("divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface", loading && "opacity-60")}>
             {loaded.groups.map((group) => (
               <li key={group.id}>
-                <Link href={`/groups/${group.id}`} className="flex items-center gap-4 px-5 py-3 hover:bg-surface-1">
+                <Link href={`/admin/groups/${group.id}`} className="flex items-center gap-4 px-5 py-3 hover:bg-surface-1">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[17px]">{group.name}</p>
                     {group.description && <p className="truncate text-[15px] text-ink-muted">{group.description}</p>}

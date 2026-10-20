@@ -37,6 +37,12 @@ export interface GroupMember extends UserBrief {
   top_position: number;
 }
 
+// 管理員直接加入成員（group_add_member）的回傳：加入的使用者 id 與顯示名稱
+export interface AddedMember {
+  id: string;
+  name: string | null;
+}
+
 export interface GroupInvite {
   code: string;
   created_by: UserBrief | null;

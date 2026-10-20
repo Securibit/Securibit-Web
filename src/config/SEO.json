@@ -112,6 +112,10 @@
         "title": "群組管理",
         "description": "後台：所有群組"
     },
+    "AdminGroup": {
+        "title": "群組詳情",
+        "description": "後台：群組的驗證碼、成員、身分組與設定"
+    },
     "AdminAudit": {
         "title": "操作紀錄",
         "description": "後台：全站操作紀錄"
