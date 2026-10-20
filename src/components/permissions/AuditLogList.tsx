@@ -74,39 +74,42 @@ const AuditLogList = (props: AuditLogListProps) => {
 
   if (logs.length === 0) {
     return (
-      <p className="py-10 text-center text-sm text-gray-blue-500 dark:text-gray-blue-400">還沒有任何紀錄</p>
+      <div className="hatch border border-line p-10 text-center">
+        <p className="tech-label">NO DATA</p>
+        <p className="mt-2 text-ink-muted">還沒有任何紀錄</p>
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <ul className="divide-y divide-gray-blue-200 dark:divide-gray-blue-700">
+      <ul className="border-t border-line">
         {logs.map((log) => {
           const target = targetText(log);
           return (
             <li
               key={log.id}
-              className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:gap-4"
+              className="grid gap-x-4 gap-y-1 border-b border-line py-3 transition-colors hover:bg-ink/5 sm:grid-cols-[10.5rem_12rem_1fr] sm:items-center"
             >
-              <UserChip user={log.actor} size="sm" className="sm:w-48 sm:flex-shrink-0" />
-              <p className="min-w-0 flex-1 text-sm text-gray-blue-800 dark:text-gray-blue-100">
-                <span className="font-medium">{auditActionText(log.action)}</span>
-                {target && (
-                  <span className="ml-2 break-all text-gray-blue-500 dark:text-gray-blue-400">{target}</span>
-                )}
-              </p>
-              <time
-                dateTime={log.created_at}
-                className="flex-shrink-0 text-xs tabular-nums text-gray-blue-500 dark:text-gray-blue-400"
-              >
+              <time dateTime={log.created_at} className="font-mono text-xs tabular-nums text-ink-dim">
                 {formatDateTime(log.created_at)}
               </time>
+              <UserChip user={log.actor} size="sm" className="min-w-0" />
+              <p className="min-w-0 text-sm">
+                <span className="font-display font-medium tracking-wide text-ink-muted">{auditActionText(log.action)}</span>
+                {target && <span className="ml-2 break-all text-ink">{target}</span>}
+              </p>
             </li>
           );
         })}
       </ul>
       {hasMore && (
-        <Button variant="bordered" className="self-center" onPress={loadMore} isLoading={loadingMore}>
+        <Button
+          variant="bordered"
+          className="self-center font-display tracking-[0.08em]"
+          onPress={loadMore}
+          isLoading={loadingMore}
+        >
           載入更多
         </Button>
       )}

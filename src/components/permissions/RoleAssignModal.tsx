@@ -5,7 +5,7 @@ import { Button, Checkbox, Modal, ModalBody, ModalContent, ModalFooter, ModalHea
 import { toast } from "react-hot-toast";
 import { canManageRole, sortRoles } from "@/lib/permissions/hierarchy";
 import { showError } from "@/lib/errorDialog";
-import { ROLE_FALLBACK_COLOR } from "@/components/permissions/RoleChip";
+import { cn } from "@/lib/utils";
 import { RoleAssignModalProps } from "@/types/Permission/RoleAssignModal";
 
 // 勾選清單本體：ModalContent 每次開啟才掛上，所以勾選狀態會從 selected 重新開始
@@ -34,18 +34,22 @@ const RoleAssignForm = (props: RoleAssignModalProps & { onClose: () => void }) =
 
   return (
     <>
-      <ModalHeader className="text-black dark:text-white">{props.title}</ModalHeader>
-      <ModalBody className="text-black dark:text-white">
+      <ModalHeader className="border-b border-line font-display tracking-wide">{props.title}</ModalHeader>
+      <ModalBody className="py-4">
         {roles.length === 0 ? (
-          <p className="py-4 text-center text-sm text-gray-blue-500 dark:text-gray-blue-400">
-            還沒有任何身分組
-          </p>
+          <div className="hatch border border-line p-8 text-center">
+            <p className="tech-label">NO DATA</p>
+            <p className="mt-2 text-sm text-ink-muted">還沒有任何身分組</p>
+          </div>
         ) : (
-          <ul className="flex flex-col gap-1">
+          <ul className="border-t border-line">
             {roles.map((role) => {
               const manageable = canManageRole(props.actor, role);
               return (
-                <li key={role.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-gray-blue-100 dark:hover:bg-gray-blue-700/50">
+                <li
+                  key={role.id}
+                  className="flex items-center gap-2 border-b border-line px-1 py-2 transition-colors hover:bg-ink/5"
+                >
                   <Checkbox
                     isSelected={checked.includes(role.id)}
                     isDisabled={!manageable || saving}
@@ -54,14 +58,15 @@ const RoleAssignForm = (props: RoleAssignModalProps & { onClose: () => void }) =
                   >
                     <span className="flex min-w-0 items-center gap-2">
                       <span
-                        className="h-3 w-3 flex-shrink-0 rounded-full"
-                        style={{ backgroundColor: role.color || ROLE_FALLBACK_COLOR }}
+                        className={cn("h-2.5 w-2.5 flex-shrink-0", !role.color && "bg-ink-dim")}
+                        style={role.color ? { backgroundColor: role.color } : undefined}
+                        aria-hidden
                       />
-                      <span className="truncate">{role.name}</span>
+                      <span className="truncate font-display text-sm">{role.name}</span>
                     </span>
                   </Checkbox>
                   {!manageable && (
-                    <span className="ml-auto flex-shrink-0 text-xs text-gray-blue-500 dark:text-gray-blue-400">
+                    <span className="ml-auto flex-shrink-0 font-mono text-[11px] tracking-[0.08em] text-ink-dim">
                       比你的身分組高
                     </span>
                   )}
@@ -71,7 +76,7 @@ const RoleAssignForm = (props: RoleAssignModalProps & { onClose: () => void }) =
           </ul>
         )}
       </ModalBody>
-      <ModalFooter>
+      <ModalFooter className="border-t border-line">
         <Button variant="bordered" onPress={props.onClose} isDisabled={saving}>
           取消
         </Button>
@@ -89,7 +94,7 @@ const RoleAssignModal = (props: RoleAssignModalProps) => (
     isOpen={props.isOpen}
     onOpenChange={(open) => !open && props.onClose()}
     scrollBehavior="inside"
-    className="dark:bg-gray-blue-800"
+    className="border border-line bg-surface-1 text-ink"
   >
     <ModalContent>{(onClose) => <RoleAssignForm {...props} onClose={onClose} />}</ModalContent>
   </Modal>

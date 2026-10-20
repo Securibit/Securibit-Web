@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleInfo } from "@fortawesome/free-solid-svg-icons";
 import PageHeader from "@/components/layout/PageHeader";
 import Spinner from "@/components/ui/Loading/Spinner";
 import RoleEditor from "@/components/permissions/RoleEditor";
@@ -52,11 +50,15 @@ const RolesClient = () => {
   }, [load, refresh]);
 
   return (
-    <>
-      <PageHeader title="身分組" subtitle={canManage ? "建立、編輯身分組並調整順序" : "你只能查看，需要「管理身分組」權限才能修改"} />
+    <div className="boot">
+      <PageHeader
+        index="02 // ROLES"
+        title="身分組"
+        subtitle={canManage ? "建立、編輯身分組並調整順序" : "你只能查看，需要「管理身分組」權限才能修改"}
+      />
 
-      <div className="mb-4 flex gap-3 rounded-lg border border-gray-blue-200 bg-gray-blue-50 p-4 text-sm text-gray-blue-700 dark:border-gray-blue-700 dark:bg-gray-blue-800 dark:text-gray-blue-200">
-        <FontAwesomeIcon icon={faCircleInfo} className="mt-0.5 w-4 shrink-0 text-tpp" />
+      <div className="mb-6 border border-line bg-surface-1 p-4 text-sm text-ink-muted">
+        <p className="tech-label mb-2">NOTE</p>
         <div className="space-y-1">
           <p>全站身分組決定每個人在整個網站（後台、建立群組等）能做什麼，和群組裡的身分組是分開的。一個人可以有多個身分組，權限會合併計算；每個人都有 @everyone。</p>
           <p>身分組越上面越高。除了「管理員」以外，你只能編輯、刪除、指派比自己最高身分組還低的身分組，而且只能開啟自己也有的權限。</p>
@@ -79,7 +81,7 @@ const RolesClient = () => {
           onChanged={handleChanged}
         />
       )}
-    </>
+    </div>
   );
 };
 

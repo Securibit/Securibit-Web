@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDebounce } from "react-use";
 import { useRouter } from "nextjs-toploader/app";
-import { Chip, Input, Pagination, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
+import { Input, Pagination, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLock, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import PageHeader from "@/components/layout/PageHeader";
 import Spinner from "@/components/ui/Loading/Spinner";
 import RoleChip from "@/components/permissions/RoleChip";
@@ -15,7 +15,7 @@ import { loadAdminUsers, loadSiteRoles } from "@/lib/admin/admin";
 import { SITE, permissionName, SITE_PERMISSIONS } from "@/lib/permissions/bits";
 import { sortRoles } from "@/lib/permissions/hierarchy";
 import { showError } from "@/lib/errorDialog";
-import { formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import { AdminUserPage } from "@/types/Admin/Admin";
 import { Role } from "@/types/Permission/Permission";
 import NoPermission from "../_components/NoPermission";
@@ -64,7 +64,7 @@ const UsersClient = () => {
     });
   }, [allowed, search, page]);
 
-  // 身分組 id → 身分組，用來顯示每個人的身分組 chip
+  // 身分組 id → 身分組，用來顯示每個人的身分組標籤
   const [roles, setRoles] = useState<Role[]>([]);
   useEffect(() => {
     if (!allowed) return;
@@ -81,17 +81,19 @@ const UsersClient = () => {
   const pages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
   return (
-    <>
-      <PageHeader title="使用者" subtitle={data ? `共 ${data.total} 位使用者` : undefined} />
+    <div className="boot">
+      <PageHeader index="01 // USERS" title="使用者" subtitle={data ? `共 ${data.total} 位使用者` : undefined} />
 
       <Input
         aria-label="搜尋使用者"
         placeholder="搜尋 Email、名稱或 @ID"
+        variant="bordered"
         value={keyword}
         onValueChange={setKeyword}
         isClearable
         onClear={() => setKeyword("")}
-        startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="w-3.5 text-gray-blue-400" />}
+        startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="w-3.5 text-ink-dim" />}
+        classNames={{ input: "font-mono text-sm" }}
         className="mb-4 sm:max-w-sm"
       />
 
@@ -101,11 +103,17 @@ const UsersClient = () => {
         <Table
           aria-label="使用者列表"
           onRowAction={(key) => router.push(`/admin/users/${String(key)}`)}
-          classNames={{ wrapper: "dark:bg-gray-blue-800", tr: "cursor-pointer" }}
+          bottomContentPlacement="outside"
+          classNames={{
+            wrapper: "border border-line bg-surface-1 p-0 shadow-none",
+            th: "tech-label h-9 bg-surface-2 first:rounded-none last:rounded-none",
+            tr: "cursor-pointer border-b border-line transition-colors last:border-b-0 hover:bg-ink/5",
+            td: "py-3",
+          }}
           bottomContent={
             pages > 1 && (
               <div className="flex justify-center">
-                <Pagination showControls page={page} total={pages} onChange={setPage} isDisabled={loading} />
+                <Pagination showControls variant="bordered" page={page} total={pages} onChange={setPage} isDisabled={loading} />
               </div>
             )
           }
@@ -120,7 +128,12 @@ const UsersClient = () => {
           <TableBody
             isLoading={loading}
             loadingContent={<Spinner />}
-            emptyContent={search ? "沒有符合條件的使用者" : "還沒有使用者"}
+            emptyContent={
+              <div className="hatch py-8 text-center">
+                <p className="tech-label">NO DATA</p>
+                <p className="mt-2 text-sm text-ink-muted">{search ? "沒有符合條件的使用者" : "還沒有使用者"}</p>
+              </div>
+            }
           >
             {data.users.map((user) => (
               <TableRow key={user.id}>
@@ -136,23 +149,20 @@ const UsersClient = () => {
                       ))}
                   </div>
                 </TableCell>
-                <TableCell className="tabular-nums">{user.totp_count}</TableCell>
+                <TableCell className="readout text-sm text-ink">{user.totp_count}</TableCell>
                 <TableCell>
-                  {user.vault_enabled ? (
-                    <Chip size="sm" variant="flat" color="success" startContent={<FontAwesomeIcon icon={faLock} className="ml-1 w-3" />}>
-                      已加密
-                    </Chip>
-                  ) : (
-                    <span className="text-sm text-gray-blue-400">未啟用</span>
-                  )}
+                  <span className="tech-label inline-flex items-center gap-2 whitespace-nowrap">
+                    <span className={cn("led", !user.vault_enabled && "led-off")} aria-hidden />
+                    {user.vault_enabled ? "已啟用" : "未啟用"}
+                  </span>
                 </TableCell>
-                <TableCell className="whitespace-nowrap text-sm">{formatDateTime(user.last_login_at)}</TableCell>
+                <TableCell className="whitespace-nowrap font-mono text-xs text-ink-muted">{formatDateTime(user.last_login_at)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       )}
-    </>
+    </div>
   );
 };
 

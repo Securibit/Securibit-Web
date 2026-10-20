@@ -1,10 +1,10 @@
 import { InfoRowProps } from "@/types/Admin/InfoRow";
 
-// 使用者詳情的一列「標題：內容」（放在 <dl> 裡）
+// 使用者詳情的一列規格：左邊 tech-label 欄位名，右邊等寬字的值（放在 <dl> 裡）
 const InfoRow = (props: InfoRowProps) => (
-  <div className="grid gap-1 py-2 sm:grid-cols-[8rem_1fr] sm:gap-4">
-    <dt className="text-sm text-gray-blue-500 dark:text-gray-blue-400">{props.label}</dt>
-    <dd className="min-w-0 break-words text-sm text-gray-blue-900 dark:text-white">{props.children}</dd>
+  <div className="grid gap-1 border-b border-line py-2.5 sm:grid-cols-[9rem_1fr] sm:gap-4">
+    <dt className="tech-label pt-0.5">{props.label}</dt>
+    <dd className="min-w-0 break-words font-mono text-sm text-ink">{props.children}</dd>
   </div>
 );
 

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { Button } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEye, faEyeSlash, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { deleteAdminUserTotp, loadAdminUserTotp, updateAdminUserTotp } from "@/lib/admin/admin";
 import { normalizeSecret } from "@/lib/totp/crud";
 import { showError } from "@/lib/errorDialog";
@@ -69,20 +69,22 @@ const UserTotpList = (props: UserTotpListProps) => {
   };
 
   return (
-    <section className="rounded-lg border border-gray-blue-200 p-4 dark:border-gray-blue-700">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-gray-blue-900 dark:text-white">
-          2FA 驗證碼
-          <span className="ml-2 text-sm font-normal text-gray-blue-500 dark:text-gray-blue-400">
-            {items ? items.length : user.totp_count} 筆
-          </span>
-        </h2>
+    <section className="border border-line bg-surface-1 p-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="tech-label">03 // 2FA</p>
+          <h2 className="mt-1 font-display text-xl font-bold text-ink">
+            驗證碼
+            <span className="ml-3 font-mono text-sm font-normal text-ink-muted">{items ? items.length : user.totp_count} 筆</span>
+          </h2>
+        </div>
         <div className="flex items-center gap-3">
-          {!items && <span className="text-xs text-gray-blue-500 dark:text-gray-blue-400">查看會被記錄在操作紀錄</span>}
+          {!items && <span className="font-mono text-[11px] tracking-[0.08em] text-ink-dim">查看會被記錄在操作紀錄</span>}
           {items ? (
             <Button
               size="sm"
               variant="bordered"
+              className="font-display tracking-[0.08em]"
               startContent={<FontAwesomeIcon icon={faEyeSlash} className="w-3.5" />}
               onPress={() => setItems(undefined)}
             >
@@ -92,7 +94,7 @@ const UserTotpList = (props: UserTotpListProps) => {
             <Button
               size="sm"
               color="primary"
-              variant="flat"
+              className="font-display tracking-[0.08em]"
               isLoading={loading}
               startContent={!loading && <FontAwesomeIcon icon={faEye} className="w-3.5" />}
               onPress={reveal}
@@ -104,17 +106,20 @@ const UserTotpList = (props: UserTotpListProps) => {
       </div>
 
       {user.vault_enabled && (
-        <div className="mt-3 flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-          <FontAwesomeIcon icon={faTriangleExclamation} className="mt-0.5 w-4 shrink-0" />
-          <p>此使用者啟用了個人加密，管理員無法查看金鑰</p>
-        </div>
+        <p className="mt-4 flex items-center gap-3 border-l-2 border-line-strong pl-3 text-sm text-ink-muted">
+          <span className="led-off" aria-hidden />
+          此使用者啟用了個人加密，管理員無法查看金鑰
+        </p>
       )}
 
       {items &&
         (items.length === 0 ? (
-          <p className="py-6 text-center text-sm text-gray-blue-500 dark:text-gray-blue-400">這位使用者沒有驗證碼</p>
+          <div className="hatch mt-4 border border-line p-10 text-center">
+            <p className="tech-label">NO DATA</p>
+            <p className="mt-2 text-ink-muted">這位使用者沒有驗證碼</p>
+          </div>
         ) : (
-          <ul className="mt-2 divide-y divide-gray-blue-200 dark:divide-gray-blue-700">
+          <ul className="mt-4 border-t border-line">
             {items.map((item) => (
               <AdminTotpRow
                 key={item.id}

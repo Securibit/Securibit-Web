@@ -45,17 +45,18 @@ const GroupsAdminClient = () => {
   if (!allowed) return <NoPermission permission={permissionName(SITE_PERMISSIONS, SITE.MANAGE_GROUPS)} />;
 
   return (
-    <>
-      <PageHeader title="群組" subtitle={loaded ? `共 ${loaded.groups.length} 個群組` : undefined} />
+    <div className="boot">
+      <PageHeader index="03 // GROUPS" title="群組" subtitle={loaded ? `共 ${loaded.groups.length} 個群組` : undefined} />
 
       <Input
         aria-label="搜尋群組"
         placeholder="搜尋群組名稱"
+        variant="bordered"
         value={keyword}
         onValueChange={setKeyword}
         isClearable
         onClear={() => setKeyword("")}
-        startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="w-3.5 text-gray-blue-400" />}
+        startContent={<FontAwesomeIcon icon={faMagnifyingGlass} className="w-3.5 text-ink-dim" />}
         className="mb-4 sm:max-w-sm"
       />
 
@@ -65,7 +66,12 @@ const GroupsAdminClient = () => {
         <Table
           aria-label="群組列表"
           onRowAction={(key) => router.push(`/groups/${String(key)}`)}
-          classNames={{ wrapper: "dark:bg-gray-blue-800", tr: "cursor-pointer" }}
+          classNames={{
+            wrapper: "border border-line bg-surface-1 p-0 shadow-none",
+            th: "tech-label h-9 bg-surface-2 first:rounded-none last:rounded-none",
+            tr: "cursor-pointer border-b border-line transition-colors last:border-b-0 hover:bg-ink/5",
+            td: "py-3",
+          }}
         >
           <TableHeader>
             <TableColumn>群組</TableColumn>
@@ -77,28 +83,33 @@ const GroupsAdminClient = () => {
           <TableBody
             isLoading={loading}
             loadingContent={<Spinner />}
-            emptyContent={search ? "沒有符合條件的群組" : "還沒有群組"}
+            emptyContent={
+              <div className="hatch py-8 text-center">
+                <p className="tech-label">NO DATA</p>
+                <p className="mt-2 text-sm text-ink-muted">{search ? "沒有符合條件的群組" : "還沒有群組"}</p>
+              </div>
+            }
           >
             {loaded.groups.map((group) => (
               <TableRow key={group.id}>
                 <TableCell>
-                  <p className="font-medium text-gray-blue-900 dark:text-white">{group.name}</p>
+                  <p className="font-display font-semibold text-ink">{group.name}</p>
                   {group.description && (
-                    <p className="max-w-xs truncate text-xs text-gray-blue-500 dark:text-gray-blue-400">{group.description}</p>
+                    <p className="max-w-xs truncate text-xs text-ink-muted">{group.description}</p>
                   )}
                 </TableCell>
                 <TableCell>
                   <UserChip user={group.owner} size="sm" />
                 </TableCell>
-                <TableCell className="tabular-nums">{group.member_count}</TableCell>
-                <TableCell className="tabular-nums">{group.account_count}</TableCell>
-                <TableCell className="whitespace-nowrap text-sm">{formatDateTime(group.created_at)}</TableCell>
+                <TableCell className="readout text-sm text-ink">{group.member_count}</TableCell>
+                <TableCell className="readout text-sm text-ink">{group.account_count}</TableCell>
+                <TableCell className="whitespace-nowrap font-mono text-xs text-ink-muted">{formatDateTime(group.created_at)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       )}
-    </>
+    </div>
   );
 };
 

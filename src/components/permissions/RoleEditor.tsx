@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Chip, Input, Switch } from "@heroui/react";
+import { Button, Input, Switch } from "@heroui/react";
 import { toast } from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -19,6 +19,7 @@ import { ROLE_FALLBACK_COLOR } from "@/components/permissions/RoleChip";
 import { countBits } from "@/lib/permissions/bits";
 import { canManageRole, sortRoles } from "@/lib/permissions/hierarchy";
 import { showError } from "@/lib/errorDialog";
+import { cn } from "@/lib/utils";
 import { Role, RoleInput } from "@/types/Permission/Permission";
 import { RoleEditorProps } from "@/types/Permission/RoleEditor";
 
@@ -54,6 +55,10 @@ const applyOrder = (roles: Role[], order: string[] | null) => {
   };
   return [...roles].sort((a, b) => index(a) - index(b));
 };
+
+// 方形的上下移按鈕
+const MOVE_BUTTON =
+  "flex h-6 w-6 items-center justify-center border border-line text-ink-muted transition-colors hover:border-phos hover:text-phos disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-line disabled:hover:text-ink-muted";
 
 // Discord 式身分組編輯器：左邊清單（排序、建立），右邊編輯名稱、顏色、權限；修改先存在草稿，按「儲存變更」才送出
 const RoleEditor = (props: RoleEditorProps) => {
@@ -210,19 +215,17 @@ const RoleEditor = (props: RoleEditorProps) => {
         : null;
 
     return (
-      <li key={def.key} className="flex items-start gap-4 py-3">
+      <li key={def.key} className="flex items-start gap-4 border-b border-line py-3">
         <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-blue-900 dark:text-white">
+          <p className="flex flex-wrap items-center gap-2 font-display text-sm font-semibold text-ink">
             {def.name}
             {isAdminRow && (
-              <Chip size="sm" color="danger" variant="flat">
-                最高權限
-              </Chip>
+              <span className="tech-label border border-alarm px-1.5 py-0.5 text-alarm">最高權限</span>
             )}
           </p>
-          <p className="text-xs text-gray-blue-500 dark:text-gray-blue-400">{def.description}</p>
+          <p className="text-xs text-ink-muted">{def.description}</p>
           {hint && (
-            <p className="mt-1 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+            <p className="mt-1 flex items-center gap-1.5 font-mono text-[11px] tracking-[0.04em] text-ink-dim">
               <FontAwesomeIcon icon={faLock} className="w-2.5" />
               {hint}
             </p>
@@ -243,13 +246,14 @@ const RoleEditor = (props: RoleEditorProps) => {
   };
 
   return (
-    <div className="grid gap-4 md:grid-cols-[16rem_1fr]">
+    <div className="grid gap-6 md:grid-cols-[16rem_1fr]">
       {/* 左：身分組清單 */}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         {canManage && (
           <Button
             color="primary"
             variant="bordered"
+            className="font-display tracking-[0.08em]"
             startContent={<FontAwesomeIcon icon={faPlus} className="w-3.5" />}
             onPress={handleCreate}
             isLoading={creating}
@@ -258,54 +262,61 @@ const RoleEditor = (props: RoleEditorProps) => {
             建立身分組
           </Button>
         )}
-        <ul className="flex flex-col gap-1">
+        <ul className="border border-line bg-surface-1">
           {list.map((role) => {
             const index = ordered.indexOf(role);
             const active = selected?.id === role.id;
             return (
               <li
                 key={role.id}
-                className={`flex items-center gap-1 rounded-lg pr-1 transition-colors ${
-                  active ? "bg-tpp/15 dark:bg-tpp/25" : "hover:bg-gray-blue-100 dark:hover:bg-gray-blue-700/50"
-                }`}
+                className={cn(
+                  "flex items-center gap-1 border-b border-l-2 border-b-line pr-1.5 transition-colors last:border-b-0",
+                  active ? "border-l-phos bg-phos/10" : "border-l-transparent hover:bg-ink/5"
+                )}
               >
                 <button
                   type="button"
                   onClick={() => select(role.id)}
-                  className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left"
+                  className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2.5 text-left"
                 >
                   <span
-                    className="h-3 w-3 flex-shrink-0 rounded-full"
-                    style={{ backgroundColor: role.color || ROLE_FALLBACK_COLOR }}
+                    className={cn("h-2.5 w-2.5 flex-shrink-0", !role.color && "bg-ink-dim")}
+                    style={role.color ? { backgroundColor: role.color } : undefined}
+                    aria-hidden
                   />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-blue-900 dark:text-white">
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 truncate font-display text-sm tracking-[0.04em]",
+                      active ? "text-phos" : "text-ink"
+                    )}
+                  >
                     {role.name}
                   </span>
-                  <span className="flex flex-shrink-0 items-center gap-1 text-xs text-gray-blue-500 dark:text-gray-blue-400">
+                  <span className="flex flex-shrink-0 items-center gap-1 font-mono text-[11px] text-ink-dim">
                     <FontAwesomeIcon icon={faUser} className="w-2.5" />
                     {role.member_count}
                   </span>
                 </button>
                 {/* @everyone 固定在最後，不能移動 */}
                 {canManage && !role.is_default && (
-                  <div className="flex flex-shrink-0">
+                  <div className="flex flex-shrink-0 gap-0.5">
                     <button
                       type="button"
                       onClick={() => handleMove(index, -1)}
                       disabled={!canMove(index, -1)}
                       aria-label={`把 ${role.name} 往上移`}
-                      className="flex h-7 w-7 items-center justify-center rounded-full text-gray-blue-500 transition-colors hover:bg-tpp/10 hover:text-tpp disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-blue-500 dark:text-gray-blue-400"
+                      className={MOVE_BUTTON}
                     >
-                      <FontAwesomeIcon icon={faArrowUp} className="w-3" />
+                      <FontAwesomeIcon icon={faArrowUp} className="w-2.5" />
                     </button>
                     <button
                       type="button"
                       onClick={() => handleMove(index, 1)}
                       disabled={!canMove(index, 1)}
                       aria-label={`把 ${role.name} 往下移`}
-                      className="flex h-7 w-7 items-center justify-center rounded-full text-gray-blue-500 transition-colors hover:bg-tpp/10 hover:text-tpp disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-blue-500 dark:text-gray-blue-400"
+                      className={MOVE_BUTTON}
                     >
-                      <FontAwesomeIcon icon={faArrowDown} className="w-3" />
+                      <FontAwesomeIcon icon={faArrowDown} className="w-2.5" />
                     </button>
                   </div>
                 )}
@@ -317,16 +328,17 @@ const RoleEditor = (props: RoleEditorProps) => {
 
       {/* 右：編輯選取的身分組 */}
       {selected && value ? (
-        <div className="flex min-w-0 flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-6">
           {readOnlyReason && (
-            <p className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-              <FontAwesomeIcon icon={faLock} className="w-3.5" />
+            <p className="flex items-center gap-3 border-l-2 border-line-strong pl-3 text-sm text-ink-muted">
+              <FontAwesomeIcon icon={faLock} className="w-3 flex-shrink-0" />
               {readOnlyReason}
             </p>
           )}
 
           <Input
             label="名稱"
+            variant="bordered"
             value={value.name}
             onValueChange={(name) => patch({ name })}
             isDisabled={selected.is_default || readOnly || saving}
@@ -336,7 +348,7 @@ const RoleEditor = (props: RoleEditorProps) => {
 
           {/* 顏色：色票 + 自訂 + 無顏色 */}
           <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium text-gray-blue-900 dark:text-white">顏色</p>
+            <p className="tech-label">COLOR</p>
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -344,11 +356,12 @@ const RoleEditor = (props: RoleEditorProps) => {
                 disabled={readOnly || saving}
                 aria-label="無顏色"
                 title="無顏色"
-                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed text-gray-blue-400 disabled:cursor-not-allowed disabled:opacity-50 ${
-                  value.color === "" ? "border-tpp" : "border-gray-blue-300 dark:border-gray-blue-600"
-                }`}
+                className={cn(
+                  "flex h-7 w-7 items-center justify-center border border-dashed transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                  value.color === "" ? "border-phos text-phos" : "border-line-strong text-ink-dim hover:border-ink-muted"
+                )}
               >
-                <FontAwesomeIcon icon={faBan} className="w-3.5" />
+                <FontAwesomeIcon icon={faBan} className="w-3" />
               </button>
               {PRESET_COLORS.map((color) => {
                 const active = value.color.toLowerCase() === color;
@@ -360,9 +373,10 @@ const RoleEditor = (props: RoleEditorProps) => {
                     disabled={readOnly || saving}
                     aria-label={`顏色 ${color}`}
                     title={color}
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-white ring-offset-2 transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 dark:ring-offset-gray-blue-800 ${
-                      active ? "ring-2 ring-tpp" : ""
-                    }`}
+                    className={cn(
+                      "flex h-7 w-7 items-center justify-center text-white outline-offset-2 transition-[outline-color] disabled:cursor-not-allowed disabled:opacity-50",
+                      active ? "outline outline-1 outline-phos" : "outline-none"
+                    )}
                     style={{ backgroundColor: color }}
                   >
                     {active && <FontAwesomeIcon icon={faCheck} className="w-3" />}
@@ -370,9 +384,10 @@ const RoleEditor = (props: RoleEditorProps) => {
                 );
               })}
               <label
-                className={`flex items-center gap-2 text-xs text-gray-blue-500 dark:text-gray-blue-400 ${
+                className={cn(
+                  "flex items-center gap-2 font-mono text-[11px] tracking-[0.08em] text-ink-muted",
                   readOnly || saving ? "opacity-50" : "cursor-pointer"
-                }`}
+                )}
               >
                 <input
                   type="color"
@@ -380,7 +395,7 @@ const RoleEditor = (props: RoleEditorProps) => {
                   onChange={(e) => patch({ color: e.target.value.toLowerCase() })}
                   disabled={readOnly || saving}
                   aria-label="自訂顏色"
-                  className="h-8 w-10 cursor-pointer rounded border border-gray-blue-300 bg-transparent disabled:cursor-not-allowed dark:border-gray-blue-600"
+                  className="h-7 w-10 cursor-pointer border border-line bg-transparent disabled:cursor-not-allowed"
                 />
                 自訂
               </label>
@@ -390,22 +405,27 @@ const RoleEditor = (props: RoleEditorProps) => {
           {/* 權限清單：ADMINISTRATOR 固定在第一列 */}
           <div className="flex flex-col">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-gray-blue-900 dark:text-white">權限</p>
-              <p className="text-xs text-gray-blue-500 dark:text-gray-blue-400">
-                已開啟 {enabledCount} / {definitions.length}
+              <p className="tech-label">PERMISSIONS</p>
+              <p className="font-mono text-xs text-ink-muted">
+                已開啟 <span className="text-ink">{enabledCount}</span> / {definitions.length}
               </p>
             </div>
-            <ul className="divide-y divide-gray-blue-200 dark:divide-gray-blue-700">
+            <ul className="mt-2 border-t border-line">
               {adminDef && renderPermission(adminDef)}
               {otherDefs.map(renderPermission)}
             </ul>
           </div>
 
           {canManage && !selected.is_default && !readOnly && (
-            <div>
+            <div className="flex flex-wrap items-center justify-between gap-4 border border-alarm p-4">
+              <div>
+                <p className="tech-label text-alarm">DANGER ZONE</p>
+                <p className="mt-1 text-sm text-ink-muted">擁有這個身分組的人會失去它的權限，刪除後無法恢復。</p>
+              </div>
               <Button
                 color="danger"
                 variant="bordered"
+                className="font-display tracking-[0.08em]"
                 startContent={<FontAwesomeIcon icon={faTrash} className="w-3.5" />}
                 onPress={() => setDeleteOpen(true)}
                 isDisabled={saving}
@@ -417,9 +437,12 @@ const RoleEditor = (props: RoleEditorProps) => {
 
           {/* 未儲存變更列 */}
           {dirty && (
-            <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-gray-blue-200 bg-white p-3 shadow-two dark:border-gray-blue-700 dark:bg-gray-blue-900">
-              <p className="flex-1 text-sm font-medium text-gray-blue-900 dark:text-white">有未儲存的變更</p>
-              <Button variant="light" size="sm" onPress={() => setDraft(null)} isDisabled={saving}>
+            <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-3 border border-phos bg-surface-1 p-3">
+              <p className="flex flex-1 items-center gap-2 font-display text-sm tracking-[0.04em] text-ink">
+                <span className="led" aria-hidden />
+                有未儲存的變更
+              </p>
+              <Button variant="bordered" size="sm" onPress={() => setDraft(null)} isDisabled={saving}>
                 重設
               </Button>
               <Button color="primary" size="sm" onPress={handleSave} isLoading={saving}>
@@ -429,7 +452,10 @@ const RoleEditor = (props: RoleEditorProps) => {
           )}
         </div>
       ) : (
-        <p className="py-10 text-center text-sm text-gray-blue-500 dark:text-gray-blue-400">還沒有任何身分組</p>
+        <div className="hatch border border-line p-10 text-center">
+          <p className="tech-label">NO DATA</p>
+          <p className="mt-2 text-ink-muted">還沒有任何身分組</p>
+        </div>
       )}
 
       <ConfirmModal

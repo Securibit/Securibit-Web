@@ -73,11 +73,11 @@ const AdminTotpEditModal = (props: AdminTotpEditModalProps) => {
       onOpenChange={(open) => !open && props.onClose()}
       size="lg"
       scrollBehavior="inside"
-      className="dark:bg-gray-blue-800"
+      className="border border-line bg-surface-1 text-ink"
     >
       <ModalContent>
-        <ModalHeader className="text-black dark:text-white">編輯驗證碼</ModalHeader>
-        <ModalBody>
+        <ModalHeader className="border-b border-line font-display tracking-wide">編輯驗證碼</ModalHeader>
+        <ModalBody className="py-5">
           <form
             id="admin-totp-edit-form"
             className="flex flex-col gap-4"
@@ -88,6 +88,7 @@ const AdminTotpEditModal = (props: AdminTotpEditModalProps) => {
           >
             <Input
               label="名稱"
+              variant="bordered"
               isRequired
               value={name}
               onValueChange={(value) => {
@@ -100,10 +101,12 @@ const AdminTotpEditModal = (props: AdminTotpEditModalProps) => {
 
             <Autocomplete
               label="類別"
+              variant="bordered"
               allowsCustomValue
               inputValue={category}
               onInputChange={setCategory}
               defaultItems={props.categories.map((value) => ({ key: value }))}
+              popoverProps={{ classNames: { content: "border border-line bg-surface-1" } }}
             >
               {(option) => <AutocompleteItem key={option.key}>{option.key}</AutocompleteItem>}
             </Autocomplete>
@@ -111,14 +114,17 @@ const AdminTotpEditModal = (props: AdminTotpEditModalProps) => {
             {secretLocked ? (
               <Input
                 label="金鑰（Secret）"
+                variant="bordered"
                 isDisabled
                 value=""
                 placeholder="已加密，無法修改"
                 description="此使用者啟用了個人加密，管理員不能查看或修改金鑰"
+                classNames={{ input: "font-mono" }}
               />
             ) : (
               <Input
                 label="金鑰（Secret）"
+                variant="bordered"
                 isRequired
                 type={showSecret ? "text" : "password"}
                 autoComplete="off"
@@ -131,12 +137,13 @@ const AdminTotpEditModal = (props: AdminTotpEditModalProps) => {
                 isInvalid={!!errors.secret}
                 errorMessage={errors.secret}
                 description="Base32 格式（A-Z、2-7），空白與小寫會自動轉換"
+                classNames={{ input: "font-mono" }}
                 endContent={
                   <button
                     type="button"
                     onClick={() => setShowSecret((prev) => !prev)}
                     aria-label={showSecret ? "隱藏金鑰" : "顯示金鑰"}
-                    className="text-gray-blue-400 hover:text-tpp"
+                    className="text-ink-dim transition-colors hover:text-phos"
                   >
                     <FontAwesomeIcon icon={showSecret ? faEyeSlash : faEye} className="w-4" />
                   </button>
@@ -147,38 +154,47 @@ const AdminTotpEditModal = (props: AdminTotpEditModalProps) => {
             <div className="grid gap-3 sm:grid-cols-3">
               <Select
                 label="位數"
+                variant="bordered"
                 selectedKeys={[String(digits)]}
                 disallowEmptySelection
                 onChange={(e) => e.target.value && setDigits(Number(e.target.value))}
+                classNames={{ value: "font-mono" }}
+                popoverProps={{ classNames: { content: "border border-line bg-surface-1" } }}
               >
                 {TOTP_DIGITS.map((d) => <SelectItem key={String(d)}>{`${d} 位數`}</SelectItem>)}
               </Select>
               <Select
                 label="週期"
+                variant="bordered"
                 selectedKeys={[String(period)]}
                 disallowEmptySelection
                 onChange={(e) => e.target.value && setPeriod(Number(e.target.value))}
+                classNames={{ value: "font-mono" }}
+                popoverProps={{ classNames: { content: "border border-line bg-surface-1" } }}
               >
                 {TOTP_PERIODS.map((p) => <SelectItem key={String(p)}>{`${p} 秒`}</SelectItem>)}
               </Select>
               <Select
                 label="演算法"
+                variant="bordered"
                 selectedKeys={[algorithm]}
                 disallowEmptySelection
                 onChange={(e) => e.target.value && setAlgorithm(e.target.value as TotpAlgorithm)}
+                classNames={{ value: "font-mono" }}
+                popoverProps={{ classNames: { content: "border border-line bg-surface-1" } }}
               >
                 {TOTP_ALGORITHMS.map((a) => <SelectItem key={a}>{a}</SelectItem>)}
               </Select>
             </div>
           </form>
           {secretChanged && (
-            <div className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-              <FontAwesomeIcon icon={faTriangleExclamation} className="mt-0.5 w-4" />
+            <div className="flex gap-3 border-l-2 border-alarm bg-alarm/5 p-3 text-sm text-ink">
+              <FontAwesomeIcon icon={faTriangleExclamation} className="mt-1 w-4 flex-shrink-0 text-alarm" />
               <p>更換金鑰後會產生完全不同的驗證碼，使用者原本綁定的服務可能就無法登入。</p>
             </div>
           )}
         </ModalBody>
-        <ModalFooter>
+        <ModalFooter className="border-t border-line">
           <Button variant="bordered" onPress={props.onClose} isDisabled={saving}>
             取消
           </Button>

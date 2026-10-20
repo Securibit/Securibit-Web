@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import { useInterval } from "react-use";
 import toast from "react-hot-toast";
-import { Button, Chip, CircularProgress, Tooltip } from "@heroui/react";
+import { Tooltip } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCopy, faEye, faEyeSlash, faLock, faPen, faQrcode, faThumbtack, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { faCopy, faEye, faEyeSlash, faPen, faQrcode, faThumbtack, faTrash } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import ExportItemModal from "@/app/code/_components/ExportItemModal";
 import { generateOtp } from "@/lib/totp/otp";
 import { showError } from "@/lib/errorDialog";
+import { cn } from "@/lib/utils";
 import { TotpItem } from "@/types/Totp/Totp";
 import { AdminTotpRowProps } from "@/types/Admin/AdminTotpRow";
 
@@ -26,7 +28,24 @@ const copy = async (text: string, successText: string) => {
   }
 };
 
-// 後台 2FA 清單的一筆：動態碼在前端用金鑰產生；已加密的沒有金鑰，只顯示「已加密」
+// 方形圖示按鈕（危險的 hover 變警示色）
+const IconButton = (props: { icon: IconDefinition; label: string; danger?: boolean; onClick: () => void }) => (
+  <Tooltip content={props.label} classNames={{ content: "border border-line bg-surface-1 text-ink" }}>
+    <button
+      type="button"
+      onClick={props.onClick}
+      aria-label={props.label}
+      className={cn(
+        "flex h-8 w-8 items-center justify-center border border-line text-ink-muted transition-colors",
+        props.danger ? "hover:border-alarm hover:text-alarm" : "hover:border-phos hover:text-phos"
+      )}
+    >
+      <FontAwesomeIcon icon={props.icon} className="w-3.5" />
+    </button>
+  </Tooltip>
+);
+
+// 後台 2FA 清單的一列：動態碼在前端用金鑰產生；已加密的沒有金鑰，只顯示「已加密」
 const AdminTotpRow = (props: AdminTotpRowProps) => {
   const { item } = props;
   const secret = item.encrypted ? null : item.secret;
@@ -76,82 +95,70 @@ const AdminTotpRow = (props: AdminTotpRowProps) => {
     : undefined;
 
   return (
-    <li className="py-3">
-      <div className="flex flex-wrap items-center gap-3">
-        {/* 名稱、類別 */}
+    <li className="group relative border-b border-line py-4">
+      <div className="flex flex-wrap items-center gap-4">
+        {/* 左：名稱 + 類別 / 已加密 */}
         <div className="min-w-0 flex-1 basis-40">
-          <p className="truncate font-medium text-gray-blue-900 dark:text-white">
-            {item.pinned && <FontAwesomeIcon icon={faThumbtack} className="mr-1.5 w-3 text-tpp" aria-label="已釘選" />}
+          <p className="truncate font-display text-base font-semibold text-ink">
+            {item.pinned && <FontAwesomeIcon icon={faThumbtack} className="mr-1.5 w-3 text-phos" aria-label="已釘選" />}
             {item.name || "（未命名）"}
           </p>
-          <div className="mt-1 flex flex-wrap gap-1">
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {item.category && (
-              <Chip size="sm" variant="flat" color="secondary">
-                {item.category}
-              </Chip>
+              <span className="tech-label inline-block border border-line px-1.5 py-0.5">{item.category}</span>
             )}
             {item.encrypted && (
-              <Chip size="sm" variant="flat" color="success" startContent={<FontAwesomeIcon icon={faLock} className="ml-1 w-3" />}>
+              <span className="tech-label inline-flex items-center gap-1.5 px-1 py-0.5">
+                <span className="led-off" aria-hidden />
                 已加密
-              </Chip>
+              </span>
             )}
           </div>
         </div>
 
-        {/* 目前的動態碼（點擊複製） */}
-        {secret && (
-          <div className="flex items-center gap-2">
-            {invalidSecret ? (
-              <span className="text-sm font-semibold text-red-500">金鑰錯誤！</span>
-            ) : (
+        {/* 右：讀數（點一下複製）+ 秒數 */}
+        <div className="flex flex-col items-end">
+          {!secret ? (
+            <span className="readout text-2xl text-ink-dim sm:text-3xl">••• •••</span>
+          ) : invalidSecret ? (
+            <span className="font-mono text-sm text-alarm">金鑰錯誤</span>
+          ) : (
+            <>
               <button
+                key={counter}
+                type="button"
                 onClick={() => otp && copy(otp, "已複製驗證碼！")}
                 title="點擊複製"
-                className="text-xl font-semibold tabular-nums text-gray-blue-900 transition-colors hover:text-tpp dark:text-white"
+                className={cn(
+                  "readout settle text-2xl transition-colors sm:text-3xl",
+                  otp ? "glow text-phos hover:text-ink" : "text-ink-dim"
+                )}
               >
-                {otp ? formatOtp(otp) : "------"}
+                {otp ? formatOtp(otp) : "--- ---"}
               </button>
-            )}
-            <CircularProgress
-              aria-label="剩餘秒數"
-              size="sm"
-              maxValue={item.period}
-              value={timeLeft}
-              color={danger ? "danger" : "primary"}
-              showValueLabel
-              formatOptions={{ style: "unit", unit: "second", unitDisplay: "narrow" }}
-            />
-          </div>
-        )}
+              <span className={cn("font-mono text-[11px] tracking-[0.08em] text-ink-dim tabular-nums", danger && "text-alarm")}>
+                {timeLeft} s
+              </span>
+            </>
+          )}
+        </div>
 
-        {/* 操作 */}
+        {/* 操作：方形圖示按鈕 */}
         <div className="flex gap-1">
           {secret && (
-            <Tooltip content={showSecret ? "隱藏金鑰" : "顯示金鑰"}>
-              <Button isIconOnly size="sm" variant="light" aria-label={showSecret ? "隱藏金鑰" : "顯示金鑰"} onPress={() => setShowSecret(!showSecret)}>
-                <FontAwesomeIcon icon={showSecret ? faEyeSlash : faEye} className="w-3.5" />
-              </Button>
-            </Tooltip>
+            <IconButton
+              icon={showSecret ? faEyeSlash : faEye}
+              label={showSecret ? "隱藏金鑰" : "顯示金鑰"}
+              onClick={() => setShowSecret(!showSecret)}
+            />
           )}
           {exportItem && !invalidSecret && (
-            <Tooltip content="QR Code">
-              <Button isIconOnly size="sm" variant="light" aria-label="顯示 QR Code" onPress={() => setExportOpen(true)}>
-                <FontAwesomeIcon icon={faQrcode} className="w-3.5" />
-              </Button>
-            </Tooltip>
+            <IconButton icon={faQrcode} label="顯示 QR Code" onClick={() => setExportOpen(true)} />
           )}
           {props.canManage && (
             <>
-              <Tooltip content="編輯">
-                <Button isIconOnly size="sm" variant="light" aria-label="編輯驗證碼" onPress={props.onEdit}>
-                  <FontAwesomeIcon icon={faPen} className="w-3.5" />
-                </Button>
-              </Tooltip>
-              <Tooltip content="刪除">
-                <Button isIconOnly size="sm" variant="light" color="danger" aria-label="刪除驗證碼" onPress={() => setConfirmOpen(true)}>
-                  <FontAwesomeIcon icon={faTrash} className="w-3.5" />
-                </Button>
-              </Tooltip>
+              <IconButton icon={faPen} label="編輯驗證碼" onClick={props.onEdit} />
+              <IconButton icon={faTrash} label="刪除驗證碼" danger onClick={() => setConfirmOpen(true)} />
             </>
           )}
         </div>
@@ -159,11 +166,20 @@ const AdminTotpRow = (props: AdminTotpRowProps) => {
 
       {/* 金鑰 */}
       {secret && showSecret && (
-        <div className="mt-2 flex items-center gap-2 rounded-md bg-gray-blue-100 px-3 py-2 dark:bg-gray-blue-900">
-          <code className="min-w-0 flex-1 break-all font-mono text-sm text-gray-blue-900 dark:text-gray-blue-100">{secret}</code>
-          <Button isIconOnly size="sm" variant="light" aria-label="複製金鑰" onPress={() => copy(secret, "已複製金鑰！")}>
-            <FontAwesomeIcon icon={faCopy} className="w-3.5" />
-          </Button>
+        <div className="mt-3 flex items-center gap-3 border border-line bg-surface-2 px-3 py-2">
+          <span className="tech-label flex-shrink-0">SECRET</span>
+          <code className="min-w-0 flex-1 break-all font-mono text-sm text-ink">{secret}</code>
+          <IconButton icon={faCopy} label="複製金鑰" onClick={() => copy(secret, "已複製金鑰！")} />
+        </div>
+      )}
+
+      {/* 倒數條：貼在列底部（沒有金鑰就不顯示） */}
+      {secret && !invalidSecret && (
+        <div className="absolute inset-x-0 bottom-0 h-px bg-line">
+          <div
+            className={cn("h-full transition-[width] duration-1000 ease-linear", danger ? "bg-alarm" : "bg-phos")}
+            style={{ width: `${(timeLeft / item.period) * 100}%` }}
+          />
         </div>
       )}
 

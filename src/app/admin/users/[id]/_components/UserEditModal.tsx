@@ -54,10 +54,10 @@ const UserEditModal = (props: UserEditModalProps) => {
   };
 
   return (
-    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} className="dark:bg-gray-blue-800">
+    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} className="border border-line bg-surface-1 text-ink">
       <ModalContent>
-        <ModalHeader className="text-black dark:text-white">修改使用者資料</ModalHeader>
-        <ModalBody>
+        <ModalHeader className="border-b border-line font-display tracking-wide">修改使用者資料</ModalHeader>
+        <ModalBody className="py-5">
           <form
             id="admin-user-edit-form"
             className="flex flex-col gap-4"
@@ -68,6 +68,7 @@ const UserEditModal = (props: UserEditModalProps) => {
           >
             <Input
               label="名稱"
+              variant="bordered"
               isRequired
               value={name}
               onValueChange={setName}
@@ -76,19 +77,21 @@ const UserEditModal = (props: UserEditModalProps) => {
             />
             <Input
               label="@ID"
+              variant="bordered"
               placeholder="留空代表清除"
               value={username}
               onValueChange={setUsername}
-              startContent={<span className="text-sm text-gray-blue-400">@</span>}
+              startContent={<span className="font-mono text-sm text-ink-dim">@</span>}
               autoComplete="off"
               spellCheck="false"
               isInvalid={!!usernameError}
               errorMessage={usernameError}
               description="小寫英文、數字、底線與點，3～32 字"
+              classNames={{ input: "font-mono" }}
             />
           </form>
         </ModalBody>
-        <ModalFooter>
+        <ModalFooter className="border-t border-line">
           <Button variant="bordered" onPress={props.onClose} isDisabled={saving}>
             取消
           </Button>

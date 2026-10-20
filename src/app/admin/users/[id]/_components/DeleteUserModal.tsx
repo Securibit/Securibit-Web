@@ -3,8 +3,6 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { deleteAdminUser } from "@/lib/admin/admin";
 import { showError } from "@/lib/errorDialog";
 import { DeleteUserModalProps } from "@/types/Admin/DeleteUserModal";
@@ -32,13 +30,17 @@ const DeleteUserModal = (props: DeleteUserModalProps) => {
   };
 
   return (
-    <Modal isOpen onOpenChange={(open) => !open && !pending && props.onClose()} className="dark:bg-gray-blue-800">
+    <Modal
+      isOpen
+      onOpenChange={(open) => !open && !pending && props.onClose()}
+      className="border border-line bg-surface-1 text-ink"
+    >
       <ModalContent>
-        <ModalHeader className="flex items-center gap-2 text-black dark:text-white">
-          <FontAwesomeIcon icon={faTriangleExclamation} className="w-4 text-red-500" />
+        <ModalHeader className="flex items-center gap-3 border-b border-line font-display tracking-wide">
+          <span className="led led-alarm" aria-hidden />
           刪除使用者
         </ModalHeader>
-        <ModalBody className="font-normal text-black dark:text-white">
+        <ModalBody className="py-5 font-normal text-ink-muted">
           <p>
             確定要刪除「{user.name || user.email}」嗎？他的帳號、所有驗證碼與群組成員資格都會刪除，無法恢復。
             擁有群組的使用者要先轉移或刪除群組。
@@ -53,14 +55,16 @@ const DeleteUserModal = (props: DeleteUserModalProps) => {
             <Input
               label={user.email ? "輸入對方的 Email 以確認" : "輸入使用者 ID 以確認"}
               placeholder={expected}
+              variant="bordered"
               value={typed}
               onValueChange={setTyped}
               autoComplete="off"
               spellCheck="false"
+              classNames={{ input: "font-mono text-sm" }}
             />
           </form>
         </ModalBody>
-        <ModalFooter>
+        <ModalFooter className="border-t border-line">
           <Button variant="bordered" onPress={props.onClose} isDisabled={pending}>
             取消
           </Button>

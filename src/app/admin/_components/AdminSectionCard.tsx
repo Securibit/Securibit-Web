@@ -1,26 +1,28 @@
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import { AdminSectionCardProps } from "@/types/Admin/AdminSectionCard";
 
-// 總覽頁的區塊入口
+// 總覽頁的區塊入口：規格表的一列（編號、名稱與說明、讀數、箭頭）
 const AdminSectionCard = (props: AdminSectionCardProps) => (
-  <Link
-    href={props.href}
-    className="group flex gap-4 rounded-lg border border-gray-blue-200 bg-white p-4 shadow-sm transition-colors hover:border-tpp dark:border-gray-blue-700 dark:bg-gray-blue-800 dark:hover:border-tpp"
-  >
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-tpp/15 text-tpp">
-      <FontAwesomeIcon icon={props.icon} className="w-4" />
-    </span>
-    <span className="min-w-0 flex-1">
-      <span className="flex items-baseline justify-between gap-2">
-        <span className="font-semibold text-gray-blue-900 group-hover:text-tpp dark:text-white">{props.title}</span>
+  <li>
+    <Link
+      href={props.href}
+      className="group grid grid-cols-[3rem_1fr_auto] items-center gap-x-4 border-b border-line py-4 transition-colors hover:bg-ink/5 sm:grid-cols-[4rem_11rem_1fr_auto]"
+    >
+      <span className="readout text-sm text-ink-dim">{props.index}</span>
+      <span className="font-display text-lg font-semibold text-ink transition-colors group-hover:text-phos">{props.title}</span>
+      <span className="col-start-2 text-sm text-ink-muted sm:col-start-3">{props.description}</span>
+      <span className="col-start-3 row-start-1 flex items-center gap-4 sm:col-start-4">
         {props.count !== undefined && (
-          <span className="text-xl font-bold tabular-nums text-gray-blue-900 dark:text-white">{props.count}</span>
+          <span className="readout text-xl text-ink">{props.count}</span>
         )}
+        <span className="flex h-8 w-8 items-center justify-center border border-line text-ink-muted transition-colors group-hover:border-phos group-hover:text-phos">
+          <FontAwesomeIcon icon={faArrowRight} className="w-3" />
+        </span>
       </span>
-      <span className="mt-1 block text-sm text-gray-blue-500 dark:text-gray-blue-400">{props.description}</span>
-    </span>
-  </Link>
+    </Link>
+  </li>
 );
 
 export default AdminSectionCard;
