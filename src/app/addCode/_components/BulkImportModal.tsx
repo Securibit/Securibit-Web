@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Autocomplete, AutocompleteItem, Button, Checkbox, Chip, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
+import { Autocomplete, AutocompleteItem, Button, Checkbox, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
 import { normalizeSecret } from "@/lib/totp/crud";
 import { TOTP_DEFAULTS } from "@/types/Totp/Totp";
 import { BulkImportModalProps } from "@/types/AddCode/BulkImportModal";
@@ -53,36 +53,39 @@ const BulkImportModal = (props: BulkImportModalProps) => {
       onOpenChange={(open) => !open && props.onClose()}
       size="lg"
       scrollBehavior="inside"
-      className="dark:bg-gray-blue-800"
+      className="border border-line bg-surface-1 text-ink"
     >
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-1 text-black dark:text-white">
-          匯入 {items.length} 筆驗證碼
+        <ModalHeader className="flex flex-col gap-1 border-b border-line font-display tracking-wide">
+          <span className="tech-label">IMPORT // BATCH</span>
+          <span>
+            匯入 <span className="font-mono">{items.length}</span> 筆驗證碼
+          </span>
           {batch && (
-            <span className="text-sm font-normal text-gray-blue-500 dark:text-gray-blue-400">
-              這是第 {batch.index} / {batch.size} 張匯出 QR Code
+            <span className="text-sm font-normal tracking-normal text-ink-muted">
+              這是第 <span className="font-mono">{batch.index} / {batch.size}</span> 張匯出 QR Code
               {batch.index < batch.size && "，匯入後請繼續掃描下一張"}
             </span>
           )}
         </ModalHeader>
-        <ModalBody className="text-black dark:text-white">
-          <ul className="flex flex-col gap-2">
+        <ModalBody className="py-5">
+          <ul className="border-t border-line">
             {items.map((item, index) => (
-              <li key={index} className="flex items-center gap-2">
+              <li key={index} className="flex items-center gap-2 border-b border-line py-2 transition-colors hover:bg-ink/5">
                 <Checkbox
                   isSelected={selected[index]}
                   onValueChange={(value) => setSelected(selected.map((old, i) => (i === index ? value : old)))}
                   classNames={{ label: "min-w-0" }}
                 >
-                  <span className="block truncate">{item.name}</span>
+                  <span className="block truncate font-display font-medium">{item.name}</span>
                   {describe(index) && (
-                    <span className="block text-xs text-gray-blue-500 dark:text-gray-blue-400">{describe(index)}</span>
+                    <span className="block font-mono text-[11px] tracking-[0.08em] text-ink-dim">{describe(index)}</span>
                   )}
                 </Checkbox>
                 {duplicates[index] && (
-                  <Chip size="sm" variant="flat" color="warning" className="ml-auto flex-shrink-0">
+                  <span className="tech-label ml-auto flex-shrink-0 border border-alarm/60 px-1.5 py-0.5 text-alarm">
                     已存在
-                  </Chip>
+                  </span>
                 )}
               </li>
             ))}
@@ -90,6 +93,7 @@ const BulkImportModal = (props: BulkImportModalProps) => {
 
           <Autocomplete
             label="類別（套用到勾選的全部，可留空）"
+            variant="bordered"
             allowsCustomValue
             inputValue={category}
             onInputChange={setCategory}
@@ -99,9 +103,12 @@ const BulkImportModal = (props: BulkImportModalProps) => {
           </Autocomplete>
 
           {errors.length > 0 && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-              <p className="font-semibold">以下內容無法匯入：</p>
-              <ul className="list-disc pl-5">
+            <div className="border border-alarm/50 bg-alarm/10 p-3 text-sm text-ink">
+              <p className="flex items-center gap-2 font-display font-semibold">
+                <span className="led led-alarm" aria-hidden />
+                以下內容無法匯入：
+              </p>
+              <ul className="mt-1 list-disc pl-5 font-mono text-xs text-ink-muted">
                 {errors.map((error, index) => (
                   <li key={index} className="break-all">{error}</li>
                 ))}
@@ -109,12 +116,12 @@ const BulkImportModal = (props: BulkImportModalProps) => {
             </div>
           )}
         </ModalBody>
-        <ModalFooter>
+        <ModalFooter className="border-t border-line">
           <Button variant="bordered" onPress={props.onClose} isDisabled={saving}>
             取消
           </Button>
           <Button color="primary" onPress={handleConfirm} isLoading={saving} isDisabled={count === 0}>
-            匯入 {count} 筆
+            匯入 <span className="font-mono">{count}</span> 筆
           </Button>
         </ModalFooter>
       </ModalContent>

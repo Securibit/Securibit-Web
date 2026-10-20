@@ -23,17 +23,20 @@ const ExportItemModal = (props: ExportItemModalProps) => {
   };
 
   return (
-    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} className="dark:bg-gray-blue-800">
+    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} className="border border-line bg-surface-1 text-ink">
       <ModalContent>
-        <ModalHeader className="text-black dark:text-white">匯出「{props.item.name}」</ModalHeader>
-        <ModalBody className="items-center text-black dark:text-white">
+        <ModalHeader className="flex flex-col gap-1 border-b border-line font-display tracking-wide">
+          <span className="tech-label">EXPORT // QR</span>
+          匯出「{props.item.name}」
+        </ModalHeader>
+        <ModalBody className="items-center py-5">
           <QrCode value={uri} alt={`${props.item.name} 的 QR Code`} />
-          <p className="text-center text-sm text-gray-blue-500 dark:text-gray-blue-400">
+          <p className="text-center text-sm text-ink-muted">
             用 Google Authenticator、Microsoft Authenticator 等 App 掃描，就能加到手機上。
           </p>
           <ExportWarning />
         </ModalBody>
-        <ModalFooter>
+        <ModalFooter className="border-t border-line">
           <Button variant="bordered" onPress={copyUri}>
             複製連結
           </Button>

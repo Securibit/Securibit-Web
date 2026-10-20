@@ -3,7 +3,7 @@ import { PageHeaderProps } from "@/types/Layout/PageHeader";
 // 頁面標題區塊：小標籤、顯示字標題、底下一條左端帶磷光的分隔線
 const PageHeader = (props: PageHeaderProps) => {
   return (
-    <div className="boot mb-6">
+    <div className="mb-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           {props.index && <p className="tech-label mb-2">{props.index}</p>}

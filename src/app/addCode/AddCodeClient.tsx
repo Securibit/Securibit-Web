@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "nextjs-toploader/app";
 import toast from "react-hot-toast";
-import { Button, Divider } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faCircleCheck } from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import useAuth from "@/components/auth/useAuth";
 import useVault from "@/components/vault/useVault";
 import PageContent from "@/components/layout/PageContent";
@@ -108,13 +108,15 @@ const AddCodeClient = () => {
   };
 
   return (
-    <PageContent className="max-w-2xl">
+    <PageContent className="max-w-5xl">
       <PageHeader
+        index="02 // ADD CODE"
         title="新增驗證碼"
         subtitle="掃描 QR Code、匯入 Google Authenticator 或備份檔，或手動輸入金鑰"
         right={
           <Button
-            variant="light"
+            variant="bordered"
+            className="font-display tracking-[0.08em]"
             startContent={<FontAwesomeIcon icon={faArrowLeft} className="w-3.5" />}
             onPress={() => router.push('/code')}
           >
@@ -123,47 +125,63 @@ const AddCodeClient = () => {
         }
       />
 
-      {lastAdded && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-          <FontAwesomeIcon icon={faCircleCheck} className="w-4" />
-          <span className="flex-1">已新增{lastAdded}，可以繼續新增下一筆。</span>
-          <Button size="sm" color="success" variant="flat" onPress={() => router.push('/code')}>
-            查看驗證碼
-          </Button>
+      <div className="boot">
+        {lastAdded && (
+          <div className="mb-6 flex flex-wrap items-center gap-3 border border-phos/50 bg-phos/10 p-3 text-sm text-ink">
+            <span className="led" aria-hidden />
+            <span className="flex-1">已新增{lastAdded}，可以繼續新增下一筆。</span>
+            <Button size="sm" color="primary" variant="bordered" className="font-display tracking-[0.08em]" onPress={() => router.push('/code')}>
+              查看驗證碼
+            </Button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-12 gap-6">
+          {/* 左：說明 + 快速匯入 */}
+          <div className="col-span-12 lg:col-span-5">
+            <p className="tech-label">A // IMPORT</p>
+            <h2 className="mt-1 font-display text-xl font-bold text-ink">快速匯入</h2>
+            <p className="mt-2 text-sm text-ink-muted">
+              貼上服務給的 otpauth 連結，或上傳綁定畫面的 QR Code 截圖；Google Authenticator 的匯出 QR Code 和本站的備份檔可以一次匯入多筆。
+            </p>
+            <div className="mt-4 border border-line bg-surface-1 p-4">
+              <QrImport onImport={handleImport} onImportMany={setBulk} />
+            </div>
+            <p className="mt-3 font-mono text-[11px] tracking-[0.08em] text-ink-dim">
+              解析成功後會自動帶入右邊的表單，確認後再按新增。
+            </p>
+          </div>
+
+          {/* 右：手動輸入表單 */}
+          <div className="col-span-12 lg:col-span-7">
+            <div className="panel p-5 sm:p-6">
+              <p className="tech-label">B // MANUAL</p>
+              <h2 className="mt-1 font-display text-xl font-bold text-ink">手動輸入</h2>
+              <div className="rule mt-4 mb-5" />
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleAddTotp();
+                }}
+              >
+                <TotpForm
+                  key={formKey}
+                  value={totp}
+                  onChange={(value) => {
+                    setTotp(value);
+                    setErrors({});
+                  }}
+                  categories={categories}
+                  errors={errors}
+                  advancedOpen={!isDefaultAdvanced(totp)}
+                />
+                <Button type="submit" color="primary" className="mt-6 w-full font-display tracking-[0.08em] sm:w-auto" isLoading={saving}>
+                  新增驗證碼
+                </Button>
+              </form>
+            </div>
+          </div>
         </div>
-      )}
-
-      <div className="rounded-lg border border-gray-blue-200 bg-white p-4 shadow sm:p-6 dark:border-gray-blue-700 dark:bg-gray-blue-800">
-        <h2 className="mb-3 font-semibold">快速匯入</h2>
-        <QrImport onImport={handleImport} onImportMany={setBulk} />
-
-        <div className="my-6 flex items-center gap-3 text-sm text-gray-blue-400">
-          <Divider className="flex-1" />
-          或手動輸入
-          <Divider className="flex-1" />
-        </div>
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleAddTotp();
-          }}
-        >
-          <TotpForm
-            key={formKey}
-            value={totp}
-            onChange={(value) => {
-              setTotp(value);
-              setErrors({});
-            }}
-            categories={categories}
-            errors={errors}
-            advancedOpen={!isDefaultAdvanced(totp)}
-          />
-          <Button type="submit" color="primary" className="mt-6 w-full sm:w-auto" isLoading={saving}>
-            新增驗證碼
-          </Button>
-        </form>
       </div>
 
       {bulk && (

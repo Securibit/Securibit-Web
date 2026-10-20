@@ -27,8 +27,8 @@ const QrCode = (props: QrCodeProps) => {
 
   return (
     <div
-      className="flex items-center justify-center rounded-lg bg-white p-2"
-      style={{ width: size + 16, height: size + 16 }}
+      className="flex items-center justify-center border border-line-strong bg-white p-2"
+      style={{ width: size + 18, height: size + 18 }}
     >
       {image?.value === props.value && (
         <img src={image.url} width={size} height={size} alt={props.alt ?? "QR Code"} />

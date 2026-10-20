@@ -69,7 +69,7 @@ const ShareToGroupModal = (props: ShareToGroupModalProps) => {
         <span className="flex flex-wrap items-center gap-2">
           已分享到「{group.name}」
           <button
-            className="font-semibold text-tpp underline underline-offset-4"
+            className="font-display font-semibold text-phos underline underline-offset-4"
             onClick={() => {
               toast.dismiss(t.id);
               router.push(`/groups/${group.id}`);
@@ -84,33 +84,42 @@ const ShareToGroupModal = (props: ShareToGroupModalProps) => {
   };
 
   return (
-    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} className="dark:bg-gray-blue-800">
+    <Modal isOpen onOpenChange={(open) => !open && props.onClose()} className="border border-line bg-surface-1 text-ink">
       <ModalContent>
-        <ModalHeader className="text-black dark:text-white">分享「{item.name}」到群組</ModalHeader>
-        <ModalBody className="text-black dark:text-white">
-          <p className="text-sm text-gray-blue-500 dark:text-gray-blue-400">
+        <ModalHeader className="flex flex-col gap-1 border-b border-line font-display tracking-wide">
+          <span className="tech-label">SHARE // GROUP</span>
+          分享「{item.name}」到群組
+        </ModalHeader>
+        <ModalBody className="py-5">
+          <p className="text-sm text-ink-muted">
             會複製一份到群組，之後兩邊各自獨立；群組的驗證碼不會套用你的個人加密。
           </p>
 
           {groups === undefined ? (
             <Spinner label="載入群組…" />
           ) : groups.length === 0 ? (
-            <div className="rounded-lg border border-gray-blue-200 p-4 text-sm dark:border-gray-blue-700">
-              <p>你目前沒有可以新增驗證碼的群組。</p>
-              <p className="mt-1 text-gray-blue-500 dark:text-gray-blue-400">
+            <div className="hatch border border-line p-4 text-sm">
+              <p className="tech-label">NO GROUP</p>
+              <p className="mt-2">你目前沒有可以新增驗證碼的群組。</p>
+              <p className="mt-1 text-ink-muted">
                 需要在群組裡有「管理驗證碼」權限，可以自己建立群組，或請群組管理員開給你。
               </p>
               <Link
                 href="/groups"
                 onClick={props.onClose}
-                className="mt-3 inline-flex items-center gap-1.5 font-medium text-tpp underline underline-offset-4"
+                className="mt-3 inline-flex items-center gap-1.5 font-display font-medium text-phos underline underline-offset-4"
               >
                 <FontAwesomeIcon icon={faUserGroup} className="w-3.5" />
                 前往群組
               </Link>
             </div>
           ) : (
-            <RadioGroup label="選擇群組" value={selected} onValueChange={setSelected}>
+            <RadioGroup
+              label="選擇群組"
+              value={selected}
+              onValueChange={setSelected}
+              classNames={{ label: "tech-label" }}
+            >
               {groups.map((group) => (
                 <Radio key={group.id} value={group.id} description={group.description || undefined}>
                   {group.name}
@@ -119,7 +128,7 @@ const ShareToGroupModal = (props: ShareToGroupModalProps) => {
             </RadioGroup>
           )}
         </ModalBody>
-        <ModalFooter>
+        <ModalFooter className="border-t border-line">
           <Button variant="bordered" onPress={props.onClose}>
             取消
           </Button>

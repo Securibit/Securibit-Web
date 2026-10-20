@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useInterval } from "react-use";
 import { cn } from "@/lib/utils";
 import { generateOtp } from "@/lib/totp/otp";
@@ -10,11 +10,15 @@ const DEMO = { secret: 'JBSWY3DZEBSWY3DZEBSWY3DZ', digits: 6, period: 30, algori
 
 const formatOtp = (otp: string) => `${otp.slice(0, 3)} ${otp.slice(3)}`;
 
+const subscribe = () => () => {};
+
 // 首頁右側會真的跳動的儀表：用示範金鑰算出目前的驗證碼
 const LiveReadout = () => {
-  const [now, setNow] = useState<number>();
-  useInterval(() => setNow(Date.now()), 1000);
-  useEffect(() => setNow(Date.now()), []);
+  // 伺服器端沒有時間可以算，掛載到瀏覽器後才顯示讀數，避免 hydration 不一致
+  const mounted = useSyncExternalStore(subscribe, () => true, () => false);
+  const [tick, setTick] = useState(() => Date.now());
+  useInterval(() => setTick(Date.now()), 1000);
+  const now = mounted ? tick : undefined;
 
   const seconds = Math.floor((now ?? 0) / 1000);
   const timeLeft = DEMO.period - (seconds % DEMO.period);
@@ -22,7 +26,7 @@ const LiveReadout = () => {
 
   const [otp, setOtp] = useState<{ counter: number; value: string }>();
   useEffect(() => {
-    if (now === undefined) return;
+    if (!mounted) return;
     let cancelled = false;
     generateOtp(DEMO, counter * DEMO.period * 1000).then((value) => {
       if (!cancelled && value) setOtp({ counter, value });
@@ -30,8 +34,7 @@ const LiveReadout = () => {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [counter, now === undefined]);
+  }, [counter, mounted]);
 
   const danger = now !== undefined && timeLeft <= 5;
 

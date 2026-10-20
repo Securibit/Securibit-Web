@@ -29,6 +29,7 @@ const TotpForm = (props: TotpFormProps) => {
       <Input
         label="名稱"
         placeholder="例如：Google - me@example.com"
+        variant="bordered"
         isRequired
         value={value.name}
         onValueChange={(name) => set({ name })}
@@ -39,6 +40,7 @@ const TotpForm = (props: TotpFormProps) => {
       <Autocomplete
         label="類別"
         placeholder="例如：工作、個人、遊戲"
+        variant="bordered"
         allowsCustomValue
         inputValue={value.category}
         onInputChange={(category) => set({ category })}
@@ -50,6 +52,7 @@ const TotpForm = (props: TotpFormProps) => {
       <Input
         label="金鑰（Secret）"
         placeholder="JBSWY3DPEHPK3PXP"
+        variant="bordered"
         isRequired
         type={showSecret ? "text" : "password"}
         autoComplete="off"
@@ -59,12 +62,13 @@ const TotpForm = (props: TotpFormProps) => {
         isInvalid={!!errors.secret}
         errorMessage={errors.secret}
         description="Base32 格式（A-Z、2-7），空白與小寫會自動轉換"
+        classNames={{ input: "font-mono tracking-[0.08em]" }}
         endContent={
           <button
             type="button"
             onClick={() => setShowSecret((prev) => !prev)}
             aria-label={showSecret ? "隱藏金鑰" : "顯示金鑰"}
-            className="text-gray-blue-400 hover:text-tpp"
+            className="text-ink-dim transition-colors hover:text-phos"
           >
             <FontAwesomeIcon icon={showSecret ? faEyeSlash : faEye} className="w-4" />
           </button>
@@ -74,18 +78,24 @@ const TotpForm = (props: TotpFormProps) => {
       <Accordion
         variant="bordered"
         defaultExpandedKeys={props.advancedOpen ? ["advanced"] : []}
+        className="border-line px-3"
       >
         <AccordionItem
           key="advanced"
           title="進階設定"
-          subtitle={`${digits} 位數 · ${period} 秒 · ${algorithm}`}
+          subtitle={`${digits} DIGITS · ${period} S · ${algorithm}`}
+          classNames={{
+            title: "font-display text-sm font-semibold tracking-[0.08em] text-ink",
+            subtitle: "font-mono text-[11px] tracking-[0.08em] text-ink-dim",
+          }}
         >
-          <p className="mb-3 text-sm text-gray-blue-500 dark:text-gray-blue-400">
+          <p className="mb-3 text-sm text-ink-muted">
             大多數服務使用預設值（6 位數、30 秒、SHA-1），除非服務另有說明否則不需更改。
           </p>
           <div className="grid gap-3 pb-2 sm:grid-cols-3">
             <Select
               label="位數"
+              variant="bordered"
               selectedKeys={[String(digits)]}
               disallowEmptySelection
               onChange={(e) => e.target.value && set({ digits: Number(e.target.value) })}
@@ -94,6 +104,7 @@ const TotpForm = (props: TotpFormProps) => {
             </Select>
             <Select
               label="週期"
+              variant="bordered"
               selectedKeys={[String(period)]}
               disallowEmptySelection
               onChange={(e) => e.target.value && set({ period: Number(e.target.value) })}
@@ -102,6 +113,7 @@ const TotpForm = (props: TotpFormProps) => {
             </Select>
             <Select
               label="演算法"
+              variant="bordered"
               selectedKeys={[algorithm]}
               disallowEmptySelection
               onChange={(e) => e.target.value && set({ algorithm: e.target.value as TotpAlgorithm })}

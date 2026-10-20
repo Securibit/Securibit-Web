@@ -47,11 +47,14 @@ const TotpEditModal = (props: TotpEditModalProps) => {
       onOpenChange={(open) => !open && props.onClose()}
       size="lg"
       scrollBehavior="inside"
-      className="dark:bg-gray-blue-800"
+      className="border border-line bg-surface-1 text-ink"
     >
       <ModalContent>
-        <ModalHeader className="text-black dark:text-white">編輯驗證碼</ModalHeader>
-        <ModalBody>
+        <ModalHeader className="flex flex-col gap-1 border-b border-line font-display tracking-wide">
+          <span className="tech-label">EDIT // CODE</span>
+          編輯驗證碼
+        </ModalHeader>
+        <ModalBody className="py-5">
           <form
             id="totp-edit-form"
             onSubmit={(e) => {
@@ -72,13 +75,13 @@ const TotpEditModal = (props: TotpEditModalProps) => {
             />
           </form>
           {secretChanged && (
-            <div className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-              <FontAwesomeIcon icon={faTriangleExclamation} className="mt-0.5 w-4" />
+            <div className="flex gap-3 border border-alarm/50 bg-alarm/10 p-3 text-sm text-ink">
+              <FontAwesomeIcon icon={faTriangleExclamation} className="mt-1 w-4 flex-shrink-0 text-alarm" />
               <p>更換金鑰後會產生完全不同的驗證碼，請確認新金鑰來自該服務重新綁定的設定。</p>
             </div>
           )}
         </ModalBody>
-        <ModalFooter>
+        <ModalFooter className="border-t border-line">
           <Button variant="bordered" onPress={props.onClose} isDisabled={saving}>
             取消
           </Button>

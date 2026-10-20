@@ -3,10 +3,9 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { Button, Checkbox, Input } from "@heroui/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLock } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import { showError } from "@/lib/errorDialog";
+import { cn } from "@/lib/utils";
 import { VaultUnlockProps } from "@/types/Vault/VaultUnlock";
 import useVault from "./useVault";
 
@@ -37,16 +36,20 @@ const VaultUnlock = (props: VaultUnlockProps) => {
   };
 
   return (
-    <div className={props.compact ? "" : "mx-auto max-w-md py-10"}>
+    <div className={cn(!props.compact && "boot mx-auto max-w-md py-10")}>
       {!props.compact && (
-        <div className="mb-6 text-center">
-          <FontAwesomeIcon icon={faLock} className="mb-3 w-8 h-8 text-tpp" />
-          <h1 className="text-xl font-bold text-gray-blue-900 dark:text-white">驗證碼已加密</h1>
-          <p className="mt-1 text-sm text-gray-blue-500 dark:text-gray-blue-400">輸入你設定的加密密碼來解鎖。</p>
+        <div className="mb-6">
+          <p className="tech-label flex items-center gap-2">
+            <span className={cn("led", error ? "led-alarm" : "led-off")} aria-hidden />
+            LOCKED // VAULT
+          </p>
+          <h1 className="mt-3 font-display text-2xl font-bold text-ink sm:text-3xl">驗證碼已加密</h1>
+          <p className="mt-2 text-sm text-ink-muted">輸入你設定的加密密碼來解鎖。</p>
+          <div className="rule-accent mt-4" />
         </div>
       )}
       <form
-        className="flex flex-col gap-3"
+        className={cn("flex flex-col gap-3", !props.compact && "panel p-5")}
         onSubmit={(e) => {
           e.preventDefault();
           handleUnlock();
@@ -55,6 +58,7 @@ const VaultUnlock = (props: VaultUnlockProps) => {
         <Input
           label="加密密碼"
           type="password"
+          variant="bordered"
           autoComplete="current-password"
           autoFocus={!props.compact}
           value={passphrase}
@@ -64,16 +68,17 @@ const VaultUnlock = (props: VaultUnlockProps) => {
           }}
           isInvalid={!!error}
           errorMessage={error}
+          classNames={{ input: "font-mono tracking-[0.08em]" }}
         />
-        <Checkbox size="sm" isSelected={remember} onValueChange={setRemember}>
+        <Checkbox size="sm" isSelected={remember} onValueChange={setRemember} classNames={{ label: "text-sm text-ink-muted" }}>
           在這台裝置記住（登出或按「立即鎖定」就會忘記）
         </Checkbox>
-        <Button type="submit" color="primary" isLoading={pending} isDisabled={!passphrase}>
+        <Button type="submit" color="primary" className="font-display tracking-[0.08em]" isLoading={pending} isDisabled={!passphrase}>
           {pending ? "解鎖中…" : "解鎖"}
         </Button>
         <button
           type="button"
-          className="text-sm text-gray-blue-500 underline underline-offset-4 hover:text-red-500"
+          className="self-start text-sm text-ink-muted underline underline-offset-4 transition-colors hover:text-alarm"
           onClick={() => setConfirmReset(true)}
         >
           忘記密碼？

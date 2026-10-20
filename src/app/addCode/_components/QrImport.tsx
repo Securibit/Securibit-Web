@@ -63,6 +63,7 @@ const QrImport = (props: QrImportProps) => {
 
   return (
     <div className="flex flex-col gap-3">
+      <p className="tech-label">OTPAUTH URI</p>
       <form
         className="flex gap-2"
         onSubmit={(e) => {
@@ -73,9 +74,11 @@ const QrImport = (props: QrImportProps) => {
         <Input
           aria-label="otpauth 連結"
           placeholder="貼上 otpauth://totp/... 連結"
+          variant="bordered"
           value={uri}
           onValueChange={setUri}
-          startContent={<FontAwesomeIcon icon={faLink} className="w-3.5 text-gray-blue-400" />}
+          classNames={{ input: "font-mono text-sm" }}
+          startContent={<FontAwesomeIcon icon={faLink} className="w-3.5 text-ink-dim" />}
           // 貼上完整連結時直接帶入，不用再按按鈕
           onPaste={(e) => {
             const text = e.clipboardData.getData("text");
@@ -85,14 +88,18 @@ const QrImport = (props: QrImportProps) => {
             }
           }}
         />
-        <Button type="submit" variant="flat" isDisabled={!uri.trim()}>
+        <Button type="submit" variant="bordered" color="primary" className="font-display tracking-[0.08em]" isDisabled={!uri.trim()}>
           帶入
         </Button>
       </form>
 
+      <div className="rule" />
+
+      <p className="tech-label">IMAGE / CAMERA</p>
       <div className="grid grid-cols-2 gap-2">
         <Button
           variant="bordered"
+          className="font-display tracking-[0.08em]"
           startContent={<FontAwesomeIcon icon={faImage} className="w-4" />}
           isLoading={decoding}
           onPress={() => fileRef.current?.click()}
@@ -101,6 +108,7 @@ const QrImport = (props: QrImportProps) => {
         </Button>
         <Button
           variant="bordered"
+          className="font-display tracking-[0.08em]"
           startContent={<FontAwesomeIcon icon={faCamera} className="w-4" />}
           onPress={() => setScanning(true)}
         >
