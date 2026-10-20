@@ -5,16 +5,16 @@
 
 /*
  * 配方：Apple 官網 / iOS 設定
- * 純白底（深色 #1C1C1E）、#F5F5F7 軟底、墨色 #1D1D1F、灰字、髮絲線，藍色 #0071E3 只給動作文字與主要按鈕。
+ * 純白底（深色 #1C1C1E）、#F5F5F7 軟底、墨色 #1D1D1F、灰字、髮絲線；幣友綠 #17FFAC 只給動作文字與主要按鈕。
  * 字：SF Pro（Apple 裝置上就是系統字）＋ 蘋方；拿不到時落到 Inter Tight ＋ Noto Sans TC。
  * 圓角 12 / 18 / 22，幾乎沒有陰影，留白當層次。
  * Tailwind 類別：
  *   bg-surface / bg-surface-1          底色 / 軟底（灰底輸入框、藥丸、群組標題列）
  *   text-ink / text-ink-muted          文字 / 灰字
  *   border-line                        髮絲線（通常加 /70 或 /60）
- *   text-accent / bg-accent            藍：動作文字、唯一的主要按鈕
+ *   text-accent / bg-brand             綠：動作文字（亮色加深）／主要按鈕底色
  *   text-alarm                         紅：只給危險操作
- *   .link-arrow                        藍字＋右箭頭的文字連結
+ *   .link-arrow                        綠字＋右箭頭的文字連結
  *   .readout                           驗證碼數字（等寬數字、細字重）
  */
 :root {
@@ -23,8 +23,10 @@
   --fg: #1D1D1F;
   --fg-muted: #6E6E73;
   --line: #D2D2D7;
-  --accent: #0071E3;
-  --accent-ink: #FFFFFF;
+  /* 幣友品牌色 #17FFAC：亮色底上當文字太淡，文字用加深的版本，按鈕底色用原色 */
+  --accent: #0B9F6B;
+  --accent-ink: #04261A;
+  --brand: #17FFAC;
   --alarm: #E30000;
 }
 
@@ -34,8 +36,9 @@
   --fg: #F5F5F7;
   --fg-muted: #A8A8AE;
   --line: #424246;
-  --accent: #2997FF;
-  --accent-ink: #FFFFFF;
+  --accent: #17FFAC;
+  --accent-ink: #04261A;
+  --brand: #17FFAC;
   --alarm: #FF453A;
 }
 
@@ -47,6 +50,7 @@
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
+  --color-brand: var(--brand);
   --color-alarm: var(--alarm);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang TC", var(--font-inter-tight), var(--font-noto-tc), "Helvetica Neue", sans-serif;

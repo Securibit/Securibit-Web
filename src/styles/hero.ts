@@ -4,7 +4,7 @@ import { heroui } from '@heroui/theme'
 
 /*
  * HeroUI 元件（按鈕、輸入框、Modal、表格…）的色票，跟 globals.css 的 Apple 配方一致：
- * primary = 系統藍 #0071E3；灰階用 Apple 的 #F5F5F7 / #D2D2D7 / #86868B / #1D1D1F；圓角 12 / 18 / 22。
+ * primary = 幣友綠 #17FFAC（按鈕上的字用深綠 #04261A）；灰階用 Apple 的 #F5F5F7 / #D2D2D7 / #86868B / #1D1D1F；圓角 12 / 18 / 22。
  */
 export default heroui({
   layout: {
@@ -23,7 +23,7 @@ export default heroui({
       colors: {
         background: '#FFFFFF',
         foreground: '#1D1D1F',
-        focus: '#0071E3',
+        focus: '#0B9F6B',
         divider: '#1D1D1F',
         content1: '#FFFFFF',
         content2: '#F5F5F7',
@@ -35,9 +35,9 @@ export default heroui({
           DEFAULT: '#E8E8ED', foreground: '#1D1D1F',
         },
         primary: {
-          50: '#E8F2FD', 100: '#C7E0FA', 200: '#94C4F5', 300: '#5EA6EF', 400: '#2E8BE9',
-          500: '#0071E3', 600: '#005BB8', 700: '#00468E', 800: '#003166', 900: '#001D40',
-          DEFAULT: '#0071E3', foreground: '#FFFFFF',
+          50: '#E6FFF6', 100: '#C2FFE9', 200: '#8FFFD6', 300: '#5CFFC3', 400: '#33FFB6',
+          500: '#17FFAC', 600: '#0BCF89', 700: '#0B9F6B', 800: '#08704C', 900: '#04402B',
+          DEFAULT: '#17FFAC', foreground: '#04261A',
         },
         success: {
           50: '#E9F9EE', 100: '#C8F0D5', 200: '#95E2AE', 300: '#62D389', 400: '#3DCB6E',
@@ -65,7 +65,7 @@ export default heroui({
       colors: {
         background: '#1C1C1E',
         foreground: '#F5F5F7',
-        focus: '#2997FF',
+        focus: '#17FFAC',
         divider: '#F5F5F7',
         content1: '#2A2A2D',
         content2: '#323235',
@@ -77,9 +77,9 @@ export default heroui({
           DEFAULT: '#3A3A3C', foreground: '#F5F5F7',
         },
         primary: {
-          50: '#001D40', 100: '#003166', 200: '#00468E', 300: '#005BB8', 400: '#0071E3',
-          500: '#2997FF', 600: '#5EB0FF', 700: '#94CAFF', 800: '#C7E3FF', 900: '#E8F2FF',
-          DEFAULT: '#2997FF', foreground: '#FFFFFF',
+          50: '#E6FFF6', 100: '#C2FFE9', 200: '#8FFFD6', 300: '#5CFFC3', 400: '#33FFB6',
+          500: '#17FFAC', 600: '#0BCF89', 700: '#0B9F6B', 800: '#08704C', 900: '#04402B',
+          DEFAULT: '#17FFAC', foreground: '#04261A',
         },
         success: {
           50: '#0B3016', 100: '#155527', 200: '#1F7B37', 300: '#2AA148', 400: '#30D158',

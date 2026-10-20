@@ -24,7 +24,7 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
     <html lang="zh-Hant" suppressHydrationWarning className={cn(interTight.variable, notoTc.variable)}>
       <body className="min-h-full font-sans">
         {/* 換頁時頂部的進度條 */}
-        <NextTopLoader color="#0071E3" height={2} showSpinner={false} shadow={false} />
+        <NextTopLoader color="#17FFAC" height={2} showSpinner={false} shadow={false} />
         <Providers>{children}</Providers>
       </body>
     </html>

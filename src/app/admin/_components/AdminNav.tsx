@@ -45,7 +45,7 @@ const AdminNav = () => {
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex items-center gap-3 rounded-[10px] px-3 py-1.5 text-[15px]",
-                  active ? "bg-accent text-accent-ink" : "text-ink hover:bg-surface-1"
+                  active ? "bg-brand text-accent-ink" : "text-ink hover:bg-surface-1"
                 )}
               >
                 <FontAwesomeIcon icon={section.icon} className={cn("w-4", !active && "text-ink-muted")} />
