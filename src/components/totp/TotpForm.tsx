@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Autocomplete, AutocompleteItem, Input, Select, SelectItem } from "@heroui/react";
+import { Input, Select, SelectItem } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronDown, faChevronUp, faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import {
@@ -12,6 +12,7 @@ import {
   TotpAlgorithm,
 } from "@/types/Totp/Totp";
 import { TotpFormProps } from "@/types/Totp/TotpForm";
+import CategoryInput from "./CategoryInput";
 
 // 新增頁與編輯對話框共用的 TOTP 欄位
 const TotpForm = (props: TotpFormProps) => {
@@ -40,19 +41,11 @@ const TotpForm = (props: TotpFormProps) => {
         errorMessage={errors.name}
       />
 
-      <Autocomplete
-        label="類別"
-        placeholder="例如：工作、個人、遊戲"
-        variant="flat"
-        labelPlacement="outside"
-        size="lg"
-        allowsCustomValue
-        inputValue={value.category}
-        onInputChange={(category) => set({ category })}
-        defaultItems={props.categories.map((category) => ({ key: category }))}
-      >
-        {(item) => <AutocompleteItem key={item.key}>{item.key}</AutocompleteItem>}
-      </Autocomplete>
+      <CategoryInput
+        value={value.category}
+        onChange={(category) => set({ category })}
+        suggestions={props.categories}
+      />
 
       <Input
         label="金鑰"

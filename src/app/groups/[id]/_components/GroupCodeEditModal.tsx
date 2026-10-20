@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import {
-  Autocomplete,
-  AutocompleteItem,
   Button,
   Input,
   Modal,
@@ -21,6 +19,7 @@ import { isValidSecret, normalizeSecret } from "@/lib/totp/crud";
 import { TotpErrors } from "@/lib/totp/validate";
 import { TOTP_ALGORITHMS, TOTP_DEFAULTS, TOTP_DIGITS, TOTP_PERIODS, TotpAlgorithm, TotpInput } from "@/types/Totp/Totp";
 import { GroupCodeEditModalProps } from "@/types/Group/GroupCodeEditModal";
+import CategoryInput from "@/components/totp/CategoryInput";
 
 /*
  * 編輯群組的一筆驗證碼。欄位同 TotpForm，但沒有「查看金鑰」時拿不到原本的金鑰：
@@ -118,19 +117,11 @@ const GroupCodeEditModal = (props: GroupCodeEditModalProps) => {
               errorMessage={errors.name}
             />
 
-            <Autocomplete
-              label="類別"
-              placeholder="例如：工作、個人、遊戲"
-              variant="flat"
-              labelPlacement="outside"
-              size="lg"
-              allowsCustomValue
-              inputValue={form.category}
-              onInputChange={(category) => set({ category })}
-              defaultItems={props.categories.map((category) => ({ key: category }))}
-            >
-              {(item) => <AutocompleteItem key={item.key}>{item.key}</AutocompleteItem>}
-            </Autocomplete>
+            <CategoryInput
+              value={form.category}
+              onChange={(category) => set({ category })}
+              suggestions={props.categories}
+            />
 
             <Input
               label="金鑰"

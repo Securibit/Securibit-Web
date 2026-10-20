@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import {
-  Autocomplete,
-  AutocompleteItem,
   Button,
   Input,
   Modal,
@@ -19,6 +17,8 @@ import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { isValidSecret, normalizeSecret } from "@/lib/totp/crud";
 import { TOTP_ALGORITHMS, TOTP_DIGITS, TOTP_PERIODS, TotpAlgorithm, TotpInput } from "@/types/Totp/Totp";
 import { AdminTotpEditModalProps } from "@/types/Admin/AdminTotpEditModal";
+import { normalizeCategories } from "@/lib/totp/categories";
+import CategoryInput from "@/components/totp/CategoryInput";
 
 /*
  * 管理員編輯使用者的一筆 2FA。
@@ -51,7 +51,7 @@ const AdminTotpEditModal = (props: AdminTotpEditModalProps) => {
 
     const patch: Partial<TotpInput> = {};
     if (name.trim() !== item.name) patch.name = name;
-    if (category.trim() !== item.category) patch.category = category;
+    if (normalizeCategories(category) !== normalizeCategories(item.category)) patch.category = category;
     if (secretChanged) patch.secret = secret;
     if (digits !== item.digits) patch.digits = digits;
     if (period !== item.period) patch.period = period;
@@ -95,19 +95,7 @@ const AdminTotpEditModal = (props: AdminTotpEditModalProps) => {
               errorMessage={errors.name}
             />
 
-            <Autocomplete
-              label="類別"
-              labelPlacement="outside"
-              variant="flat"
-              size="lg"
-              allowsCustomValue
-              inputValue={category}
-              onInputChange={setCategory}
-              defaultItems={props.categories.map((value) => ({ key: value }))}
-              popoverProps={{ classNames: { content: "bg-surface text-ink" } }}
-            >
-              {(option) => <AutocompleteItem key={option.key}>{option.key}</AutocompleteItem>}
-            </Autocomplete>
+            <CategoryInput value={category} onChange={setCategory} suggestions={props.categories} />
 
             {secretLocked ? (
               <Input

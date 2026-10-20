@@ -3,6 +3,7 @@ import { GroupAccount, GroupCodes, GroupDetail, GroupSummary } from '@/types/Gro
 import { AuditLog, Overwrite, OverwriteTargetType, RoleInput } from '@/types/Permission/Permission';
 import { TotpInput } from '@/types/Totp/Totp';
 import { normalizeSecret } from '@/lib/totp/crud';
+import { normalizeCategories } from '@/lib/totp/categories';
 
 // ---------- 群組 ----------
 
@@ -55,7 +56,7 @@ export const loadGroupAccounts = async (gid: string) => {
 const cleanItem = (input: TotpInput) => ({
   ...input,
   name: input.name.trim(),
-  category: input.category.trim(),
+  category: normalizeCategories(input.category),
   secret: normalizeSecret(input.secret),
 });
 
@@ -65,7 +66,7 @@ export const addGroupAccounts = (gid: string, inputs: TotpInput[]) =>
 export const updateGroupAccount = (accountId: string, patch: Partial<TotpInput>) => {
   const cleaned: Partial<TotpInput> = { ...patch };
   if (patch.name !== undefined) cleaned.name = patch.name.trim();
-  if (patch.category !== undefined) cleaned.category = patch.category.trim();
+  if (patch.category !== undefined) cleaned.category = normalizeCategories(patch.category);
   if (patch.secret !== undefined) cleaned.secret = normalizeSecret(patch.secret);
   return rpcVoid('group_account_update', { account_id: accountId, patch: cleaned });
 };

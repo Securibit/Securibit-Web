@@ -15,6 +15,7 @@ import { isValidSecret } from "@/lib/totp/crud";
 import { showError } from "@/lib/errorDialog";
 import { TOTP_DEFAULTS, TotpItem } from "@/types/Totp/Totp";
 import { GroupCodeCardProps } from "@/types/Group/GroupCodeCard";
+import { formatCategories } from "@/lib/totp/categories";
 
 // 每 4 位插一個空白方便閱讀（6 位數 → 123 456，8 位數 → 1234 5678），同 CodeCard
 const formatOtp = (otp: string) =>
@@ -149,7 +150,7 @@ const GroupCodeCard = (props: GroupCodeCardProps) => {
           )}
           <span className="truncate">{account.name}</span>
         </p>
-        {account.category && <p className="truncate text-[15px] text-ink-muted">{account.category}</p>}
+        {account.category && <p className="truncate text-[15px] text-ink-muted">{formatCategories(account.category)}</p>}
       </div>
 
       {/* 驗證碼：點一下複製 */}

@@ -2,6 +2,7 @@ import { supabase } from '@/config/supabase';
 import { TOTP_DEFAULTS, TotpInput, TotpItem } from '@/types/Totp/Totp';
 import { VaultInfo } from '@/types/Vault/Vault';
 import { decodeItems, encodeSecret } from '@/lib/vault/codec';
+import { normalizeCategories } from './categories';
 
 export type TotpResult =
   | { success: true; data: TotpItem[] }
@@ -24,7 +25,7 @@ export const isValidSecret = (secret: string) => isBase32(normalizeSecret(secret
 const cleanInput = (input: TotpInput): TotpInput => ({
   name: input.name.trim(),
   secret: normalizeSecret(input.secret),
-  category: input.category.trim(),
+  category: normalizeCategories(input.category),
   digits: input.digits ?? TOTP_DEFAULTS.digits,
   period: input.period ?? TOTP_DEFAULTS.period,
   algorithm: input.algorithm ?? TOTP_DEFAULTS.algorithm,
@@ -71,7 +72,7 @@ const cleanPatch = (patch: Partial<TotpInput>): Partial<TotpInput> => {
   const cleaned: Partial<TotpInput> = { ...patch };
   if (patch.name !== undefined) cleaned.name = patch.name.trim();
   if (patch.secret !== undefined) cleaned.secret = normalizeSecret(patch.secret);
-  if (patch.category !== undefined) cleaned.category = patch.category.trim();
+  if (patch.category !== undefined) cleaned.category = normalizeCategories(patch.category);
   return cleaned;
 };
 

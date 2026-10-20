@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Autocomplete, AutocompleteItem, Button, Checkbox, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
+import { Button, Checkbox, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
 import { normalizeSecret } from "@/lib/totp/crud";
 import { TOTP_DEFAULTS } from "@/types/Totp/Totp";
 import { BulkImportModalProps } from "@/types/AddCode/BulkImportModal";
+import { formatCategories, normalizeCategories } from "@/lib/totp/categories";
+import CategoryInput from "@/components/totp/CategoryInput";
 
-// 一次匯入多筆：列出解析到的驗證碼，可以取消勾選、統一指定類別
+// 一次匯入多筆：列出解析到的驗證碼，可以取消勾選、統一指定類別（可多個）
 const BulkImportModal = (props: BulkImportModalProps) => {
   const { items, errors, batch } = props.result;
 
@@ -31,7 +33,7 @@ const BulkImportModal = (props: BulkImportModalProps) => {
     setSaving(true);
     const inputs = items
       .filter((_, index) => selected[index])
-      .map((item) => ({ ...item, category: category.trim() || item.category }));
+      .map((item) => ({ ...item, category: normalizeCategories(category) || item.category }));
     const ok = await props.onConfirm(inputs);
     setSaving(false);
     if (ok) props.onClose();
@@ -40,7 +42,7 @@ const BulkImportModal = (props: BulkImportModalProps) => {
   const describe = (index: number) => {
     const item = items[index];
     const parts = [];
-    if (item.category) parts.push(item.category);
+    if (item.category) parts.push(formatCategories(item.category));
     if (item.digits !== TOTP_DEFAULTS.digits) parts.push(`${item.digits} 位數`);
     if (item.period !== TOTP_DEFAULTS.period) parts.push(`${item.period} 秒`);
     if (item.algorithm !== TOTP_DEFAULTS.algorithm) parts.push(item.algorithm);
@@ -85,19 +87,13 @@ const BulkImportModal = (props: BulkImportModalProps) => {
           </ul>
 
           <div>
-            <Autocomplete
-              label="類別"
+            <CategoryInput
+              value={category}
+              onChange={setCategory}
+              suggestions={props.categories}
               placeholder="套用到勾選的全部，可留空"
-              variant="flat"
-              labelPlacement="outside"
-              size="lg"
-              allowsCustomValue
-              inputValue={category}
-              onInputChange={setCategory}
-              defaultItems={props.categories.map((name) => ({ key: name }))}
-            >
-              {(option) => <AutocompleteItem key={option.key}>{option.key}</AutocompleteItem>}
-            </Autocomplete>
+              description="可選多個，會取代各筆原本的類別"
+            />
           </div>
 
           {errors.length > 0 && (

@@ -14,6 +14,7 @@ import { TOTP_DEFAULTS } from "@/types/Totp/Totp";
 import { CodeCardProps } from "@/types/Code/CodeCard";
 import ExportItemModal from "./ExportItemModal";
 import { showError } from "@/lib/errorDialog";
+import { formatCategories } from '@/lib/totp/categories';
 
 // 每 4 位插一個空白方便閱讀（6 位數 → 123 456，8 位數 → 1234 5678）
 const formatOtp = (otp: string) =>
@@ -98,7 +99,7 @@ const CodeCard = (props: CodeCardProps) => {
           {item.pinned && <FontAwesomeIcon icon={faThumbtack} className="w-3 shrink-0 text-ink-muted" aria-label="已釘選" />}
           <span className="truncate">{item.name}</span>
         </p>
-        {item.category && <p className="truncate text-[15px] text-ink-muted">{item.category}</p>}
+        {item.category && <p className="truncate text-[15px] text-ink-muted">{formatCategories(item.category)}</p>}
       </div>
 
       {/* 驗證碼：點一下複製 */}

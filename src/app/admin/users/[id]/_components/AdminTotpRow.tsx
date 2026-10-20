@@ -13,6 +13,7 @@ import { showError } from "@/lib/errorDialog";
 import { cn } from "@/lib/utils";
 import { TotpItem } from "@/types/Totp/Totp";
 import { AdminTotpRowProps } from "@/types/Admin/AdminTotpRow";
+import { formatCategories } from "@/lib/totp/categories";
 
 // 每 3 / 4 位插一個空白（同 CodeCard）
 const formatOtp = (otp: string) =>
@@ -92,7 +93,7 @@ const AdminTotpRow = (props: AdminTotpRowProps) => {
             {item.pinned && <FontAwesomeIcon icon={faThumbtack} className="w-3 shrink-0 text-ink-muted" aria-label="已釘選" />}
             <span className="truncate">{item.name || "（未命名）"}</span>
           </p>
-          {item.category && <p className="truncate text-[15px] text-ink-muted">{item.category}</p>}
+          {item.category && <p className="truncate text-[15px] text-ink-muted">{formatCategories(item.category)}</p>}
         </div>
 
         {/* 驗證碼：點一下複製 */}

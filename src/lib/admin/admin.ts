@@ -3,6 +3,7 @@ import { AdminGroup, AdminTotpItem, AdminUserDetail, AdminUserPage } from '@/typ
 import { AuditLog, Role, RoleInput } from '@/types/Permission/Permission';
 import { TotpInput } from '@/types/Totp/Totp';
 import { normalizeSecret } from '@/lib/totp/crud';
+import { normalizeCategories } from '@/lib/totp/categories';
 
 // ---------- 使用者 ----------
 
@@ -27,7 +28,7 @@ export const loadAdminUserTotp = async (userId: string) => {
 export const updateAdminUserTotp = (userId: string, itemId: string, patch: Partial<TotpInput>) => {
   const cleaned: Partial<TotpInput> = { ...patch };
   if (patch.name !== undefined) cleaned.name = patch.name.trim();
-  if (patch.category !== undefined) cleaned.category = patch.category.trim();
+  if (patch.category !== undefined) cleaned.category = normalizeCategories(patch.category);
   if (patch.secret !== undefined) cleaned.secret = normalizeSecret(patch.secret);
   return rpcVoid('admin_update_user_totp', { user_id: userId, item_id: itemId, patch: cleaned });
 };

@@ -28,6 +28,7 @@ import { TotpInput, TotpItem } from "@/types/Totp/Totp";
 import GroupCodeCard from "./GroupCodeCard";
 import GroupCodeEditModal from "./GroupCodeEditModal";
 import AddGroupCodeModal from "./AddGroupCodeModal";
+import { collectCategories, hasCategory, parseCategories } from "@/lib/totp/categories";
 
 // 「隱藏驗證碼」偏好和個人驗證碼頁共用
 const HIDE_KEY = "securibit:hideCodes";
@@ -185,11 +186,8 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
     };
   }, [gid, serverIds, serverNonce]);
 
-  // 既有類別（去重、排序），給篩選與表單建議用
-  const categories = useMemo(
-    () => Array.from(new Set((accounts ?? []).map((account) => account.category).filter(Boolean))).sort(),
-    [accounts]
-  );
+  // 所有驗證碼類別的聯集（排序），給篩選與表單建議用
+  const categories = useMemo(() => collectCategories(accounts ?? []), [accounts]);
   const activeCategory = category && categories.includes(category) ? category : undefined;
 
   // 釘選的排最上面，其餘維持儲存的順序
@@ -203,8 +201,8 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
     const q = keyword.trim().toLowerCase();
     return ordered.filter(
       (account) =>
-        (!activeCategory || account.category === activeCategory) &&
-        (!q || account.name.toLowerCase().includes(q) || account.category.toLowerCase().includes(q))
+        (!activeCategory || hasCategory(account.category, activeCategory)) &&
+        (!q || account.name.toLowerCase().includes(q) || parseCategories(account.category).some((name) => name.toLowerCase().includes(q)))
     );
   }, [ordered, sorting, keyword, activeCategory]);
 

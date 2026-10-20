@@ -10,6 +10,7 @@ import { TotpInput } from "@/types/Totp/Totp";
 import { UserTotpListProps } from "@/types/Admin/UserTotpList";
 import AdminTotpRow from "./AdminTotpRow";
 import AdminTotpEditModal from "./AdminTotpEditModal";
+import { collectCategories, normalizeCategories } from "@/lib/totp/categories";
 
 // 使用者的 2FA：按「顯示」才載入（每次載入都會寫一筆操作紀錄）
 const UserTotpList = (props: UserTotpListProps) => {
@@ -18,10 +19,8 @@ const UserTotpList = (props: UserTotpListProps) => {
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<AdminTotpItem>();
 
-  const categories = useMemo(
-    () => [...new Set((items ?? []).map((item) => item.category).filter(Boolean))].sort(),
-    [items]
-  );
+  // 所有驗證碼類別的聯集，給編輯表單當建議
+  const categories = useMemo(() => collectCategories(items ?? []), [items]);
 
   const reveal = async () => {
     setLoading(true);
@@ -45,7 +44,7 @@ const UserTotpList = (props: UserTotpListProps) => {
               ...current,
               ...patch,
               name: patch.name?.trim() ?? current.name,
-              category: patch.category?.trim() ?? current.category,
+              category: patch.category !== undefined ? normalizeCategories(patch.category) : current.category,
               secret: patch.secret !== undefined ? normalizeSecret(patch.secret) : current.secret,
             }
           : current

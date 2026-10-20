@@ -1,5 +1,6 @@
 import { TOTP_ALGORITHMS, TOTP_DEFAULTS, TOTP_DIGITS, TOTP_PERIODS, TotpAlgorithm, TotpInput, TotpItem } from '@/types/Totp/Totp';
 import { isValidSecret, normalizeSecret } from './crud';
+import { normalizeCategories } from './categories';
 
 export type OtpauthResult =
   | { success: true; data: TotpInput }
@@ -68,8 +69,8 @@ export const parseOtpauthUri = (text: string): OtpauthResult => {
 
   const label = decodeURIComponent(url.pathname.replace(/^\//, '')).trim();
   const name = composeName(label, params.get('issuer') ?? '');
-  // category 不是標準參數，是本站匯出備份時加上的，其他 App 會忽略
-  const category = params.get('category')?.trim() ?? '';
+  // category 不是標準參數，是本站匯出備份時加上的（多個類別用「,」串起來），其他 App 會忽略
+  const category = normalizeCategories(params.get('category'));
 
   return {
     success: true,

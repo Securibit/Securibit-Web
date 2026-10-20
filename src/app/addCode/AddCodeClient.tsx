@@ -24,6 +24,7 @@ import { TOTP_DEFAULTS, TotpInput, TotpItem } from "@/types/Totp/Totp";
 import QrImport from "./_components/QrImport";
 import BulkImportModal from "./_components/BulkImportModal";
 import { showError } from "@/lib/errorDialog";
+import { collectCategories } from '@/lib/totp/categories';
 
 const EMPTY_FORM: TotpInput = { name: '', secret: '', category: '', ...TOTP_DEFAULTS };
 
@@ -70,10 +71,8 @@ const AddCodeClient = () => {
   const targetGroup = groups.find((group) => group.id === scope);
   const target = targetGroup ? scope : '';
 
-  const categories = useMemo(
-    () => [...new Set(items.map((item) => item.category).filter(Boolean))].sort(),
-    [items]
-  );
+  // 所有驗證碼類別的聯集，給類別欄位當建議
+  const categories = useMemo(() => collectCategories(items), [items]);
 
   const handleImport = (input: TotpInput) => {
     // 保留使用者已選的類別

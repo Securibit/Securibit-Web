@@ -28,6 +28,7 @@ import { TotpResult, clearTotp, deleteTotp, isValidSecret, loadTotp, reorderTotp
 import { GroupDetail, GroupSummary } from '@/types/Group/Group';
 import { TotpInput, TotpItem } from '@/types/Totp/Totp';
 import { showError } from "@/lib/errorDialog";
+import { collectCategories, hasCategory, parseCategories } from '@/lib/totp/categories';
 
 // 「隱藏驗證碼」偏好記在這個瀏覽器（私密視窗等讀寫失敗時就當沒設定）
 const HIDE_KEY = 'securibit:hideCodes';
@@ -82,11 +83,8 @@ const CodeClient = () => {
     }
   };
 
-  // 既有類別（去重、排序），給編輯表單當建議選項
-  const categories = useMemo(
-    () => [...new Set((items ?? []).map((item) => item.category).filter(Boolean))].sort(),
-    [items]
-  );
+  // 所有驗證碼類別的聯集（排序），給篩選與編輯表單當建議選項
+  const categories = useMemo(() => collectCategories(items ?? []), [items]);
 
   // 篩選中的類別被刪光或改名時，自動回到全部
   const activeCategory = category && categories.includes(category) ? category : undefined;
@@ -103,13 +101,13 @@ const CodeClient = () => {
     [items]
   );
 
-  // 名稱或類別包含關鍵字（不分大小寫），再依類別篩選
+  // 名稱或任一類別包含關鍵字（不分大小寫），再篩出含有所選類別的
   const filtered = useMemo(() => {
     if (sorting) return ordered;
     const q = keyword.trim().toLowerCase();
     return ordered.filter((item) =>
-      (!activeCategory || item.category === activeCategory) &&
-      (!q || item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q))
+      (!activeCategory || hasCategory(item.category, activeCategory)) &&
+      (!q || item.name.toLowerCase().includes(q) || parseCategories(item.category).some((name) => name.toLowerCase().includes(q)))
     );
   }, [ordered, sorting, keyword, activeCategory]);
 
