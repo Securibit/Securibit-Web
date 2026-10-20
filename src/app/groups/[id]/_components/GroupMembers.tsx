@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/react";
@@ -8,6 +9,7 @@ import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import { faEllipsis, faRightLeft, faTags, faUserMinus } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import UserChip from "@/components/permissions/UserChip";
+import { userPageHref } from "@/lib/users/users";
 import RoleChip from "@/components/permissions/RoleChip";
 import RoleAssignModal from "@/components/permissions/RoleAssignModal";
 import useAuth from "@/components/auth/useAuth";
@@ -87,7 +89,10 @@ const GroupMembers = ({ detail, actor, onChanged }: GroupMembersProps) => {
 
           return (
             <li key={member.id} className="flex items-center gap-3 px-5 py-3">
-              <UserChip user={member} className="min-w-0 flex-1" />
+              {/* 點頭像或名字到對方的個人頁面（自己的會導回個人頁面） */}
+              <Link href={userPageHref(member.id, member.username)} className="min-w-0 flex-1 rounded-[10px] transition-opacity hover:opacity-70">
+                <UserChip user={member} />
+              </Link>
 
               {/* 身分 */}
               <div className="flex min-w-0 shrink flex-wrap items-center justify-end gap-1.5">
