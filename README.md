@@ -54,7 +54,10 @@ pnpm build && pnpm start
 > Firebase → Supabase 的資料搬移步驟另見 [`MIGRATION.md`](./MIGRATION.md)。
 
 ## 開發者
+由幣友 BITYO 與靈魂之神工作室共同開發。
+
 - 夏特稀 — <https://github.com/mmm25002500>
+- 糖豆魚 — <https://github.com/PTDTW>
 
 ## 貢獻
 有問題就開 issue。要改東西的話 fork 出去開分支發 PR，commit 訊息寫清楚、確認 `pnpm build` 過得了再丟。
@@ -62,6 +65,6 @@ pnpm build && pnpm start
 
 ## 授權
 採用 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/deed.zh-Hant)，完整條款見 [`LICENSE`](./LICENSE)。
-可自由使用、改作、學習，但**不能商用**，且**要標明來源**（TershiXia / bityo）。
+可自由使用、改作、學習，但**不能商用**，且**要標明來源**（TershiXia／幣友 BITYO／靈魂之神工作室）。
 
-© 2026 TershiXia · bityo
+© 2026 TershiXia · 幣友 BITYO 🤝 靈魂之神工作室

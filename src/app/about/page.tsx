@@ -40,7 +40,7 @@ const About = () => {
           網頁版的兩步驟驗證器
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-[19px] text-ink-muted sm:text-[21px]">
-          Securibit 由 Bityo 團隊打造，使用與 Google Authenticator 相同的 TOTP 演算法（RFC 6238），
+          Securibit 由幣友 BITYO 與靈魂之神工作室打造，使用與 Google Authenticator 相同的 TOTP 演算法（RFC 6238），
           可以取代手機上的驗證器 App，產生各大網站登入時需要的 6 或 8 位數驗證碼。
         </p>
       </section>

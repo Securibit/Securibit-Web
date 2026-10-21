@@ -35,7 +35,7 @@ const VaultShot = () => (
 
 const GroupShot = () => (
   <div className="mx-auto max-w-xl overflow-hidden rounded-[18px] border border-line/70 bg-surface text-left">
-    <div className="border-b border-line/60 px-5 py-3 text-[17px] font-semibold">Bityo 公司帳號 · 3 位成員</div>
+    <div className="border-b border-line/60 px-5 py-3 text-[17px] font-semibold">幣友 BITYO 團隊帳號 · 3 位成員</div>
     {[
       ['Andy', '擁有者', '看得到金鑰'],
       ['小安', '工程師', '只看驗證碼'],
