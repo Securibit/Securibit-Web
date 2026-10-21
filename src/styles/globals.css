@@ -1,81 +1,126 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../../tailwind.config.ts";
+@plugin "./hero.ts";
+@source "../../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}";
 
-/* 在 globals.css 或相應的 CSS 模塊文件中 */
-.justify-text {
-  text-align: justify;
-  text-align-last: center;
-  /* 這會使最後一行文字置中 */
+/*
+ * 配方：Apple 官網 / iOS 設定
+ * 純白底（深色 #1C1C1E）、#F5F5F7 軟底、墨色 #1D1D1F、灰字、髮絲線；幣友綠 #17FFAC 只給動作文字與主要按鈕。
+ * 字：SF Pro（Apple 裝置上就是系統字）＋ 蘋方；拿不到時落到 Inter Tight ＋ Noto Sans TC。
+ * 圓角 12 / 18 / 22，幾乎沒有陰影，留白當層次。
+ * Tailwind 類別：
+ *   bg-surface / bg-surface-1          底色 / 軟底（灰底輸入框、藥丸、群組標題列）
+ *   text-ink / text-ink-muted          文字 / 灰字
+ *   border-line                        髮絲線（通常加 /70 或 /60）
+ *   text-accent / bg-brand             綠：動作文字（亮色加深）／主要按鈕底色
+ *   text-alarm                         紅：只給危險操作
+ *   .link-arrow                        綠字＋右箭頭的文字連結
+ *   .readout                           驗證碼數字（等寬數字、細字重）
+ */
+:root {
+  --bg: #FFFFFF;
+  --bg-1: #F5F5F7;
+  --fg: #1D1D1F;
+  --fg-muted: #6E6E73;
+  --line: #D2D2D7;
+  /* 幣友品牌色 #17FFAC：亮色底上當文字太淡，文字用加深的版本，按鈕底色用原色 */
+  --accent: #0B9F6B;
+  --accent-ink: #04261A;
+  --brand: #17FFAC;
+  --alarm: #E30000;
 }
 
-/* 或者使用 Tailwind 的 @layer 指令來擴展你的工具類 */
-@layer utilities {
-  .justify-text {
-    @apply text-justify;
-    text-align-last: center;
-  }
+.dark {
+  --bg: #1C1C1E;
+  --bg-1: #2A2A2D;
+  --fg: #F5F5F7;
+  --fg-muted: #A8A8AE;
+  --line: #424246;
+  --accent: #17FFAC;
+  --accent-ink: #04261A;
+  --brand: #17FFAC;
+  --alarm: #FF453A;
+}
+
+@theme inline {
+  --color-surface: var(--bg);
+  --color-surface-1: var(--bg-1);
+  --color-ink: var(--fg);
+  --color-ink-muted: var(--fg-muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-brand: var(--brand);
+  --color-alarm: var(--alarm);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang TC", var(--font-inter-tight), var(--font-noto-tc), "Helvetica Neue", sans-serif;
 }
 
 @layer base {
-  .text-edge-outline {
-    -webkit-text-stroke: 1px rgba(255, 255, 255, 0.3);
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    color: var(--fg);
+    background-color: var(--bg);
+    font-size: 17px;
+    line-height: 1.47;
+    -webkit-font-smoothing: antialiased;
+    text-wrap: pretty;
+  }
+  /* 深色底上 antialiased 會把字變細，改回預設的次像素渲染 */
+  html.dark body {
+    -webkit-font-smoothing: auto;
+  }
+
+  /* 切換亮暗模式時顏色淡入淡出 */
+  @media (prefers-reduced-motion: no-preference) {
+    body,
+    body * {
+      transition-property: background-color, border-color, color, fill, stroke;
+      transition-duration: 0.3s;
+      transition-timing-function: ease;
+    }
+  }
+
+  h1, h2, h3, h4 {
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.1;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 25%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 }
 
-.swiper-pagination-bullet {
-  width: 16px;
-  /* 長方形的寬度 */
-  height: 4px;
-  /* 長方形的高度 */
-  border-radius: 0;
-  /* 無圓角 */
-  margin-right: 4px;
-  /* 指示器之間的間距 */
-  opacity: 1;
-  /* 完全不透明 */
-  background: #28C8C8;
-  /* 指示器的顏色 */
-}
-
-.swiper-pagination-bullet-active {
-  width: 40px;
-  /* 活動指示器的寬度 */
-}
-
-/* Swiper 自定義 */
-
-/* sm以上 右下 */
-.swiper-pagination {
-  bottom: 30px !important;
-  left: auto !important;
-  right: auto !important;
-  text-align: center !important;
-}
-
-/* sm以下 中下 */
-@media (max-width: 640px) {
-  .swiper-pagination {
-    text-align: center !important;
-    right: 0 !important;
-    left: 0 !important;
+@layer components {
+  /* Apple 式的文字連結：藍字 + 右箭頭 */
+  .link-arrow {
+    color: var(--accent);
+    font-weight: 400;
   }
-}
+  .link-arrow::after {
+    content: " ›";
+    font-weight: 500;
+  }
+  .link-arrow:hover {
+    text-decoration: underline;
+  }
 
-/* inactive */
-.swiper-pagination-bullet.custom-bullet {
-  width: 8px;
-  height: 8px;
-  background-color: rgb(255, 255, 255);
-  border-radius: 50%;
-  margin: 0 5px;
-  transition: background-color 0.3s ease;
-}
-
-/* active */
-.swiper-pagination-bullet-active.custom-bullet-active {
-  width: 8px;
-  height: 8px;
-  background-color: rgb(255, 255, 255);
-  border-radius: 5px;
+  /* 驗證碼：SF 的等寬數字，細字重 */
+  .readout {
+    font-variant-numeric: tabular-nums;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+  }
 }

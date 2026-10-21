@@ -1,25 +1,14 @@
 import { CardProps } from "@/types/HomePage/Card";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
+// 一區一個想法：小字主題、大標題、一段說明、（可選）一個畫面
 const HomePageCard = (props: CardProps) => {
   return (
-    <div className="card w-96 shadow-xl text-black dark:text-white bg-white dark:bg-gray-blue-700 justify-self-center">
-      <figure className="px-10 pt-10">
-        <FontAwesomeIcon icon={props.icon} className="rounded-xl w-1/4 pr-1" />
-        {/* <img src="/images/stock/photo-1606107557195-0e29a4b5b4aa.jpg" alt="No Img" className="rounded-xl" /> */}
-      </figure>
-      <div className="card-body items-center text-center">
-        <h2 className="card-title">{ props.title }</h2>
-        <p>{props.description}</p>
-        {
-          props.buttonLink || props.buttonText ? (
-            <div className="card-actions">
-              <button className="btn btn-primary">{ props.buttonText }</button>
-            </div>
-          ) : ''
-          }
-      </div>
-    </div>
+    <section className="border-t border-line/70 px-5 py-20 text-center sm:py-28">
+      <p className="text-[15px] font-semibold text-ink-muted">{props.eyebrow}</p>
+      <h2 className="mx-auto mt-2 max-w-3xl text-[36px] font-semibold tracking-tight sm:text-[48px]">{props.title}</h2>
+      <p className="mx-auto mt-5 max-w-xl text-[19px] text-ink-muted sm:text-[21px]">{props.description}</p>
+      {props.children && <div className="mt-12">{props.children}</div>}
+    </section>
   )
 }
 

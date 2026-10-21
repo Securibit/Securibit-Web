@@ -1,180 +1,121 @@
-import React, { useEffect, useState } from "react";
+"use client";
+
+import { Drawer, DrawerBody, DrawerContent, DrawerFooter, DrawerHeader } from "@heroui/react";
+import { usePathname } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import {
-  Typography,
-  List,
-  ListItem,
-  ListItemPrefix,
-  ListItemSuffix,
-  Chip,
-  Drawer,
-  Card,
-} from "@material-tailwind/react";
+  ArrowLeftEndOnRectangleIcon,
+  ArrowRightStartOnRectangleIcon,
+  DocumentTextIcon,
+  HomeIcon,
+  InformationCircleIcon,
+  KeyIcon,
+  PlusCircleIcon,
+  ShieldCheckIcon,
+  UserCircleIcon,
+  UserGroupIcon,
+} from "@heroicons/react/24/outline";
+import { cn } from "@/lib/utils";
+import { SITE } from "@/lib/permissions/bits";
 import { SidebarListItemProps, SidebarProps } from "@/types/Sidebar/Sidebar";
-// import BityoIcon from "@/images/icon/bityo.png";
-import { useRouter } from 'next/navigation'; import {
-  CurrencyDollarIcon,
-} from "@heroicons/react/24/solid";
+import useAuth from "../auth/useAuth";
+import Themes from "../Themes";
+import RoleChip from "../permissions/RoleChip";
 
 const SidebarListItem = (props: SidebarListItemProps) => {
   const router = useRouter();
 
   return (
-    <ListItem
-      disabled={props.disabled}
-      nonce={undefined}
-      onResize={undefined}
-      onResizeCapture={undefined}
+    <button
       onClick={() => {
-        props.onClick && props.onClick();
-        router.push(props.link);
+        props.onClick?.();
+        if (props.link) router.push(props.link);
       }}
-      placeholder={undefined}
-      onPointerEnterCapture={undefined}
-      onPointerLeaveCapture={undefined}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-left text-[17px] transition-colors",
+        props.active ? "bg-surface-1 text-ink" : "text-ink hover:bg-surface-1"
+      )}
     >
-      <ListItemPrefix
-        nonce={undefined}
-        onResize={undefined}
-        onResizeCapture={undefined}
-        placeholder={undefined}
-        onPointerEnterCapture={undefined}
-        onPointerLeaveCapture={undefined}
-      >
-        <props.icon className="h-5 w-5" />
-      </ListItemPrefix>
-      {props.text}
-      {
-        props.chip && (
-          <ListItemSuffix
-            nonce={undefined}
-            onResize={undefined}
-            onResizeCapture={undefined}
-            placeholder={undefined}
-            onPointerEnterCapture={undefined}
-            onPointerLeaveCapture={undefined}
-          >
-            <Chip
-              value={props.chip.value}
-              size={props.chip.size}
-              variant="ghost"
-              color={props.chip.color}
-              className="rounded-full"
-            />
-          </ListItemSuffix>
-        )
-      }
-    </ListItem>
-  )
-}
+      <props.icon className="h-5 w-5" />
+      <span className="flex-1">{props.text}</span>
+    </button>
+  );
+};
 
+// 手機版側欄：依登入狀態顯示可用項目
 const Sidebar = (props: SidebarProps) => {
-  const [open, setOpen] = React.useState(0);
-  const [openAlert, setOpenAlert] = useState(true);
-  const [isDrawerOpen, setIsDrawerOpen] = React.useState(props.isDrawerOpen);
-  const router = useRouter();
+  const pathname = usePathname();
+  const { user, profile, siteRoles, can, login, logout } = useAuth();
 
-  useEffect(() => {
-    setIsDrawerOpen(props.isDrawerOpen);
-  }, [props.isDrawerOpen]);
+  const closeDrawer = () => props.setIsDrawerOpen(false);
 
-  const handleOpen = (value: number) => {
-    setOpen(open === value ? 0 : value);
-  };
+  // 前綴比對：/groups/xxx 也算在「群組」；首頁只在完全相等時亮
+  const isActive = (link: string) =>
+    link === "/" ? pathname === "/" : pathname === link || pathname.startsWith(`${link}/`);
 
-  const openDrawer = () => setIsDrawerOpen(true);
-  const closeDrawer = () => {
-    setIsDrawerOpen(false)
-    props.setIsDrawerOpen(false);
-  };
+  const links = [
+    { icon: HomeIcon, text: "首頁", link: "/" },
+    ...(user
+      ? [
+          { icon: KeyIcon, text: "驗證碼", link: "/code" },
+          { icon: PlusCircleIcon, text: "新增驗證碼", link: "/addCode" },
+          { icon: UserGroupIcon, text: "群組", link: "/groups" },
+          ...(can(SITE.VIEW_ADMIN) ? [{ icon: ShieldCheckIcon, text: "後台", link: "/admin" }] : []),
+          { icon: UserCircleIcon, text: "個人頁面", link: "/me/MyPage" },
+        ]
+      : []),
+    { icon: InformationCircleIcon, text: "關於我們", link: "/about" },
+    { icon: DocumentTextIcon, text: "免責聲明", link: "/disclaimer" },
+  ];
 
   return (
-    <>
-      <Drawer open={isDrawerOpen}
-        onClose={closeDrawer}
-        nonce={undefined}
-        onResize={undefined}
-        onResizeCapture={undefined}
-        placement="right"
-        className="text-white dark:bg-blue-gray-900"
-        transition={{ type: "spring", duration: 0.8 }}
-        overlayProps={{
-          className: "fixed",
-          onClick: closeDrawer
-        }} placeholder={undefined} onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined}      >
-        <Card
-          color="transparent"
-          shadow={false}
-          className="h-full w-full p-4 overflow-y-auto" nonce={undefined} onResize={undefined} onResizeCapture={undefined} placeholder={undefined} onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined}>
-          <button
-            className="mb-2 flex items-center gap-4 p-4"
-            onClick={() => {
-              router.push('/');
-              closeDrawer();
-            }}
-          >
-            {/* <Image
-              src={BityoIcon}
-              alt="Bityo"
-              className="h-8 w-8"
-            /> */}
-            <Typography variant="h5" className="text-black dark:text-white" nonce={undefined} onResize={undefined} onResizeCapture={undefined} placeholder={undefined} onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined}>
-              Bityo
-            </Typography>
-          </button>
-          <List nonce={undefined} onResize={undefined} onResizeCapture={undefined} className="dark:text-blue-gray-100" placeholder={undefined} onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined}>
-            {/* <SidebarListItem
-              key={index}
-              icon={item.icon}
-              text={item.text}
-              link={item.link}
-              disabled={item.disabled}
-              onClick={() => {
-                item.onClick && item.onClick();
-                closeDrawer();
-              }}
-              chip={item.chip}
-            /> */}
-
+    <Drawer
+      isOpen={props.isDrawerOpen}
+      onOpenChange={(open) => props.setIsDrawerOpen(open)}
+      placement="right"
+      size="xs"
+      className="bg-surface text-ink"
+    >
+      <DrawerContent>
+        <DrawerHeader className="flex flex-col gap-0.5">
+          <span className="text-[17px] font-semibold">Securibit</span>
+          {user && (
+            <span className="flex items-center gap-2 text-[15px] font-normal text-ink-muted">
+              {siteRoles[0] && <RoleChip role={siteRoles[0]} />}
+              {profile?.name || user.displayName}
+            </span>
+          )}
+        </DrawerHeader>
+        <DrawerBody className="gap-0.5 px-3">
+          {links.map((item) => (
+            <SidebarListItem key={item.link} {...item} active={isActive(item.link)} onClick={closeDrawer} />
+          ))}
+        </DrawerBody>
+        <DrawerFooter className="flex flex-col items-stretch gap-1 border-t border-line px-3">
+          <Themes showLabel />
+          {user ? (
             <SidebarListItem
-              icon={CurrencyDollarIcon}
-              key={1}
-              text={'驗證碼'}
-              link={'/code'}
-              disabled={false}
+              icon={ArrowRightStartOnRectangleIcon}
+              text="登出"
               onClick={() => {
-                router.push('/code');
                 closeDrawer();
+                logout();
               }}
             />
-
+          ) : (
             <SidebarListItem
-              icon={CurrencyDollarIcon}
-              key={1}
-              text={'新增驗證碼'}
-              link={'/addCode'}
-              disabled={false}
+              icon={ArrowLeftEndOnRectangleIcon}
+              text="使用 Google 登入"
               onClick={() => {
-                router.push('/addCode');
                 closeDrawer();
+                login();
               }}
             />
-
-            <SidebarListItem
-              icon={CurrencyDollarIcon}
-              key={1}
-              text={'我的頁面'}
-              link={'/me/MyPage'}
-              disabled={false}
-              onClick={() => {
-                router.push('/me/MyPage');
-                closeDrawer();
-              }}
-            />
-          </List>
-        </Card>
-      </Drawer>
-    </>
+          )}
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
   );
-}
+};
 
 export default Sidebar;

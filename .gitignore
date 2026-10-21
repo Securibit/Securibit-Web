@@ -28,9 +28,16 @@ yarn-error.log*
 .env
 .env*.local
 
+# Supabase 遷移用的敏感檔案，勿 commit
+serviceAccount.json
+legacy-users.json
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# vim 暫存檔
+*.swp

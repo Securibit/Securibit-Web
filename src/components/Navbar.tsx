@@ -1,187 +1,83 @@
-/* eslint-disable @next/next/no-img-element */
-/* eslint-disable @next/next/no-html-link-for-pages */
+"use client";
 
-import { faKey, faPlus, faRightFromBracket } from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import Themes from "./Themes";
-import { useEffect, useState } from "react";
-import { User } from "firebase/auth";
-import { useRouter } from 'next/navigation';
-import { toast } from 'react-hot-toast';
+import { useState } from "react";
 import Image from "next/image";
-import { IconButton } from "@material-tailwind/react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Button } from "@heroui/react";
+import { Bars3Icon } from "@heroicons/react/24/outline";
+import { cn } from "@/lib/utils";
+import { SITE } from "@/lib/permissions/bits";
+import Themes from "./Themes";
 import Sidebar from "./Sidebar/Sidebar";
-import { UserData } from '@/types/userData';
-import { Bars3Icon } from '@heroicons/react/24/solid';
-import { checkAuth, handleGoogleLogin, logout } from "@/lib/totp/account";
+import useAuth from "./auth/useAuth";
+import UserMenu from "./UserMenu";
+import NotificationBell from "./NotificationBell";
 
-// 整個 Navbar
+// 登入後才出現的主選單；perm 有值的還要有對應權限
+const NAV_ITEMS = [
+  { href: '/code', label: '驗證碼' },
+  { href: '/addCode', label: '新增' },
+  { href: '/groups', label: '群組' },
+  { href: '/admin', label: '後台', perm: SITE.VIEW_ADMIN },
+];
+
+// 像 Apple 官網那條窄窄的導覽列：小字、很淡的分隔線
 const Navbar = () => {
-  const router = useRouter();
-  const [isOpen, setIsOpen] = useState(false);
-  const [userData, setUserData] = useState<UserData | undefined>();
-  const [user, setUser] = useState<User | undefined>();
-
-  // 登入
-  const handleLogin = async () => {
-    const result = await handleGoogleLogin();
-
-    if (result.success) {
-      toast.success('登入成功！', { position: 'top-right' });
-    } else {
-      toast.error(`登入失敗！\n失敗原因：${result.message}`, { position: 'top-right' });
-    }
-  };
-
-  // 登出
-  const handleLogout = async () => {
-    const result = await logout();
-
-    if (result.success) {
-      toast.success('登出成功！', { position: 'top-right' });
-    } else {
-      toast.error(`登出失敗！\n錯誤訊息：${result.message}`, { position: 'top-right' });
-    }
-  };
-
-  // 當使用者登入狀態改變時，檢查使用者驗證
-  useEffect(() => {
-    const unsubscribe = checkAuth((user, data) => {
-      if (user) {
-        setUser(user);
-        if (data) {
-          setUserData(data);
-        }
-      } else {
-        setUser(undefined);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const pathname = usePathname();
+  const { user, can, login } = useAuth();
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
+  // 前綴比對：/groups/xxx 也算在「群組」
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
   return (
-    <nav className="bg-[rgba(41,44,53,0.1)] dark:bg-[rgba(41,44,53,0.3)]">
-      <div className="mx-auto px-2 sm:px-6 lg:px-5">
-        <div className="relative flex h-16 items-center justify-between">
-          <div className="absolute inset-y-0 left-0 flex items-center sm:hidden">
-            <></>
+    <header className="sticky top-0 z-40 border-b border-line/60 bg-surface/80 backdrop-blur-xl">
+      <div className="flex h-16 items-center gap-10 px-6 text-[16px] sm:px-8">
+        <Link href="/" className="flex items-center gap-2.5 text-[19px] font-semibold text-ink">
+          <Image src="/imgs/bityo_bg_circle.png" alt="" width={1920} height={1920} className="h-7 w-auto" />
+          Securibit
+        </Link>
+
+        {user && (
+          <nav className="hidden items-center gap-8 md:flex">
+            {NAV_ITEMS.filter((item) => !item.perm || can(item.perm)).map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn("transition-opacity hover:opacity-100", isActive(item.href) ? "text-ink" : "text-ink/70")}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        )}
+
+        <div className="ml-auto flex items-center gap-6">
+          <div className="hidden md:flex">
+            <Themes />
           </div>
-          {/* Logo */}
-          <button
-            className="flex items-center gap-2"
-            onClick={() => router.push('/')}
-          >
-            <Image
-              src="/imgs/bityo_bg_circle.png"
-              alt="about-image"
-              width={1920}
-              height={1920}
-              className="h-8 w-auto drop-shadow-three dark:drop-shadow-none lg:mr-0"
-            />
-            <p>TOTP 2FA 驗證器</p>
+          <NotificationBell />
+
+          {user ? (
+            <UserMenu />
+          ) : (
+            <Button onPress={login} color="primary" radius="full" className="hidden h-9 px-5 text-[15px] font-medium md:flex">
+              登入
+            </Button>
+          )}
+
+          {/* 手機：開側欄 */}
+          <button aria-label="開啟選單" onClick={() => setIsDrawerOpen(true)} className="text-ink md:hidden">
+            <Bars3Icon className="h-6 w-6" />
           </button>
-          <div className="absolute right-0 flex items-center gap-7 pr-2 sm:pr-0">
-            {/* 首頁 */}
-
-            {/* 驗證碼 */}
-            {
-              user && <button
-                onClick={() => { router.push('/code') }}
-                className="hidden md:flex gap-2 items-center"
-              >
-                <FontAwesomeIcon icon={faKey} className="w-4" />
-                <p>驗證碼</p>
-              </button>
-            }
-
-            {/* 新增驗證碼 */}
-            {
-              user && <button
-                onClick={() => { router.push('/addCode') }}
-                className="hidden md:flex gap-2 items-center"
-              >
-                <FontAwesomeIcon icon={faPlus} className="w-4" />
-                <p>新增驗證碼</p>
-              </button>
-            }
-
-            {/* 登出 */}
-            {
-              user && <button
-                onClick={handleLogout}
-                className="hidden md:flex gap-2 items-center"
-              >
-                <FontAwesomeIcon icon={faRightFromBracket} className="w-4" />
-                <p>登出</p>
-              </button>
-            }
-
-            {/* 個人檔案 */}
-            {
-              user && <button
-                onClick={() => { router.push('/me/MyPage') }}
-                className="hidden md:flex gap-2 items-center"
-              >
-
-                <div className="relative">
-                  <img
-                    src={user.photoURL as string}
-                    className="w-7 h-7 rounded-full"
-                  />
-                  <span className="top-0 left-5 absolute  w-3 h-3 bg-green-400 border-2 border-white dark:border-gray-blue-800 rounded-full"></span>
-                </div>
-                <p>{user?.displayName}</p>
-              </button>
-            }
-
-            {/* 登入 */}
-            {
-              !user && <button
-                onClick={handleLogin}
-                className="hidden md:flex gap-2 items-center"
-              >
-                <FontAwesomeIcon icon={faRightFromBracket} className="w-4" />
-                <p>登入</p>
-              </button>
-            }
-
-            {/* 切換背景 */}
-            <div className="hidden md:flex">
-              <Themes></Themes>
-            </div>
-
-            {/* 更多 */}
-            <div className="relative ml- md:hidden">
-              <IconButton
-                variant="text"
-                size="lg"
-                onClick={() => setIsDrawerOpen(true)}
-                nonce={undefined}
-                onResize={undefined}
-                onResizeCapture={undefined}
-                placeholder={undefined}
-                onPointerEnterCapture={undefined}
-                onPointerLeaveCapture={undefined}
-              >
-                <Bars3Icon className="h-8 w-8 stroke-2 dark:invert" />
-              </IconButton>
-            </div>
-          </div>
         </div>
       </div>
 
-      <Sidebar
-        isDrawerOpen={isDrawerOpen}
-        setIsDrawerOpen={setIsDrawerOpen}
-      ></Sidebar>
-
-      <div className="sm:hidden" id="mobile-menu">
-      </div>
-    </nav>
+      <Sidebar isDrawerOpen={isDrawerOpen} setIsDrawerOpen={setIsDrawerOpen} />
+    </header>
   );
-}
+};
 
 export default Navbar;

@@ -1,28 +1,25 @@
-import { faFacebook, faYoutube } from "@fortawesome/free-brands-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useRouter } from "next/router";
+"use client";
 
+import Link from "next/link";
+import { useRouter } from "nextjs-toploader/app";
+import useAuth from "../auth/useAuth";
+
+// Apple 的主視覺不放大按鈕，只放藍色文字連結
 const ButtonSection = () => {
   const router = useRouter();
-  
+  const { user, login } = useAuth();
+
   return (
-    <div className="mt-5 grid grid-cols-1 gap-3 sm:w-fit sm:grid-cols-2 items-center">
-      <button
-        onClick={() => router.push('/code')}
-        className="flex items-center justify-center rounded-lg px-2 py-2 border-2 border-tpp hover:bg-tpp/50 dark:hover:bg-tpp/50 text-white"
-      >
-        <FontAwesomeIcon icon={faFacebook} className="mr-2 w-5" />
-        開始使用
+    <div className="flex items-center justify-center gap-8 text-[19px]">
+      {/* 未登入時直接帶去 Google 登入，不要先跳到驗證碼頁再被擋回來 */}
+      <button onClick={() => (user ? router.push('/code') : login())} className="link-arrow">
+        {user ? '前往驗證碼' : '開始使用'}
       </button>
-      <button
-        onClick={() => router.push('/about')}
-        className="flex items-center justify-center px-2 py-2 rounded-lg border-2 border-[#17FFAD] hover:bg-[#17FFAD]/50 dark:hover:bg-tpp/50 text-white"
-      >
-        <FontAwesomeIcon icon={faYoutube} className="mr-2 w-5" />
-        了解更多
-      </button>
+      <Link href="/about" className="link-arrow">
+        進一步了解
+      </Link>
     </div>
   )
-} 
+}
 
 export default ButtonSection;

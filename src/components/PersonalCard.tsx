@@ -1,89 +1,116 @@
+"use client";
 /* eslint-disable @next/next/no-img-element */
-import { auth } from "@/config/firebase";
-import { signOut } from "firebase/auth";
-import {useRouter} from "next/router";
+import { ReactNode } from "react";
+import Link from "next/link";
+import { useRouter } from "nextjs-toploader/app";
 import toast from "react-hot-toast";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCopy } from "@fortawesome/free-solid-svg-icons";
+import { formatDateTime } from "@/lib/utils";
+import { showError } from "@/lib/errorDialog";
+import { PersonalCardProps } from "@/types/Profile/PersonalCard";
+import useAuth from "./auth/useAuth";
 
-interface Props {
-  uid: string;
-  name: string;
-  email: string;
-  photoURL: string;
-  bgPhotoURL: string;
-  emailVerified: boolean;
-  phoneNumber: string;
-  metadata: {
-    creationTime: string;
-    lastSignInTime: string;
-  };
-}
+// 0001 migration 給每個人塞的預設背景圖；等於「沒有設定」，不顯示
+const DEFAULT_BG_PHOTO = 'https://img.freepik.com/free-photo/abstract-luxury-plain-blur-grey-black-gradient-used-as-background-studio-wall-display-your-products_1258-63747.jpg?w=2000';
 
-const PersonalCard = (props: Props) => {
+// 像 iOS 設定的分組列表：上面是身分，下面一組一組的欄位
+const PersonalCard = (props: PersonalCardProps) => {
+  const { profile } = props;
   const router = useRouter();
+  const { logout } = useAuth();
+  const siteRoles = props.siteRoles ?? [];
+  const bgPhoto = profile.bgPhotoURL && profile.bgPhotoURL !== DEFAULT_BG_PHOTO ? profile.bgPhotoURL : '';
 
-  const logout_btn = () => {
-    signOut(auth).then(() => {
-      toast.success('登出成功！', {
-        position: "top-right"
-      });
-    }).catch((error) => {
-      toast.success(`登出失敗！\n錯誤訊息：\n${error}`, {
-        position: "top-right"
-      });
-    });
-    router.push('/');
-  }
+  const copyUid = async () => {
+    try {
+      await navigator.clipboard.writeText(profile.uid);
+      toast.success("已複製", { position: "top-right" });
+    } catch {
+      showError("無法複製", "瀏覽器不允許存取剪貼簿，請手動複製使用者 ID。");
+    }
+  };
+
+  const groups: { title: string; rows: [string, ReactNode][] }[] = [
+    {
+      title: '帳號',
+      rows: [
+        ['@ID', profile.username ? `@${profile.username}` : <Link key="set" href="/me/update_info" className="text-accent">設定</Link>],
+        [
+          '使用者 ID',
+          <button key="uid" type="button" onClick={copyUid} title="點一下複製" className="flex max-w-full items-center gap-2 text-ink hover:opacity-60">
+            <span className="truncate text-[15px] tabular-nums">{profile.uid}</span>
+            <FontAwesomeIcon icon={faCopy} className="w-3.5 shrink-0 text-ink-muted" />
+          </button>,
+        ],
+        ['電子郵件', profile.email || '無'],
+        ['驗證狀態', profile.emailVerified ? '已驗證' : '未驗證'],
+        ['電話', profile.phoneNumber || '無'],
+        ...(siteRoles.length > 0
+          ? [['身分組', <span key="roles" className="flex flex-wrap justify-end gap-1.5">
+              {siteRoles.map((role) => (
+                <span key={role.id} className="rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px]">{role.name}</span>
+              ))}
+            </span>] as [string, ReactNode]]
+          : []),
+      ],
+    },
+    {
+      title: '登入資訊',
+      rows: [
+        ['建立時間', formatDateTime(profile.metadata.creationTime)],
+        ['最後登入', formatDateTime(profile.lastLoginAt)],
+        ['IP', profile.lastLoginIp || '無'],
+        ['裝置', profile.lastLoginDevice || '無'],
+      ],
+    },
+  ];
 
   return (
-    <>
-      <div className="w-full bg-white border border-gray-blue-200 rounded-lg shadow dark:bg-gray-blue-800 dark:border-gray-blue-700">
-        <div className="flex flex-col items-center pb-10">
-          <div className="relative mb-3 mt-3">
-            <img className="w-24 h-24 shadow-lg p-1 rounded-full ring-2 ring-gray-blue-300 dark:ring-gray-blue-" src={props.photoURL} alt="Bonnie image" />
-            <span className="right-1 bottom-1 absolute  w-5 h-5 bg-green-400 border-2 border-white dark:border-gray-blue-800 rounded-full"></span>
+    <div className="flex flex-col gap-8">
+      {/* 身分 */}
+      <div className="overflow-hidden rounded-[18px] border border-line/70 bg-surface">
+        {bgPhoto && <img className="h-32 w-full object-cover" src={bgPhoto} alt="" />}
+        <div className="flex items-center gap-4 px-5 py-5">
+          {profile.photoURL ? (
+            <img className="h-16 w-16 shrink-0 rounded-full object-cover" src={profile.photoURL} referrerPolicy="no-referrer" alt="" />
+          ) : (
+            // 沒有大頭照時顯示名字的第一個字
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-surface-1 text-2xl font-semibold">
+              {profile.name.slice(0, 1) || '?'}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[22px] font-semibold">{profile.name}</p>
+            <p className="truncate text-[15px] text-ink-muted">{profile.email}</p>
           </div>
-
-          <h5 className="mb-1 text-xl font-medium text-gray-blue-900 dark:text-white">{ props.name }</h5>
-          {/* <span className="text-sm text-gray-blue-500 dark:text-gray-blue-400">{ props.email }</span>
-          <span className="text-sm text-gray-blue-700 dark:text-gray-blue-300">UID: {props.uid}</span> */}
-          
-          <table className="text-sm my-3">
-            <tbody>
-              <tr>
-                <td className="px-2 py-2 text-gray-blue-500 font-semibold">Email</td>
-                <td className="px-2 py-2">{ props.email }</td>
-              </tr>
-              <tr>
-                <td className="px-2 py-2 text-gray-blue-500 font-semibold">手機號碼</td>
-                <td className="px-2 py-2">{ props.phoneNumber? props.phoneNumber: '無' }</td>
-              </tr>
-              <tr>
-                <td className="px-2 py-2 text-gray-blue-500 font-semibold">Email 是否驗證</td>
-                <td className="px-2 py-2">{ props.emailVerified ? '是' : '否' }</td>
-              </tr>
-              <tr>
-                <td className="px-2 py-2 text-gray-blue-500 font-semibold">創建時間</td>
-                <td className="px-2 py-2">{ props.metadata.creationTime }</td>
-              </tr>
-              <tr>
-                <td className="px-2 py-2 text-gray-blue-500 font-semibold">最後登入時間</td>
-                <td className="px-2 py-2">{ props.metadata.lastSignInTime }</td>
-              </tr>
-              <tr>
-                <td className="px-2 py-2 text-gray-blue-500 font-semibold">UID</td>
-                <td className="px-2 py-2">{props.uid}</td>
-              </tr>
-            </tbody>
-          </table>
-          
-          <div className="flex mt-4 space-x-3 md:mt-6">
-            <button onClick={() => router.push('/me/update_info')} className="inline-flex items-center px-4 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 focus:outline-none dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-900">管理帳戶</button>
-            <button onClick={logout_btn} className="inline-flex items-center px-4 py-2 text-sm font-medium text-center text-gray-blue-900 bg-white border border-gray-blue-300 rounded-lg hover:bg-gray-blue-100 focus:ring-4 focus:outline-none focus:ring-gray-blue-200 dark:bg-gray-blue-800 dark:text-white dark:border-gray-blue-600 dark:hover:bg-gray-blue-700 dark:hover:border-gray-blue-700 dark:focus:ring-gray-blue-700">登出帳戶</button>
-          </div>
+          <button onClick={() => router.push('/me/update_info')} className="shrink-0 text-[17px] text-accent hover:underline">
+            編輯
+          </button>
         </div>
       </div>
-    </>
-  )
-}
+
+      {groups.map((group) => (
+        <section key={group.title}>
+          <h2 className="mb-2 px-5 text-[13px] font-normal text-ink-muted">{group.title}</h2>
+          <dl className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
+            {group.rows.map(([label, value]) => (
+              <div key={label} className="flex items-center justify-between gap-6 px-5 py-3">
+                <dt className="shrink-0 text-[17px]">{label}</dt>
+                <dd className="min-w-0 text-right text-[17px] text-ink-muted">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ))}
+
+      {props.children}
+
+      <button onClick={logout} className="rounded-[18px] border border-line/70 bg-surface py-3 text-center text-[17px] text-alarm hover:bg-surface-1">
+        登出
+      </button>
+    </div>
+  );
+};
 
 export default PersonalCard;

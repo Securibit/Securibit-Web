@@ -1,9 +1,8 @@
-import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
-
 export interface CardProps {
+  // 小字的主題名，例如「加密」
+  eyebrow: string;
   title: string;
   description: string;
-  icon: IconDefinition;
-  buttonText?: string;
-  buttonLink?: string;
+  // 區塊下方的示意畫面（可選）
+  children?: React.ReactNode;
 }
