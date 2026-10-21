@@ -44,6 +44,10 @@
         "author": "TershiXia",
         "copyright": "TershiXia"
     },
+    "Download": {
+        "title": "下載 App",
+        "description": "下載 Securibit 的 macOS、Android、Linux App，和網頁版用同一個帳號同步驗證碼。"
+    },
     "About": {
         "title": "關於我們",
         "description": "TOTP 2FA 是一個網頁版的兩步驟驗證器，登入 Google 帳號就能在任何裝置上查看驗證碼。",

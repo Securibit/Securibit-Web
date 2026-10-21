@@ -22,6 +22,9 @@ const NAV_ITEMS = [
   { href: '/admin', label: '後台', perm: SITE.VIEW_ADMIN },
 ];
 
+// 不用登入也看得到的項目
+const PUBLIC_NAV_ITEMS = [{ href: '/download', label: '下載' }];
+
 // 像 Apple 官網那條窄窄的導覽列：小字、很淡的分隔線
 const Navbar = () => {
   const pathname = usePathname();
@@ -40,19 +43,17 @@ const Navbar = () => {
           Securibit
         </Link>
 
-        {user && (
-          <nav className="hidden items-center gap-8 md:flex">
-            {NAV_ITEMS.filter((item) => !item.perm || can(item.perm)).map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn("transition-opacity hover:opacity-100", isActive(item.href) ? "text-ink" : "text-ink/70")}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        )}
+        <nav className="hidden items-center gap-8 md:flex">
+          {[...(user ? NAV_ITEMS.filter((item) => !item.perm || can(item.perm)) : []), ...PUBLIC_NAV_ITEMS].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn("transition-opacity hover:opacity-100", isActive(item.href) ? "text-ink" : "text-ink/70")}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
 
         <div className="ml-auto flex items-center gap-6">
           <div className="hidden md:flex">
