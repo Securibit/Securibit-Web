@@ -4,6 +4,7 @@ import { Drawer, DrawerBody, DrawerContent, DrawerFooter, DrawerHeader } from "@
 import { usePathname } from "next/navigation";
 import { useRouter } from "nextjs-toploader/app";
 import {
+  ArrowDownTrayIcon,
   ArrowLeftEndOnRectangleIcon,
   ArrowRightStartOnRectangleIcon,
   DocumentTextIcon,
@@ -64,6 +65,7 @@ const Sidebar = (props: SidebarProps) => {
           { icon: UserCircleIcon, text: "個人頁面", link: "/me/MyPage" },
         ]
       : []),
+    { icon: ArrowDownTrayIcon, text: "下載 App", link: "/download" },
     { icon: InformationCircleIcon, text: "關於我們", link: "/about" },
     { icon: DocumentTextIcon, text: "免責聲明", link: "/disclaimer" },
   ];
