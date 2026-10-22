@@ -23,7 +23,7 @@ import { rpc } from "@/lib/rpc";
 import { has } from "@/lib/permissions/bits";
 import { SiteAccess } from "@/types/Auth/Auth";
 
-// 還沒執行 0009 migration、或讀取失敗時：沒有任何全站權限
+// 資料庫還沒有全站權限功能、或讀取失敗時：沒有任何全站權限
 const NO_ACCESS: SiteAccess = { permissions: 0, top_position: 0, roles: [] };
 
 const loadAccess = async () => {

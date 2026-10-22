@@ -1,14 +1,10 @@
-import { rpc, withMigrationHint } from '@/lib/rpc';
+import { rpc } from '@/lib/rpc';
 import { auditActionText } from '@/lib/permissions/auditActions';
 import { AccountActivity, ActivityViewer, LoginRecord } from '@/types/Activity/Activity';
 import { Result, UserBrief } from '@/types/Permission/Permission';
 
-// 函式不存在（還沒執行 0014）時改成提示要執行哪個 migration
-const MIGRATION = '0014_activity_log.sql';
-const withHint = <T>(fn: string, result: Result<T>) => withMigrationHint(fn, MIGRATION, result);
-
 const call = async <T>(fn: string, args: Record<string, unknown>): Promise<Result<T[]>> => {
-  const result = withHint(fn, await rpc<T[] | null>(fn, args));
+  const result = await rpc<T[] | null>(fn, args);
   return result.success ? { success: true, data: result.data ?? [] } : result;
 };
 

@@ -1,4 +1,4 @@
-// 權限位元定義（與 docs/groups-and-permissions.md、migration 0009 一致）
+// 權限位元定義（與 docs/groups-and-permissions.md、database/init.sql 一致）
 // 資料庫是 bigint，前端用 number；目前只用到 bit 0～9，可以直接用位元運算
 
 export interface PermissionDef {

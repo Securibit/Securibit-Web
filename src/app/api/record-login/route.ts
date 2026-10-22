@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   if (error) return serverError('記錄登入失敗', error);
 
-  // 每次登入另外留一筆登入紀錄（0014_activity_log.sql 的 login_history）
+  // 每次登入另外留一筆登入紀錄（login_history）
   const { error: historyError } = await auth.admin.from('login_history').insert({
     user_id: auth.user.id,
     ip: ip || null,

@@ -24,8 +24,8 @@ export const isValidSecret = (secret: string) => isBase32(normalizeSecret(secret
  * 這裡只剩加密設定（profiles.vault）的 RPC；舊的 totp_* RPC 在資料庫保留給舊版頁面相容，前端不再使用。
  */
 
-// 函式不存在（migration 還沒執行）
-const MISSING_MIGRATION = '資料庫還沒更新，請先在 Supabase 執行 0011_default_group.sql。';
+// 函式不存在（資料庫還沒更新）
+const MISSING_MIGRATION = '資料庫還沒更新，請照最新的 database/init.sql 更新 Supabase。';
 
 /**
  * 更新加密設定，並一次換掉多筆金鑰（設定密碼、改密碼、停用時用）。

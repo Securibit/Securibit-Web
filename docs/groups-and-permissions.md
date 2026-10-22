@@ -1,6 +1,6 @@
 # 群組、身分組與後台：規格
 
-這份文件是資料庫（migration 0008、0009）、資料層（`src/lib`）與畫面三邊共用的約定。
+這份文件是資料庫（`database/init.sql`）、資料層（`src/lib`）與畫面三邊共用的約定。
 改了任何一邊的介面，都要回來更新這份文件。
 
 ## 0. 總覽
@@ -89,7 +89,7 @@
 
 ## 2. 資料表
 
-### 2.1 0008_accounts.sql（使用者 @ID + 驗證碼資料表）
+### 2.1 使用者 @ID 與驗證碼資料表
 
 ```sql
 -- profiles 加 @ID
@@ -157,7 +157,7 @@ create table totp_secrets (
 
 保留字：`admin`、`administrator`、`root`、`system`、`securibit`、`everyone`、`here`、`support`、`help`、`null`、`undefined`。
 
-### 2.2 0009_groups_permissions.sql
+### 2.2 群組與權限
 
 ```sql
 -- 全站身分組
@@ -274,7 +274,8 @@ alter table totp_accounts add foreign key (group_id) references groups(id) on de
 - 群組：`group.create`、`group.update`、`group.transfer`、`group.role.create/update/delete/reorder`、
   `group.member.roles`、`group.member.kick`、`group.member.join`、`group.member.add`（0017）、`group.member.leave`、
   `group.invite.create/revoke`、`group.invite.email`、`group.account.create/update/delete`、
-  `group.account.overwrite`、`group.account.secret.view`（取得金鑰時）
+  `group.account.overwrite`、`group.account.secret.view`（取得金鑰時）、
+  `group.category.reorder`（0020；target_type `group`，detail `{ name, categories, old_categories }`，順序沒變不記）
 
 ## 3. RPC（0009）
 
@@ -315,6 +316,7 @@ alter table totp_accounts add foreign key (group_id) references groups(id) on de
 | `group_account_update(account_id, patch jsonb)` | 該筆的 MANAGE_CODES | void；改 secret 不需要 VIEW_SECRETS |
 | `group_account_delete(account_id)` | 該筆的 MANAGE_CODES | void |
 | `group_accounts_reorder(gid, ids uuid[])` | MANAGE_CODES（群組層級） | void |
+| `group_set_category_order(gid, names text[])`（0020） | MANAGE_CODES（群組層級） | 整理後存進去的 `text[]`。names = 由前到後的類別順序（所有成員共用，存在 `groups.category_order`）；去頭尾空白、去空、去重（保留第一次出現的位置）；名稱超過 50 字、含逗號或頓號、超過 200 個 → raise。順序有變才記 `group.category.reorder`，並通知全體成員 `codes:<gid>` |
 | `group_account_secret(account_id)` | 該筆的 VIEW_SECRETS | 金鑰字串；記錄 `group.account.secret.view` |
 | `group_account_secrets(gid)` | — | `{ "<account_id>": "<secret>" }`，只含呼叫者有 VIEW_SECRETS 的；用來匯出 / 前端自己產碼；記錄一筆 secret.view（detail 帶數量） |
 | `group_account_overwrites(account_id)` | MANAGE_ROLES | `[{ target_type, target_id, allow, deny }]` |
@@ -334,7 +336,8 @@ alter table totp_accounts add foreign key (group_id) references groups(id) on de
                 "role_ids": ["..."], "joined_at": "...", "is_owner": true, "top_position": 0 }],
   "invites": [{ "code": "...", "created_by": { SiteUserBrief }, "created_at": "...", "expires_at": null,
                 "max_uses": null, "uses": 0 }],
-  "email_invites": [{ "id": "...", "email": "...", "invited_by": { SiteUserBrief }, "created_at": "..." }]
+  "email_invites": [{ "id": "...", "email": "...", "invited_by": { SiteUserBrief }, "created_at": "..." }],
+  "category_order": ["交易所", "社群"]
 }
 ```
 `roles` 由高到低（@everyone 最後）。`invites` / `email_invites` 只在有 CREATE_INVITE 或 MANAGE_GROUP 時有內容，否則是空陣列；
@@ -367,6 +370,7 @@ alter table totp_accounts add foreign key (group_id) references groups(id) on de
 |---|---|---|
 | `admin_users(search text, page_offset int, page_size int)` | VIEW_USERS | `{ total, users: [AdminUser] }`。search 比對 email / name / username（ilike），null 列全部；依 created 新到舊 |
 | `admin_user(user_id)` | VIEW_USERS | `AdminUser` 加 `groups: [{ id, name, is_owner }]` |
+| `admin_user_sessions(user_id)`（0020） | VIEW_USERS | 對方登入中的裝置，只能看、不能登出：格式同 `list_my_sessions()`（`[{ id, created_at, updated_at, refreshed_at, last_active_at, user_agent, ip, aal, current, device_name, platform, app_version }]`，依 last_active_at 新到舊），`current` 一律 false；管不到對方（階層不比對方高）時 `ip` 是 null（同 `admin_user_login_history`）；找不到 → raise「找不到這位使用者」 |
 | `admin_update_user(user_id, name text, username text)` | MANAGE_USERS + 階層 | void；username 規則同 set_username；null 代表不改，空字串代表清除 |
 | `admin_user_totp(user_id)` | VIEW_USER_TOTP | `[{ id, name, category, digits, period, algorithm, pinned, secret, encrypted }]`；已加密的 `secret` 是 null、`encrypted` true；記錄 `site.user.totp.view` |
 | `admin_update_user_totp(user_id, item_id, patch jsonb)` | MANAGE_USER_TOTP | void；patch 欄位同 totp_update；該使用者啟用加密時不能改 secret（raise） |
@@ -386,8 +390,10 @@ alter table totp_accounts add foreign key (group_id) references groups(id) on de
 ```json
 { "id": "...", "email": "...", "name": "...", "username": "...", "photo_url": "...",
   "creation_time": "...", "last_login_at": "...", "last_login_ip": "...", "last_login_device": "...",
+  "last_active_at": "...",
   "role_ids": ["..."], "top_position": 0, "totp_count": 3, "vault_enabled": false }
 ```
+`last_active_at`（0020）：對方所有登入中 session（過了 not_after 的不算）的最後活動取最新的，算法同 `list_my_sessions`；沒有 session 時 null。
 
 ## 4. Next.js API route
 
@@ -476,7 +482,7 @@ src/app/admin/                     後台（總覽、使用者、使用者詳情
 - `marryhan25648@gmail.com`：已有 profile 就直接指派「管理員」，還沒有才寫進 `site_pending_roles`（避免之後被移除管理員後，下次登入又被加回去）。
 - `@everyone` 的 id 固定 `00000000-0000-0000-0000-000000000000`，「管理員」固定 `00000000-0000-0000-0000-000000000001`。
 - `/api/delete-account` 刪除前呼叫 `can_delete_self()`。
-- **0010 安全性修正（`0010_security_fixes.sql`）**：
+- **安全性規則**：
   - **全站階層**：只有「最高位身分組的持有者」（`site_is_root`：自己有身分組，而且沒有任何人的最高身分組比自己高；
     只看有人持有的身分組，最上面的身分組沒人時由下一個有人持有的身分組接手）不受階層限制。
     一般 `ADMINISTRATOR` 仍有全部權限位元，但不能動比自己高或同位的身分組與使用者。前端 `isSiteRoot()` 同規則。

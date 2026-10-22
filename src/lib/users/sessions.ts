@@ -1,22 +1,21 @@
 import { supabase } from '@/config/supabase';
-import { rpc, rpcVoid, withMigrationHint } from '@/lib/rpc';
+import { rpc, rpcVoid } from '@/lib/rpc';
 import { parseUserAgent } from '@/lib/users/userAgent';
 import { SessionDisplay, SessionRecord } from '@/types/Activity/Session';
 import { Result } from '@/types/Permission/Permission';
 
-// 已登入的裝置（0019_sessions.sql）
-const MIGRATION = '0019_sessions.sql';
+// 已登入的裝置
 
 // ---------- RPC ----------
 
 export const loadMySessions = async (): Promise<Result<SessionRecord[]>> => {
-  const result = withMigrationHint('list_my_sessions', MIGRATION, await rpc<SessionRecord[] | null>('list_my_sessions'));
+  const result = await rpc<SessionRecord[] | null>('list_my_sessions');
   return result.success ? { success: true, data: result.data ?? [] } : result;
 };
 
 // 登出某一台裝置（不能是這台）
 export const revokeMySession = async (sessionId: string) =>
-  withMigrationHint('revoke_my_session', MIGRATION, await rpcVoid('revoke_my_session', { session_id: sessionId }));
+  rpcVoid('revoke_my_session', { session_id: sessionId });
 
 // 登出這台以外的所有裝置（Auth API，這台的 session 保留）
 export const signOutOtherSessions = async (): Promise<Result<null>> => {

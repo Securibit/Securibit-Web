@@ -41,3 +41,6 @@ next-env.d.ts
 
 # vim 暫存檔
 *.swp
+
+# 開發用的資料庫 migration（只留在本機）；新專案用 database/init.sql
+/supabase/

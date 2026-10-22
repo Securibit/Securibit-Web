@@ -11,7 +11,7 @@ import { showError } from "@/lib/errorDialog";
 import { PersonalCardProps } from "@/types/Profile/PersonalCard";
 import useAuth from "./auth/useAuth";
 
-// 0001 migration 給每個人塞的預設背景圖；等於「沒有設定」，不顯示
+// 資料庫給每個人預設的背景圖；等於「沒有設定」，不顯示
 const DEFAULT_BG_PHOTO = 'https://img.freepik.com/free-photo/abstract-luxury-plain-blur-grey-black-gradient-used-as-background-studio-wall-display-your-products_1258-63747.jpg?w=2000';
 
 // 像 iOS 設定的分組列表：上面是身分，下面一組一組的欄位

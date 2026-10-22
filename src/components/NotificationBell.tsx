@@ -49,7 +49,7 @@ const NotificationBell = () => {
 
   const reload = useCallback(async () => {
     const result = await loadMyInvitations();
-    // 群組功能的 migration 還沒跑等失敗情況，就當沒有通知，不打擾使用者
+    // 資料庫還沒有群組功能等失敗情況，就當沒有通知，不打擾使用者
     if (result.success) setInvitations(result.data);
   }, []);
 

@@ -1,10 +1,10 @@
 import { supabase } from '@/config/supabase';
 import { Result } from '@/types/Permission/Permission';
 
-// 函式不存在（migration 還沒執行）時的提示
+// 函式不存在（資料庫還沒更新）時的提示
 const MISSING_FUNCTION = 'PGRST202';
 const missingMessage = (fn: string) =>
-  `資料庫還沒有「${fn}」功能，請先在 Supabase 執行 0008_accounts.sql 與 0009_groups_permissions.sql。`;
+  `資料庫還沒有「${fn}」功能，請照最新的 database/init.sql 更新 Supabase。`;
 
 /** 呼叫 RPC，統一回傳 { success, data } / { success: false, message }（message 是資料庫給的中文訊息） */
 export const rpc = async <T>(fn: string, args: Record<string, unknown> = {}): Promise<Result<T>> => {
@@ -14,12 +14,6 @@ export const rpc = async <T>(fn: string, args: Record<string, unknown> = {}): Pr
   }
   return { success: true, data: data as T };
 };
-
-/** 某個 migration 新增的函式還不存在時，把錯誤換成「請先執行哪個 migration」 */
-export const withMigrationHint = <T>(fn: string, migration: string, result: Result<T>): Result<T> =>
-  result.success || !result.message.includes(`「${fn}」`)
-    ? result
-    : { success: false, message: `資料庫還沒更新，請先在 Supabase 執行 ${migration}。` };
 
 /** 不需要回傳值的 RPC */
 export const rpcVoid = async (fn: string, args: Record<string, unknown> = {}): Promise<Result<null>> => {
