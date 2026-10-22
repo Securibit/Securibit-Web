@@ -128,7 +128,8 @@ const UsersClient = () => {
                         {user.vault_enabled && <FontAwesomeIcon icon={faLock} className="w-3" aria-label="已設定加密密碼" />}
                         {user.totp_count} 筆
                       </p>
-                      <p className="text-[13px] tabular-nums text-ink-muted">{formatDateTime(user.last_login_at)}</p>
+                      <p className="text-[13px] tabular-nums text-ink-muted">最後登入 {formatDateTime(user.last_login_at)}</p>
+                      <p className="text-[13px] tabular-nums text-ink-muted">最後活動 {formatDateTime(user.last_active_at)}</p>
                     </div>
                     <FontAwesomeIcon icon={faChevronRight} className="w-2.5 shrink-0 text-ink-muted" />
                   </Link>

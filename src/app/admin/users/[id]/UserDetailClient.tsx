@@ -12,7 +12,7 @@ import Spinner from "@/components/ui/Loading/Spinner";
 import RoleChip from "@/components/permissions/RoleChip";
 import RoleAssignModal from "@/components/permissions/RoleAssignModal";
 import useAuth from "@/components/auth/useAuth";
-import { loadAdminUser, loadSiteRoles, setUserSiteRoles } from "@/lib/admin/admin";
+import { loadAdminUser, loadAdminUserSessions, loadSiteRoles, setUserSiteRoles } from "@/lib/admin/admin";
 import { SITE, SITE_PERMISSIONS, permissionName } from "@/lib/permissions/bits";
 import { Actor, canManageMember, isSiteRoot, sortRoles } from "@/lib/permissions/hierarchy";
 import { showError } from "@/lib/errorDialog";
@@ -28,6 +28,7 @@ import InfoRow from "./_components/InfoRow";
 import ActivitySection from "@/components/activity/ActivitySection";
 import LoginHistoryList from "@/components/activity/LoginHistoryList";
 import AccountActivityList from "@/components/activity/AccountActivityList";
+import SessionList from "@/components/activity/SessionList";
 import { loadAdminUserActivity, loadAdminUserLoginHistory } from "@/lib/users/activity";
 
 // 登入紀錄 / 操作紀錄每次載入的筆數
@@ -67,6 +68,8 @@ const UserDetailClient = (props: UserDetailClientProps) => {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [rolesOpen, setRolesOpen] = useState(false);
+  // 已登入的裝置（固定住函式，SessionList 才不會每次重畫都重讀）
+  const loadSessions = useCallback(() => loadAdminUserSessions(userId), [userId]);
 
   // 重新載入失敗時保留畫面上原本的資料（第一次就失敗才顯示「找不到」）
   const applyDetail = useCallback((data: AdminUserDetail | null) => setDetail((prev) => data ?? prev ?? null), []);
@@ -198,6 +201,8 @@ const UserDetailClient = (props: UserDetailClientProps) => {
           <dl className="divide-y divide-line/60 overflow-hidden rounded-[18px] border border-line/70 bg-surface">
             <InfoRow label="建立時間">{formatDateTime(detail.creation_time)}</InfoRow>
             <InfoRow label="最後登入">{formatDateTime(detail.last_login_at)}</InfoRow>
+            {/* 所有登入中裝置的最後活動取最新的；沒有登入中的裝置時顯示「無」 */}
+            <InfoRow label="最後活動">{formatDateTime(detail.last_active_at)}</InfoRow>
             {/* 階層不比對方高時資料庫不給 IP（null） */}
             <InfoRow label="IP">{detail.last_login_ip || (detail.last_login_at && detail.last_login_ip === null ? "不公開" : "無")}</InfoRow>
             <InfoRow label="裝置">{detail.last_login_device || "無"}</InfoRow>
@@ -234,6 +239,11 @@ const UserDetailClient = (props: UserDetailClientProps) => {
 
         {/* 2FA */}
         {can(SITE.VIEW_USER_TOTP) && canReachTotp && <UserTotpList user={detail} canManage={can(SITE.MANAGE_USER_TOTP)} />}
+
+        {/* 登入中的裝置：同個人頁面的列表，但只能看 */}
+        <ActivitySection title="已登入的裝置">
+          <SessionList load={loadSessions} readOnly />
+        </ActivitySection>
 
         {/* 每次登入 */}
         <ActivitySection title="登入紀錄">

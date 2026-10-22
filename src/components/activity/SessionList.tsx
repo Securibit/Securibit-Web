@@ -8,14 +8,16 @@ import { formatDateTime } from "@/lib/utils";
 import { loadMySessions, revokeMySession, sessionDisplay, signOutOtherSessions } from "@/lib/users/sessions";
 import { SessionRecord } from "@/types/Activity/Session";
 import { Result } from "@/types/Permission/Permission";
+import { SessionListProps } from "@/types/Activity/SessionList";
 import { ListEmpty, ListLoading } from "./ListStates";
 
 // 確認對話框：登出某一台，或登出其他所有裝置
 type Pending = { kind: "one"; session: SessionRecord; name: string } | { kind: "others" };
 
 // 已登入的裝置：一列一個 session（裝置名稱、平台 · App／瀏覽器 · IP、最後活動與首次登入），
-// 這台裝置排第一並標出來；其他的可以單獨登出，最下面是「登出其他所有裝置」
-const SessionList = () => {
+// 這台裝置排第一並標出來；其他的可以單獨登出，最下面是「登出其他所有裝置」。
+// 後台看別人的裝置時給 load 並設 readOnly：只列出來，不能登出、也不標「這台裝置」
+const SessionList = ({ load = loadMySessions, readOnly = false }: SessionListProps) => {
   // null：載入中
   const [sessions, setSessions] = useState<SessionRecord[] | null>(null);
   // 對話框關上後保留內容，關閉動畫時標題不會跳掉
@@ -38,13 +40,13 @@ const SessionList = () => {
 
   useEffect(() => {
     let cancelled = false;
-    loadMySessions().then((result) => {
+    load().then((result) => {
       if (!cancelled) apply(result);
     });
     return () => {
       cancelled = true;
     };
-  }, [apply]);
+  }, [apply, load]);
 
   const confirm = async () => {
     const result = pending.kind === "one" ? await revokeMySession(pending.session.id) : await signOutOtherSessions();
@@ -54,13 +56,13 @@ const SessionList = () => {
     }
     toast.success(pending.kind === "one" ? `已登出「${pending.name}」` : "已登出其他所有裝置", { position: "top-right" });
     setConfirmOpen(false);
-    apply(await loadMySessions());
+    apply(await load());
   };
 
   if (sessions === null) return <ListLoading />;
   if (sessions.length === 0) return <ListEmpty text="沒有登入中的裝置" />;
 
-  const hasOthers = sessions.some((session) => !session.current);
+  const hasOthers = !readOnly && sessions.some((session) => !session.current);
 
   return (
     <div className="flex flex-col gap-4">
@@ -72,7 +74,7 @@ const SessionList = () => {
               <div className="min-w-0">
                 <p className="flex items-center gap-2 text-[17px] font-medium">
                   <span className="truncate">{display.name}</span>
-                  {session.current && (
+                  {session.current && !readOnly && (
                     <span className="shrink-0 rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] font-normal text-ink-muted">這台裝置</span>
                   )}
                 </p>
@@ -86,7 +88,7 @@ const SessionList = () => {
                   首次登入 {formatDateTime(session.created_at)}
                 </p>
               </div>
-              {!session.current && (
+              {!session.current && !readOnly && (
                 <button
                   type="button"
                   onClick={() => ask({ kind: "one", session, name: display.name })}

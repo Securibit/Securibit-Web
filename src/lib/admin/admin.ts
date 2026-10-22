@@ -1,6 +1,7 @@
 import { callApi, rpc, rpcVoid } from '@/lib/rpc';
 import { AdminGroup, AdminTotpItem, AdminUserDetail, AdminUserPage } from '@/types/Admin/Admin';
-import { AuditLog, Role, RoleInput } from '@/types/Permission/Permission';
+import { AuditLog, Result, Role, RoleInput } from '@/types/Permission/Permission';
+import { SessionRecord } from '@/types/Activity/Session';
 import { TotpInput } from '@/types/Totp/Totp';
 import { normalizeSecret } from '@/lib/totp/crud';
 import { normalizeCategories } from '@/lib/totp/categories';
@@ -17,6 +18,12 @@ export const updateAdminUser = (userId: string, name: string | null, username: s
   rpcVoid('admin_update_user', { user_id: userId, name, username });
 
 export const deleteAdminUser = (userId: string) => callApi<{ success: true }>('/api/admin/delete-user', { userId });
+
+// 使用者已登入的裝置（只能看，current 一律是 false）
+export const loadAdminUserSessions = async (userId: string): Promise<Result<SessionRecord[]>> => {
+  const result = await rpc<SessionRecord[] | null>('admin_user_sessions', { user_id: userId });
+  return result.success ? { success: true, data: result.data ?? [] } : result;
+};
 
 // ---------- 使用者的 2FA ----------
 

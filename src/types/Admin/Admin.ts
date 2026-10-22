@@ -12,6 +12,8 @@ export interface AdminUser {
   last_login_at: string | null;
   last_login_ip: string | null;
   last_login_device: string | null;
+  // 最後活動：這位使用者所有登入中裝置的最後活動取最新的；沒有登入中的裝置是 null（0020）
+  last_active_at?: string | null;
   role_ids: string[];
   top_position: number;
   totp_count: number;
