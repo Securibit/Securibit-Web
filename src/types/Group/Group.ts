@@ -74,6 +74,8 @@ export interface GroupDetail {
   members: GroupMember[];
   invites: GroupInvite[];
   email_invites: GroupEmailInvite[];
+  // 群組自訂的類別順序（所有成員共用）；舊版資料庫沒有這個欄位
+  category_order?: string[] | null;
 }
 
 // group_accounts() 的一筆（不含金鑰）

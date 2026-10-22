@@ -31,6 +31,7 @@ export const AUDIT_ACTION_TEXT: Record<string, string> = {
   'group.account.overwrite': '變更驗證碼權限',
   'group.account.secret.view': '查看金鑰',
   'group.account.clear': '清空驗證碼',
+  'group.category.reorder': '調整類別順序',
   'group.encryption.enable': '開啟加密',
   'group.encryption.disable': '關閉加密',
   // 使用者的帳號變更（0014；target_type 'user'）

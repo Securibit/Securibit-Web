@@ -49,13 +49,8 @@ export const kickMember = (gid: string, userId: string) => rpcVoid('group_kick',
  * 全站管理員（MANAGE_GROUPS / ADMINISTRATOR）直接把使用者加進群組，不用邀請；加入後只有 @everyone 的權限。
  * target：電子郵件、@ID（可帶 @）或使用者 ID
  */
-export const addGroupMember = async (gid: string, target: string): Promise<Result<AddedMember>> => {
-  const result = await rpc<AddedMember>('group_add_member', { gid, target: target.trim() });
-  if (!result.success && result.message.includes('「group_add_member」')) {
-    return { success: false, message: '資料庫還沒更新，請先在 Supabase 執行 0017_admin_add_member.sql。' };
-  }
-  return result;
-};
+export const addGroupMember = (gid: string, target: string) =>
+  rpc<AddedMember>('group_add_member', { gid, target: target.trim() });
 
 export const setMemberRoles = (gid: string, userId: string, roleIds: string[]) =>
   rpcVoid('group_set_member_roles', { gid, user_id: userId, role_ids: roleIds });
@@ -111,6 +106,12 @@ export const deleteGroupAccount = (accountId: string) =>
 
 export const reorderGroupAccounts = (gid: string, ids: string[]) =>
   rpcVoid('group_accounts_reorder', { gid, ids });
+
+// 調整類別順序（群組層級的「管理驗證碼」）：names 由前到後，回傳資料庫整理過的順序
+export const setCategoryOrder = async (gid: string, names: string[]) => {
+  const result = await rpc<string[] | null>('group_set_category_order', { gid, names });
+  return result.success ? { ...result, data: result.data ?? [] } : result;
+};
 
 // 單筆金鑰（需要該筆的「查看金鑰」）
 export const loadGroupAccountSecret = (accountId: string) =>

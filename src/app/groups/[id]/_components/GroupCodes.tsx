@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowsUpDown, faEllipsis, faEye, faEyeSlash, faFileExport, faLock, faMagnifyingGlass, faPlus, faTrashCan, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faArrowsUpDown, faEllipsis, faEye, faEyeSlash, faFileExport, faLock, faMagnifyingGlass, faPlus, faTags, faTrashCan, faXmark } from "@fortawesome/free-solid-svg-icons";
 import Spinner from "@/components/ui/Loading/Spinner";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import useAuth from "@/components/auth/useAuth";
@@ -22,6 +22,7 @@ import {
   loadGroupAccountSecrets,
   loadGroupCodes,
   reorderGroupAccounts,
+  setCategoryOrder,
   updateGroupAccount,
 } from "@/lib/groups/groups";
 import { GROUP, has } from "@/lib/permissions/bits";
@@ -35,7 +36,8 @@ import { isValidSecret } from "@/lib/totp/crud";
 import GroupCodeCard from "./GroupCodeCard";
 import GroupCodeEditModal from "./GroupCodeEditModal";
 import AddGroupCodeModal from "./AddGroupCodeModal";
-import { collectCategories, hasCategory, parseCategories } from "@/lib/totp/categories";
+import CategoryOrderModal from "./CategoryOrderModal";
+import { collectCategories, hasCategory, orderCategories, parseCategories } from "@/lib/totp/categories";
 
 // 「隱藏驗證碼」偏好所有群組共用
 const HIDE_KEY = "securibit:hideCodes";
@@ -67,7 +69,7 @@ const pillClass = (active: boolean) =>
   );
 
 // 群組的驗證碼分頁（驗證碼頁也用這個顯示選中的群組，含預設群組）
-const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
+const GroupCodes = ({ detail, actor, onChanged, heading }: GroupCodesProps) => {
   const gid = detail.group.id;
   // 群組層級的權限：新增、排序、清空要群組層級的「管理驗證碼」；覆寫要「管理身分組」
   const canAdd = has(detail.permissions, GROUP.MANAGE_CODES);
@@ -97,6 +99,7 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
   const [bulk, setBulk] = useState<ImportTextResult>();
   const [exportOpen, setExportOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
+  const [categoryOrderOpen, setCategoryOrderOpen] = useState(false);
   const [shareTarget, setShareTarget] = useState<TotpItem>();
   const reorderSeq = useRef(0);
 
@@ -207,8 +210,9 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
     };
   }, [gid, serverIds, serverNonce]);
 
-  // 所有驗證碼類別的聯集（排序），給篩選與表單建議用
-  const categories = useMemo(() => collectCategories(accounts ?? []), [accounts]);
+  // 所有驗證碼類別的聯集，照群組自訂的順序排（沒排過的照字母），給篩選與表單建議用
+  const categoryOrder = detail.category_order;
+  const categories = useMemo(() => orderCategories(collectCategories(accounts ?? []), categoryOrder), [accounts, categoryOrder]);
   const activeCategory = category && categories.includes(category) ? category : undefined;
 
   // 釘選的排最上面，其餘維持儲存的順序
@@ -326,6 +330,18 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
     return !!neighbor && !!neighbor.pinned === !!ordered[index].pinned;
   };
 
+  // 調整類別順序：存好後重新讀取群組詳情拿到新的順序
+  const handleCategoryOrder = async (names: string[]) => {
+    const result = await setCategoryOrder(gid, names);
+    if (!result.success) {
+      showError("調整類別順序失敗", result.message);
+      return false;
+    }
+    await onChanged();
+    toast.success("已調整類別順序", { position: "top-right" });
+    return true;
+  };
+
   const serverCode = (account: GroupAccount) => {
     if (!server || secrets[account.id] !== undefined) return undefined;
     const entry = server.codes[account.id];
@@ -392,6 +408,7 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
                     onAction={(action) => {
                       if (action === "hide") toggleHideCodes(!hideCodes);
                       if (action === "sort") setSorting(true);
+                      if (action === "categoryOrder") setCategoryOrderOpen(true);
                       if (action === "export") setExportOpen(true);
                       if (action === "clear") setClearOpen(true);
                     }}
@@ -400,6 +417,10 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
                       {hideCodes ? "顯示驗證碼" : "隱藏驗證碼"}
                     </DropdownItem>
                     <DropdownItem key="sort" startContent={<FontAwesomeIcon icon={faArrowsUpDown} className="w-3.5" />}>調整順序</DropdownItem>
+                    {/* 類別順序所有成員共用，同樣要群組層級的「管理驗證碼」；兩個類別以上才有得排 */}
+                    {canAdd && categories.length >= 2 ? (
+                      <DropdownItem key="categoryOrder" startContent={<FontAwesomeIcon icon={faTags} className="w-3.5" />}>調整類別順序</DropdownItem>
+                    ) : null}
                     <DropdownItem key="export" startContent={<FontAwesomeIcon icon={faFileExport} className="w-3.5" />}>匯出</DropdownItem>
                     {/* 清空要群組層級的「管理驗證碼」；沒有就不列出 */}
                     {canAdd ? (
@@ -556,6 +577,10 @@ const GroupCodes = ({ detail, actor, heading }: GroupCodesProps) => {
           onClose={() => setBulk(undefined)}
           onConfirm={handleAdd}
         />
+      )}
+
+      {categoryOrderOpen && (
+        <CategoryOrderModal categories={categories} onClose={() => setCategoryOrderOpen(false)} onSave={handleCategoryOrder} />
       )}
 
       {exportOpen && <ExportModal items={exportItems} onClose={() => setExportOpen(false)} />}

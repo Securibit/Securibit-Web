@@ -27,6 +27,17 @@ export const normalizeCategories = (value: string | null | undefined) => joinCat
 export const collectCategories = (items: { category: string }[]) =>
   [...new Set(items.flatMap((item) => parseCategories(item.category)))].sort();
 
+/**
+ * 照群組自訂的類別順序排：order 裡的（而且還有驗證碼在用的）照 order 排在前面，
+ * 其餘的照字母排在後面（同 collectCategories）
+ */
+export const orderCategories = (categories: string[], order: string[] | null | undefined) => {
+  const existing = new Set(categories);
+  const head = [...new Set(order ?? [])].filter((name) => existing.has(name));
+  const placed = new Set(head);
+  return [...head, ...categories.filter((name) => !placed.has(name)).sort()];
+};
+
 /** 是否含有某個類別 */
 export const hasCategory = (value: string, name: string) => parseCategories(value).includes(name);
 

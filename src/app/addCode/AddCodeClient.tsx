@@ -16,7 +16,7 @@ import TotpForm from "@/components/totp/TotpForm";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import ScopePicker from "@/app/code/_components/ScopePicker";
 import { readCodeScope, writeCodeScope } from "@/lib/codeScope";
-import { addGroupAccounts, loadGroupAccounts, loadGroupAccountSecrets, loadMyGroups } from "@/lib/groups/groups";
+import { addGroupAccounts, loadGroupAccounts, loadGroupAccountSecrets, loadGroupDetail, loadMyGroups } from "@/lib/groups/groups";
 import { GROUP, has } from "@/lib/permissions/bits";
 import { normalizeSecret } from "@/lib/totp/crud";
 import { ImportTextResult } from "@/lib/totp/importText";
@@ -26,7 +26,7 @@ import { TOTP_DEFAULTS, TotpInput, TotpItem } from "@/types/Totp/Totp";
 import QrImport from "./_components/QrImport";
 import BulkImportModal from "./_components/BulkImportModal";
 import { showError } from "@/lib/errorDialog";
-import { collectCategories } from '@/lib/totp/categories';
+import { collectCategories, orderCategories } from '@/lib/totp/categories';
 
 const EMPTY_FORM: TotpInput = { name: '', secret: '', category: '', ...TOTP_DEFAULTS };
 
@@ -44,6 +44,8 @@ const AddCodeClient = () => {
   const [saving, setSaving] = useState(false);
   // 目標群組既有的驗證碼（記著是哪個群組的，換群組時舊的就不算數）
   const [loadedItems, setLoadedItems] = useState<{ gid: string; list: TotpItem[] }>();
+  // 目標群組自訂的類別順序（同樣記著是哪個群組的）
+  const [categoryOrder, setCategoryOrder] = useState<{ gid: string; order: string[] }>();
   const [lastAdded, setLastAdded] = useState<string>();
   // 匯入時換 key 讓表單重新掛上，進階設定才會依匯入值決定是否展開
   const [formKey, setFormKey] = useState(0);
@@ -101,8 +103,21 @@ const AddCodeClient = () => {
     };
   }, [target, needsUnlock, key]);
 
-  // 所有驗證碼類別的聯集，給類別欄位當建議
-  const categories = useMemo(() => collectCategories(items), [items]);
+  // 目標群組的類別順序：只影響建議的排列，讀不到就照字母排
+  useEffect(() => {
+    if (!target) return;
+    let cancelled = false;
+    loadGroupDetail(target).then((result) => {
+      if (!cancelled && result.success) setCategoryOrder({ gid: target, order: result.data?.category_order ?? [] });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [target]);
+
+  // 所有驗證碼類別的聯集（照群組自訂的順序），給類別欄位當建議
+  const order = categoryOrder?.gid === target ? categoryOrder.order : undefined;
+  const categories = useMemo(() => orderCategories(collectCategories(items), order), [items, order]);
 
   const handleImport = (input: TotpInput) => {
     // 保留使用者已選的類別
