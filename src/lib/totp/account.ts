@@ -150,9 +150,10 @@ export const handleGoogleLogin = async (): Promise<{ success: boolean; message?:
   return { success: true };
 };
 
-// logout
+// logout：只登出這個瀏覽器（supabase-js 預設 global 會連 App 和其他裝置一起登出）；
+// 要登出其他裝置用個人頁面「已登入的裝置」
 export const logout = async () => {
-  const { error } = await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
   if (error) {
     return { success: false, message: error.message };
   }
