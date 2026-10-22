@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.bityo.securibit",
+      "sha256_cert_fingerprints": [
+        "11:97:C6:12:3C:F6:56:AF:9E:2F:23:D4:0A:1E:42:B9:D4:CD:2C:E1:70:65:F9:1D:28:49:4E:CF:74:CC:E8:45"
+      ]
+    }
+  }
+]
