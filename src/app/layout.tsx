@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     template: '%s - TOTP 2FA',
   },
   description: SEO.Index.description,
-  icons: { icon: '/favicon.ico' },
+  icons: { icon: '/favicon.ico', apple: '/apple-touch-icon.png' },
 }
 
 const RootLayout = ({ children }: { children: React.ReactNode }) => {

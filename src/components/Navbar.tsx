@@ -39,7 +39,7 @@ const Navbar = () => {
     <header className="sticky top-0 z-40 border-b border-line/60 bg-surface/80 backdrop-blur-xl">
       <div className="flex h-16 items-center gap-10 px-6 text-[16px] sm:px-8">
         <Link href="/" className="flex items-center gap-2.5 text-[19px] font-semibold text-ink">
-          <Image src="/imgs/bityo_bg_circle.png" alt="" width={1920} height={1920} className="h-7 w-auto" />
+          <Image src="/imgs/logo.svg" alt="" width={28} height={28} className="h-7 w-7" />
           Securibit
         </Link>
 
