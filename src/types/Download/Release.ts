@@ -1,8 +1,8 @@
 // 下載頁：GitHub Release 整理成各平台的安裝檔
 
-export type PlatformId = 'macos' | 'android' | 'linux';
+export type PlatformId = 'macos' | 'windows' | 'android' | 'linux';
 
-// 訪客目前用的裝置；ios、windows 目前沒有安裝檔
+// 訪客目前用的裝置；ios 目前沒有安裝檔
 export type DevicePlatform = PlatformId | 'ios' | 'windows' | 'other';
 
 export interface ReleaseFile {
@@ -26,6 +26,8 @@ export interface PlatformDownloads {
   requirement: string;
   // 列表下方的補充說明
   footnote?: string;
+  // 這一版沒有檔案時整個平台不顯示（較晚才支援的平台，舊版本本來就沒有）
+  hideWhenEmpty?: boolean;
   files: ReleaseFile[];
 }
 

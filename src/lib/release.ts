@@ -47,6 +47,27 @@ const PLATFORMS: PlatformSpec[] = [
     ],
   },
   {
+    id: 'windows',
+    name: 'Windows',
+    requirement: 'Windows 10 以上（64 位元）',
+    footnote: '安裝檔還沒有程式碼簽章，Windows 可能會顯示「Windows 已保護您的電腦」，按「其他資訊」再按「仍要執行」就能安裝。',
+    // 1.2.0 才有 Windows 版，更早的版本不列
+    hideWhenEmpty: true,
+    files: [
+      {
+        rule: fileRule(String.raw`securibit-${VERSION}-windows-x64-setup\.exe`),
+        label: '安裝檔',
+        note: '裝在自己的帳號底下，不需要系統管理員權限，之後會自動更新。',
+        recommended: true,
+      },
+      {
+        rule: fileRule(String.raw`securibit-${VERSION}-windows-x64\.zip`),
+        label: '免安裝版',
+        note: '解壓縮後打開 Securibit 資料夾裡的 securibit.exe。不會自動更新，有新版要自己重新下載。',
+      },
+    ],
+  },
+  {
     id: 'android',
     name: 'Android',
     requirement: 'Android 7.0 以上',
@@ -108,8 +129,9 @@ const formatDate = (value: string | null) => {
 const toRelease = (data: GitHubRelease): AppRelease => {
   const assets = Array.isArray(data.assets) ? data.assets : [];
 
-  const platforms = PLATFORMS.map(({ files, ...platform }) => ({
+  const platforms = PLATFORMS.map(({ files, hideWhenEmpty, ...platform }) => ({
     ...platform,
+    hideWhenEmpty,
     files: files.flatMap(({ rule, command, ...spec }) => {
       const asset = assets.find((item) => rule.test(item.name));
       if (!asset) return [];
@@ -121,7 +143,7 @@ const toRelease = (data: GitHubRelease): AppRelease => {
         command: command?.(asset.name),
       }];
     }),
-  }));
+  })).filter((platform) => !(platform.hideWhenEmpty && platform.files.length === 0));
 
   const tag = data.tag_name || '';
   return {

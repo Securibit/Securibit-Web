@@ -134,15 +134,18 @@ const Recommended = ({ device, platforms }: { device: DevicePlatform; platforms:
   if (device === 'ios') {
     return <p className="mx-auto mt-8 max-w-xl text-[17px] text-ink-muted">iPhone 版還在準備上架，現在可以先用網頁版。</p>;
   }
-  if (device === 'windows') {
-    return <p className="mx-auto mt-8 max-w-xl text-[17px] text-ink-muted">還沒有 Windows 版，現在可以先用網頁版。</p>;
-  }
   // Linux 有兩種安裝方式，讓使用者自己在下面挑
-  if (device !== 'macos' && device !== 'android') return null;
+  if (device !== 'macos' && device !== 'android' && device !== 'windows') return null;
 
   const platform = platforms.find((item) => item.id === device);
   const file = platform?.files.find((item) => item.recommended) ?? platform?.files[0];
-  if (!platform || !file) return null;
+  if (!platform || !file) {
+    // 這一版還沒有 Windows 版（Windows 區塊也不會顯示）
+    if (device === 'windows') {
+      return <p className="mx-auto mt-8 max-w-xl text-[17px] text-ink-muted">這一版還沒有 Windows 版，現在可以先用網頁版。</p>;
+    }
+    return null;
+  }
 
   return (
     <div className="mt-8 flex flex-col items-center gap-2">
@@ -169,7 +172,7 @@ const DownloadClient = ({ release }: DownloadClientProps) => {
   const device = useDevicePlatform();
 
   const platforms = release?.platforms ?? [];
-  // 預設照 macOS、Android、Linux、iOS；偵測到的平台排到最前面
+  // 預設照 macOS、Windows、Android、Linux、iOS；偵測到的平台排到最前面
   const order: DevicePlatform[] = [...PLATFORM_IDS, 'ios'];
   const sorted = device && order.includes(device) ? [device, ...order.filter((id) => id !== device)] : order;
 
@@ -204,7 +207,7 @@ const DownloadClient = ({ release }: DownloadClientProps) => {
         ) : (
           <div className="mx-auto mt-10 max-w-md rounded-[18px] border border-line/70 bg-surface px-5 py-6">
             <p className="text-[19px] font-semibold">暫時讀不到下載清單</p>
-            <p className="mt-1 text-[16px] text-ink-muted">可以直接到 GitHub 的發佈頁，下載 macOS、Android、Linux 的安裝檔。</p>
+            <p className="mt-1 text-[16px] text-ink-muted">可以直接到 GitHub 的發佈頁，下載 macOS、Windows、Android、Linux 的安裝檔。</p>
             <Button
               as="a"
               href={LATEST_RELEASE_URL}
@@ -226,7 +229,7 @@ const DownloadClient = ({ release }: DownloadClientProps) => {
           {sorted.map((id) => {
             if (id === 'ios') return <IosBlock key={id} mine={device === 'ios'} />;
             const platform = platforms.find((item) => item.id === id);
-            // 讀不到 GitHub 時只剩上面的退回連結，不列空的平台
+            // 讀不到 GitHub 時只剩上面的退回連結，不列空的平台；這一版沒有 Windows 版時也不列
             if (!platform) return null;
             return <PlatformBlock key={id} platform={platform} mine={device === id} />;
           })}
