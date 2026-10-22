@@ -12,18 +12,24 @@ import CategoryInput from "@/components/totp/CategoryInput";
 const BulkImportModal = (props: BulkImportModalProps) => {
   const { items, errors, batch } = props.result;
 
-  // 金鑰和既有的、或和清單裡前面的重複，預設不勾
+  // 金鑰和群組既有的重複標「已存在」，和清單裡前面的重複標「和第 N 筆相同」，都預設不勾
+  // （分開標，不然清單裡自己重複的，例如 Google Authenticator 存了兩次，看起來像群組裡已經有）
   const duplicates = useMemo(() => {
-    const seen = new Set(props.existing.map((item) => normalizeSecret(item.secret)));
-    return items.map((item) => {
+    const have = new Set(props.existing.map((item) => normalizeSecret(item.secret)));
+    const first = new Map<string, number>();
+    return items.map((item, index): string | null => {
       const secret = normalizeSecret(item.secret);
-      const duplicate = seen.has(secret);
-      seen.add(secret);
-      return duplicate;
+      if (have.has(secret)) return "已存在";
+      const earlier = first.get(secret);
+      if (earlier === undefined) {
+        first.set(secret, index);
+        return null;
+      }
+      return `和第 ${earlier + 1} 筆相同`;
     });
   }, [items, props.existing]);
 
-  const [selected, setSelected] = useState(() => duplicates.map((duplicate) => !duplicate));
+  const [selected, setSelected] = useState(() => duplicates.map((duplicate) => duplicate === null));
   const [category, setCategory] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -80,7 +86,7 @@ const BulkImportModal = (props: BulkImportModalProps) => {
                   {describe(index) && <span className="block truncate text-[13px] text-ink-muted">{describe(index)}</span>}
                 </Checkbox>
                 {duplicates[index] && (
-                  <span className="ml-auto shrink-0 rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-alarm">已存在</span>
+                  <span className="ml-auto shrink-0 rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-alarm">{duplicates[index]}</span>
                 )}
               </li>
             ))}
