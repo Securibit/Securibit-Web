@@ -1,25 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticate, serverError } from '@/lib/server/supabaseAdmin';
-
-// 從 user-agent 粗略解析出「OS · 瀏覽器」
-function parseDevice(ua: string): string {
-  if (!ua) return '未知裝置';
-  let os = '未知系統';
-  if (/iPhone|iPad|iPod/i.test(ua)) os = 'iOS';
-  else if (/Android/i.test(ua)) os = 'Android';
-  else if (/Mac OS X/i.test(ua)) os = 'macOS';
-  else if (/Windows/i.test(ua)) os = 'Windows';
-  else if (/Linux/i.test(ua)) os = 'Linux';
-
-  let browser = '未知瀏覽器';
-  if (/Edg\//i.test(ua)) browser = 'Edge';
-  else if (/OPR\/|Opera/i.test(ua)) browser = 'Opera';
-  else if (/Chrome\//i.test(ua)) browser = 'Chrome';
-  else if (/Firefox\//i.test(ua)) browser = 'Firefox';
-  else if (/Safari\//i.test(ua)) browser = 'Safari';
-
-  return `${os} · ${browser}`;
-}
+import { deviceText } from '@/lib/users/userAgent';
 
 // 用戶端 IP：優先用 Vercel 設定的 x-real-ip（可信）；沒有時取 x-forwarded-for 的「最後」一段
 // （最前面幾段是用戶端自己可以塞的，最後一段才是離我們最近的 proxy 加上的）
@@ -41,7 +22,7 @@ export async function POST(req: NextRequest) {
 
   const ua = req.headers.get('user-agent') ?? '';
   const ip = clientIp(req);
-  const device = parseDevice(ua);
+  const device = deviceText(ua);
 
   const { error } = await auth.admin
     .from('profiles')

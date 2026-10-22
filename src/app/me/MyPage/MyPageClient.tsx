@@ -7,6 +7,7 @@ import PageHeader from "@/components/layout/PageHeader";
 import ActivitySection from "@/components/activity/ActivitySection";
 import LoginHistoryList from "@/components/activity/LoginHistoryList";
 import AccountActivityList from "@/components/activity/AccountActivityList";
+import SessionList from "@/components/activity/SessionList";
 import { loadMyAccountActivity, loadMyLoginHistory } from "@/lib/users/activity";
 
 // 個人頁面只顯示最近幾筆，按「全部」到 /me/activity
@@ -23,6 +24,9 @@ const MyPageClient = () => {
       <PageHeader title="個人頁面" />
       {profile ? (
         <PersonalCard profile={profile} siteRoles={siteRoles}>
+          <ActivitySection title="已登入的裝置">
+            <SessionList />
+          </ActivitySection>
           <ActivitySection title="登入紀錄" href="/me/activity?tab=login">
             <LoginHistoryList load={loadLogins} pageSize={PREVIEW_SIZE} />
           </ActivitySection>

@@ -15,6 +15,12 @@ export const rpc = async <T>(fn: string, args: Record<string, unknown> = {}): Pr
   return { success: true, data: data as T };
 };
 
+/** 某個 migration 新增的函式還不存在時，把錯誤換成「請先執行哪個 migration」 */
+export const withMigrationHint = <T>(fn: string, migration: string, result: Result<T>): Result<T> =>
+  result.success || !result.message.includes(`「${fn}」`)
+    ? result
+    : { success: false, message: `資料庫還沒更新，請先在 Supabase 執行 ${migration}。` };
+
 /** 不需要回傳值的 RPC */
 export const rpcVoid = async (fn: string, args: Record<string, unknown> = {}): Promise<Result<null>> => {
   const result = await rpc<unknown>(fn, args);
