@@ -9,6 +9,7 @@ const Footer = () => {
           <Link href="/download" className="hover:underline">下載 App</Link>
           <Link href="/about" className="hover:underline">關於我們</Link>
           <Link href="/disclaimer" className="hover:underline">免責聲明</Link>
+          <Link href="/privacy" className="hover:underline">隱私權政策</Link>
           <a href="https://github.com/Securibit" target="_blank" rel="noopener noreferrer" className="hover:underline">GitHub 開源專案</a>
         </nav>
       </div>

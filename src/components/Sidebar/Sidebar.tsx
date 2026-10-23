@@ -11,6 +11,7 @@ import {
   HomeIcon,
   InformationCircleIcon,
   KeyIcon,
+  LockClosedIcon,
   PlusCircleIcon,
   ShieldCheckIcon,
   UserCircleIcon,
@@ -68,6 +69,7 @@ const Sidebar = (props: SidebarProps) => {
     { icon: ArrowDownTrayIcon, text: "下載 App", link: "/download" },
     { icon: InformationCircleIcon, text: "關於我們", link: "/about" },
     { icon: DocumentTextIcon, text: "免責聲明", link: "/disclaimer" },
+    { icon: LockClosedIcon, text: "隱私權政策", link: "/privacy" },
   ];
 
   return (

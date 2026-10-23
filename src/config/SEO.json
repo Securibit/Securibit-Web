@@ -66,6 +66,14 @@
         "author": "TershiXia",
         "copyright": "TershiXia"
     },
+    "Privacy": {
+        "title": "隱私權政策",
+        "description": "Securibit 蒐集哪些資料、為什麼蒐集、怎麼使用與保存，以及你依個人資料保護法享有的權利。"
+    },
+    "DeleteAccount": {
+        "title": "刪除帳戶",
+        "description": "在網站或 App 刪除 Securibit 帳戶與所有資料的方法，以及會刪除和保留哪些資料。"
+    },
     "MyPage": {
         "title": "個人頁面",
         "description": "查看您的帳戶資料與最後登入資訊。",
