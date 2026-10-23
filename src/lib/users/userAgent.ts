@@ -9,6 +9,8 @@ export interface UserAgentInfo {
 
 // Securibit App：呼叫網站 API 時是 SecuribitApp (…)，直接打 Supabase 時是 Dart 預設的 Dart/3.x (dart:io)
 const APP = /SecuribitApp|^Dart\//i;
+// 1.3.2 起帶版本：SecuribitApp/1.3.2 (…)
+const APP_VERSION = /SecuribitApp\/([0-9][0-9A-Za-z.+-]*)/i;
 
 export const parseUserAgent = (ua: string): UserAgentInfo => {
   let os = '未知系統';
@@ -21,7 +23,8 @@ export const parseUserAgent = (ua: string): UserAgentInfo => {
   else if (/Linux/i.test(ua)) [os, device] = ['Linux', 'Linux 電腦'];
 
   let browser = '未知瀏覽器';
-  if (APP.test(ua)) browser = 'Securibit App';
+  const appVersion = APP_VERSION.exec(ua)?.[1];
+  if (APP.test(ua)) browser = appVersion ? `Securibit App ${appVersion}` : 'Securibit App';
   else if (/Edg\//i.test(ua)) browser = 'Edge';
   else if (/OPR\/|Opera/i.test(ua)) browser = 'Opera';
   else if (/Chrome\/|CriOS\//i.test(ua)) browser = 'Chrome';
