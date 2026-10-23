@@ -4,7 +4,7 @@
 -- 用途：在「全新、空白」的 Supabase 專案建立完整的 schema（資料表、函式、觸發器、
 --       RLS policy、權限、Realtime publication 與內建種子資料）。
 -- 用法：到 Supabase 後台 → SQL Editor，整份貼上執行一次即可（不要重複執行）。
--- 內容：等同於依序套用開發時的 0001 ～ 0021 migration 之後的最終狀態，
+-- 內容：等同於依序套用開發時的 0001 ～ 0022 migration 之後的最終狀態，
 --       但只保留最終結果，不含搬移舊資料的步驟。
 --       已經有資料的專案不要執行這份（資料表已存在會失敗）。
 -- 依賴：Supabase 內建的 auth schema（auth.users、auth.sessions、auth.uid()、auth.jwt()）、
@@ -3797,7 +3797,7 @@ as $$
     end,
     'last_login_device', p.last_login_device,
     'last_active_at', (
-      select max(greatest(s.created_at, s.updated_at, s.refreshed_at at time zone 'UTC', d.last_seen_at))
+      select max(case when d.session_id is null then greatest(s.created_at, s.updated_at, s.refreshed_at at time zone 'UTC') else d.last_seen_at end)
       from auth.sessions s
       left join public.session_devices d on d.session_id = s.id and d.user_id = s.user_id
       where s.user_id = p.id
@@ -4865,7 +4865,7 @@ create trigger session_devices_cleanup
 -- p_current 排第一並標成 current（null = 沒有目前的 session），其餘依最後活動新到舊；p_show_ip false 時 ip 是 null：
 -- [{ id, created_at, updated_at, refreshed_at, last_active_at, user_agent, ip, aal, current,
 --    device_name, platform, app_version }]
--- last_active_at：換 token、session 更新與 App 回報的最後使用時間取最新的
+-- last_active_at：App 的 session 是 App 回報的最後使用（在畫面上、沒鎖定時每 5 分鐘與離開時寫）；網站是換 token、session 更新取最新的
 create function public.user_sessions_json(p_uid uuid, p_current uuid, p_show_ip boolean)
 returns jsonb
 language sql
@@ -4895,7 +4895,8 @@ as $$
       s.updated_at,
       -- refreshed_at 是不帶時區的 UTC 時間
       (s.refreshed_at at time zone 'UTC') as refreshed_at,
-      greatest(s.created_at, s.updated_at, s.refreshed_at at time zone 'UTC', d.last_seen_at) as last_active_at,
+      -- App 的 session 用 App 回報的最後使用（只常駐在背景換 token 不算）；網站用換 token 與 session 更新的時間
+      case when d.session_id is null then greatest(s.created_at, s.updated_at, s.refreshed_at at time zone 'UTC') else d.last_seen_at end as last_active_at,
       left(s.user_agent, 512) as user_agent,
       case when p_show_ip then host(s.ip) end as ip,
       s.aal::text as aal,
