@@ -4,7 +4,7 @@
 -- 用途：在「全新、空白」的 Supabase 專案建立完整的 schema（資料表、函式、觸發器、
 --       RLS policy、權限、Realtime publication 與內建種子資料）。
 -- 用法：到 Supabase 後台 → SQL Editor，整份貼上執行一次即可（不要重複執行）。
--- 內容：等同於依序套用開發時的 0001 ～ 0020 migration 之後的最終狀態，
+-- 內容：等同於依序套用開發時的 0001 ～ 0021 migration 之後的最終狀態，
 --       但只保留最終結果，不含搬移舊資料的步驟。
 --       已經有資料的專案不要執行這份（資料表已存在會失敗）。
 -- 依賴：Supabase 內建的 auth schema（auth.users、auth.sessions、auth.uid()、auth.jwt()）、
@@ -282,17 +282,21 @@ create index audit_logs_group_idx on public.audit_logs (group_id, id desc);
 create index audit_logs_target_idx on public.audit_logs (target_type, target_id, id desc);
 create index audit_logs_actor_idx on public.audit_logs (actor_id, id desc);
 
--- 登入紀錄（量大，獨立一張表）：每次登入一筆，由 /api/record-login 用 service role 寫入
+-- 登入紀錄（量大，獨立一張表）：每次登入一筆，由 /api/record-login 用 service role 寫入。
+-- 為了追查重複開帳號、濫用後刪帳號，刪除帳號後仍保留：user_id 不設 FK（不跟著 profile 刪），
+-- 並記下登入當時的 email；一律保留一年，由 /api/record-login 每次寫入時刪掉一年前的紀錄
 create table public.login_history (
   id          bigserial primary key,
-  user_id     uuid not null references public.profiles (id) on delete cascade,
+  user_id     uuid not null,
   created_at  timestamptz not null default now(),
   ip          text,
   device      text,          -- 「OS · 瀏覽器」
   user_agent  text,          -- 完整 user-agent（截斷 512 字）
-  provider    text           -- 登入方式：google / email（auth user 的 app_metadata.provider）
+  provider    text,          -- 登入方式：google / email（auth user 的 app_metadata.provider）
+  email       text           -- 登入當時的 email（帳號刪除後靠它辨識是誰）
 );
 create index login_history_user_idx on public.login_history (user_id, created_at desc);
+create index login_history_created_idx on public.login_history (created_at);
 
 -- ---------- 即時同步 ----------
 

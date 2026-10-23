@@ -35,9 +35,10 @@ export async function POST(req: NextRequest) {
 
   if (error) return serverError('記錄登入失敗', error);
 
-  // 每次登入另外留一筆登入紀錄（login_history）
+  // 每次登入另外留一筆登入紀錄（login_history）；刪除帳號後仍保留，email 用來辨識是誰
   const { error: historyError } = await auth.admin.from('login_history').insert({
     user_id: auth.user.id,
+    email: auth.user.email ?? null,
     ip: ip || null,
     device,
     user_agent: ua.slice(0, 512) || null,
@@ -45,5 +46,11 @@ export async function POST(req: NextRequest) {
   });
 
   if (historyError) return serverError('記錄登入紀錄失敗', historyError);
+
+  // 登入紀錄保留一年：順便刪掉所有人一年前的紀錄（有 created_at 索引）；刪不掉只是晚點清，不影響登入
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - 1);
+  const { error: pruneError } = await auth.admin.from('login_history').delete().lt('created_at', cutoff.toISOString());
+  if (pruneError) console.error('清除一年前的登入紀錄失敗', pruneError);
   return NextResponse.json({ success: true });
 }
