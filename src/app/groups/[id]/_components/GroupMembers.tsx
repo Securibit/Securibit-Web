@@ -2,18 +2,19 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
-import { faBan, faEllipsis, faRightLeft, faTags, faUserMinus } from "@fortawesome/free-solid-svg-icons";
+import { faBan, faEllipsis, faRightFromBracket, faRightLeft, faTags, faUserMinus } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import UserChip from "@/components/permissions/UserChip";
 import { userPageHref } from "@/lib/users/users";
 import RoleChip from "@/components/permissions/RoleChip";
 import RoleAssignModal from "@/components/permissions/RoleAssignModal";
 import useAuth from "@/components/auth/useAuth";
-import { addGroupMember, banUser, kickMember, setMemberRoles, transferGroup } from "@/lib/groups/groups";
+import { addGroupMember, banUser, kickMember, leaveGroup, setMemberRoles, transferGroup } from "@/lib/groups/groups";
 import { GROUP, SITE, has } from "@/lib/permissions/bits";
 import { canManageMember, sortRoles } from "@/lib/permissions/hierarchy";
 import { showError } from "@/lib/errorDialog";
@@ -22,14 +23,15 @@ import { GroupMember } from "@/types/Group/Group";
 import { GroupMembersProps } from "@/types/Group/GroupMembers";
 import BanReasonModal from "./BanReasonModal";
 
-type MenuKey = "roles" | "transfer" | "kick" | "ban";
+type MenuKey = "roles" | "transfer" | "kick" | "ban" | "leave";
 
 const displayName = (member: GroupMember) =>
   member.name || (member.username ? `@${member.username}` : member.email || "這位成員");
 
-// 成員分頁：列表、指派身分組、移除、封鎖、轉移擁有權；全站管理員可以直接新增成員
-const GroupMembers = ({ detail, actor, onChanged, adminMode }: GroupMembersProps) => {
+// 成員分頁：列表、指派身分組、移除、封鎖、轉移擁有權、自己離開；全站管理員可以直接新增成員
+const GroupMembers = ({ detail, actor, onChanged, adminMode, exitHref }: GroupMembersProps) => {
   const { user, can } = useAuth();
+  const router = useRouter();
   const gid = detail.group.id;
   const canAssign = has(detail.permissions, GROUP.MANAGE_ROLES);
   const canKick = has(detail.permissions, GROUP.KICK_MEMBERS);
@@ -42,6 +44,7 @@ const GroupMembers = ({ detail, actor, onChanged, adminMode }: GroupMembersProps
 
   const [assigning, setAssigning] = useState<GroupMember>();
   const [kicking, setKicking] = useState<GroupMember>();
+  const [leaving, setLeaving] = useState(false);
   const [banning, setBanning] = useState<GroupMember>();
   const [transferring, setTransferring] = useState<GroupMember>();
 
@@ -141,6 +144,8 @@ const GroupMembers = ({ detail, actor, onChanged, adminMode }: GroupMembersProps
             if (detail.is_owner && !member.is_owner) menu.push({ key: "transfer", label: "轉移擁有權", icon: faRightLeft });
             if (canKick && manageable && !isSelf) menu.push({ key: "kick", label: "移出群組", icon: faUserMinus, danger: true });
             if (canBan && manageable && !isSelf) menu.push({ key: "ban", label: "封鎖", icon: faBan, danger: true });
+            // 自己（不是擁有者）可以直接在這裡離開群組，例如全站管理員加入後要退出
+            if (isSelf && !member.is_owner) menu.push({ key: "leave", label: "離開群組", icon: faRightFromBracket, danger: true });
 
             return (
               <li key={member.id} className="flex items-center gap-3 px-5 py-3">
@@ -179,6 +184,7 @@ const GroupMembers = ({ detail, actor, onChanged, adminMode }: GroupMembersProps
                         if (key === "transfer") setTransferring(member);
                         if (key === "kick") setKicking(member);
                         if (key === "ban") setBanning(member);
+                        if (key === "leave") setLeaving(true);
                       }}
                     >
                       {(entry) => (
@@ -219,6 +225,27 @@ const GroupMembers = ({ detail, actor, onChanged, adminMode }: GroupMembersProps
           }}
         />
       )}
+
+      <ConfirmModal
+        isOpen={leaving}
+        danger
+        title="離開群組"
+        description={`確定要離開「${detail.group.name}」嗎？離開後就看不到群組的驗證碼，要重新受邀才能再加入。`}
+        confirmLabel="離開"
+        onCancel={() => setLeaving(false)}
+        onConfirm={async () => {
+          setLeaving(false);
+          const result = await leaveGroup(gid);
+          if (!result.success) {
+            showError("離開群組失敗", result.message);
+            return;
+          }
+          toast.success(`已離開「${detail.group.name}」`, { position: "top-right" });
+          // 後台還管得到這個群組，留在原頁重新整理；前台回到群組列表
+          if (adminMode) await onChanged();
+          else router.replace(exitHref);
+        }}
+      />
 
       <ConfirmModal
         isOpen={!!kicking}

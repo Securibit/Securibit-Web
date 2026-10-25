@@ -101,6 +101,9 @@ const AuditLogList = (props: AuditLogListProps) => {
               <p className="min-w-0 text-[15px]">
                 <span className="text-ink-muted">{auditActionText(log.action)}</span>
                 {target && <span className="ml-2 break-all text-ink">{target}</span>}
+                {log.group && log.target_type !== "group" && (
+                  <span className="ml-2 break-all text-ink-muted">在「{log.group.name}」</span>
+                )}
                 {change && <span className="ml-2 break-all text-ink-muted">{change}</span>}
               </p>
             </li>

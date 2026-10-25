@@ -158,7 +158,7 @@ const GroupView = (props: GroupViewProps) => {
           <GroupCodes {...tabProps} />
         </Tab>
         <Tab key="members" title={`成員 ${detail.members.length}`}>
-          <GroupMembers {...tabProps} adminMode={props.adminMode} />
+          <GroupMembers {...tabProps} adminMode={props.adminMode} exitHref={exitHref} />
         </Tab>
         <Tab key="roles" title="身分組">
           <GroupRoles {...tabProps} />

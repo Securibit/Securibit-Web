@@ -317,6 +317,12 @@ create table vault_escrow (
   `group.account.overwrite`、`group.account.secret.view`（取得金鑰時）、
   `group.category.reorder`（0020；target_type `group`，detail `{ name, categories, old_categories }`，順序沒變不記）
 
+**管理員查看的紀錄只在後台出現**（0025）：
+- 網站管理員（ADMINISTRATOR、MANAGE_GROUPS）不是群組成員、靠網站權限取得金鑰時，`group.account.secret.view` 的 detail 加上 `via_site: true`。
+  `group_audit_log` 不列這些紀錄（呼叫者有全站 VIEW_AUDIT_LOG 時照列）；`admin_audit_log` 除了全站紀錄，另外列出這些紀錄，並附上 `group { id, name }`。
+- 後台查看使用者的 2FA（`site.user.totp.view`）不列進使用者自己的 `my_account_activity`，`admin_user_activity` 照列。
+- 0025 之前的紀錄：操作者現在不是那個群組的成員、又有全站 ADMINISTRATOR 或 MANAGE_GROUPS 的，補上 `via_site`。
+
 ## 3. RPC（0009）
 
 全部 `security definer`、`set search_path = public`、`revoke execute from public, anon`、`grant execute to authenticated`。
@@ -340,7 +346,7 @@ create table vault_escrow (
 | 函式 | 權限 | 回傳 |
 |---|---|---|
 | `group_create(name text, description text)` | 全站 CREATE_GROUPS | 新群組 id（uuid）。同時建立 `@everyone`（position 0、permissions 2）並把自己加成成員 |
-| `my_groups()` | 登入 | `[{ id, name, description, owner_id, is_owner, member_count, account_count, permissions }]`，`permissions` = 我在該群組的基礎權限；account_count = 我看得到的數量 |
+| `my_groups()` | 登入 | `[{ id, name, description, owner_id, owner, is_owner, member_count, account_count, permissions }]`，`owner` 是擁有者的 `{ id, name, username, photo_url }`（0025，不含 email），`members_preview` 是擁有者以外的成員依身分組位置由高到低（同位置先加入的在前）取前 3 位（同格式）；`permissions` = 我在該群組的基礎權限；account_count = 我看得到的數量 |
 | `group_detail(gid uuid)` | 成員（或全站 MANAGE_GROUPS） | 見下方 |
 | `group_update(gid, name text, description text)` | MANAGE_GROUP | void |
 | `group_delete(gid)` | 擁有者、全站 ADMINISTRATOR | void |

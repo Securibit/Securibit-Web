@@ -49,6 +49,8 @@ export interface AuditLog {
   target_id: string | null;
   detail: Record<string, unknown>;
   created_at: string;
+  // 全站操作紀錄裡，網站管理員在某個群組查看金鑰的紀錄附上那個群組
+  group?: { id: string; name: string } | null;
 }
 
 // lib 裡所有 RPC 包裝的回傳格式；code 是自己的 API route 給的錯誤代碼（例如 reauth_required）

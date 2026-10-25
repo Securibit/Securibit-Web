@@ -4,7 +4,7 @@
 -- 用途：在「全新、空白」的 Supabase 專案建立完整的 schema（資料表、函式、觸發器、
 --       RLS policy、權限、Realtime publication 與內建種子資料）。
 -- 用法：到 Supabase 後台 → SQL Editor，整份貼上執行一次即可（不要重複執行）。
--- 內容：等同於依序套用開發時的 0001 ～ 0024 migration 之後的最終狀態，
+-- 內容：等同於依序套用開發時的 0001 ～ 0025 migration 之後的最終狀態，
 --       但只保留最終結果，不含搬移舊資料的步驟。
 --       已經有資料的專案不要執行這份（資料表已存在會失敗）。
 -- 依賴：Supabase 內建的 auth schema（auth.users、auth.sessions、auth.uid()、auth.jwt()）、
@@ -567,6 +567,19 @@ set search_path = public
 as $$
   insert into audit_logs (group_id, actor_id, action, target_type, target_id, detail)
   values (p_gid, p_actor, p_action, p_target_type, p_target_id, coalesce(p_detail, '{}'::jsonb));
+$$;
+
+-- 網站管理員（管理員、管理所有群組）不是群組成員、靠網站權限查看時，操作紀錄的 detail 加上 via_site：
+-- 群組的操作紀錄與使用者自己的紀錄不顯示，只在後台看得到
+create function public.audit_via_site(p_gid uuid, p_uid uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case when exists (select 1 from group_members m where m.group_id = p_gid and m.user_id = p_uid)
+              then '{}'::jsonb else '{"via_site": true}'::jsonb end;
 $$;
 
 -- 檢查身分組顏色：'' 或 '#rrggbb'（存小寫）
@@ -2021,6 +2034,18 @@ begin
   return coalesce((
     select jsonb_agg(jsonb_build_object(
       'id', g.id, 'name', g.name, 'description', g.description, 'owner_id', g.owner_id,
+      'owner', user_brief(g.owner_id, false),
+      -- 擁有者以外的成員，依身分組位置由高到低（同位置先加入的在前）取前 3 位，App 在擁有者頭像右下角顯示
+      'members_preview', (
+        select coalesce(jsonb_agg(user_brief(x.user_id, false) order by x.top desc, x.joined_at), '[]'::jsonb)
+        from (
+          select gm.user_id, gm.joined_at, group_top_position(g.id, gm.user_id) as top
+          from group_members gm
+          where gm.group_id = g.id and gm.user_id <> g.owner_id
+          order by top desc, gm.joined_at
+          limit 3
+        ) x
+      ),
       'is_owner', g.owner_id = uid,
       'is_default', g.id = def,
       'encrypted', g.encrypted,
@@ -3582,7 +3607,8 @@ begin
   perform account_require(p_account, uid, 4);
   select secret into s from totp_secrets where totp_secrets.account_id = p_account;
   perform audit(account_group(p_account), uid, 'group.account.secret.view', 'account', p_account::text,
-                jsonb_build_object('name', (select name from totp_accounts where id = p_account)));
+                jsonb_build_object('name', (select name from totp_accounts where id = p_account))
+                  || audit_via_site(account_group(p_account), uid));
   return s;
 end;
 $$;
@@ -3608,7 +3634,8 @@ begin
   where a.group_id = p_gid and account_permissions(a.id, uid) & 4 <> 0;
   if n > 0 then
     perform audit(p_gid, uid, 'group.account.secret.view', 'group', p_gid::text,
-                  jsonb_build_object('name', (select name from groups where id = p_gid), 'count', n));
+                  jsonb_build_object('name', (select name from groups where id = p_gid), 'count', n)
+                    || audit_via_site(p_gid, uid));
   end if;
   return result;
 end;
@@ -4918,8 +4945,10 @@ $$;
 -- 查詢分頁：before_id = 上一頁最後一筆的 id；管不到的人（階層不比對方高，最高位持有者例外）的 IP 是 null。
 -- ============================================================
 
--- 操作紀錄分頁：[{ id, actor, action, target_type, target_id, detail, created_at }]，id 由大到小
-create function public.audit_page(p_gid uuid, p_before bigint, p_size int, p_with_email boolean)
+-- 操作紀錄分頁：[{ id, actor, action, target_type, target_id, detail, created_at }]，id 由大到小。
+-- p_gid 是群組：那個群組的紀錄；p_site_views false 時不列網站管理員靠網站權限查看的（detail.via_site）。
+-- p_gid 是 null：全站的紀錄；p_site_views true 時另外列出各群組裡 via_site 的紀錄，並附上 group { id, name }
+create function public.audit_page(p_gid uuid, p_before bigint, p_size int, p_with_email boolean, p_site_views boolean)
 returns jsonb
 language sql
 stable
@@ -4930,11 +4959,16 @@ as $$
     jsonb_build_object(
       'id', l.id, 'actor', user_brief(l.actor_id, p_with_email), 'action', l.action,
       'target_type', l.target_type, 'target_id', l.target_id, 'detail', l.detail, 'created_at', l.created_at
-    ) order by l.id desc), '[]'::jsonb)
+    ) || case when p_gid is null and l.group_id is not null
+              then jsonb_build_object('group', (select jsonb_build_object('id', g.id, 'name', g.name) from groups g where g.id = l.group_id))
+              else '{}'::jsonb end
+    order by l.id desc), '[]'::jsonb)
   from (
     select * from audit_logs
-    where group_id is not distinct from p_gid
-      and (p_before is null or id < p_before)
+    where (p_before is null or id < p_before)
+      and case when p_gid is null
+               then group_id is null or (p_site_views and detail ? 'via_site')
+               else group_id = p_gid and (p_site_views or not detail ? 'via_site') end
     order by id desc
     limit greatest(1, least(coalesce(p_size, 50), 200))
   ) l;
@@ -4990,7 +5024,8 @@ end;
 $$;
 
 -- 群組操作紀錄（VIEW_AUDIT_LOG）：id 由大到小，before_id null 從最新開始；
--- email 只給看得到成員 email 的人（group_sees_emails），邀請碼一律遮蔽（group_audit_redact）
+-- email 只給看得到成員 email 的人（group_sees_emails），邀請碼一律遮蔽（group_audit_redact）；
+-- 網站管理員靠網站權限查看金鑰的紀錄（via_site）只有網站的「查看操作紀錄」看得到
 create function public.group_audit_log(gid uuid, before_id bigint, page_size int)
 returns jsonb
 language plpgsql
@@ -5007,13 +5042,14 @@ begin
   with_email := group_sees_emails(p_gid, uid);
   return coalesce((
     select jsonb_agg(group_audit_redact(x.e, with_email) order by x.ord)
-    from jsonb_array_elements(audit_page(p_gid, group_audit_log.before_id, group_audit_log.page_size, with_email))
+    from jsonb_array_elements(audit_page(p_gid, group_audit_log.before_id, group_audit_log.page_size, with_email,
+                                         site_permissions(uid) & 128 <> 0))
          with ordinality as x(e, ord)
   ), '[]'::jsonb);
 end;
 $$;
 
--- 全站操作紀錄（VIEW_AUDIT_LOG）：只列 group_id null 的紀錄
+-- 全站操作紀錄（VIEW_AUDIT_LOG）：group_id null 的紀錄，加上網站管理員在各群組靠網站權限查看金鑰的紀錄
 create function public.admin_audit_log(before_id bigint, page_size int)
 returns jsonb
 language plpgsql
@@ -5025,7 +5061,7 @@ declare
   uid uuid := require_uid();
 begin
   perform site_require(uid, 128);
-  return audit_page(null, admin_audit_log.before_id, admin_audit_log.page_size, site_permissions(uid) & 4 <> 0);
+  return audit_page(null, admin_audit_log.before_id, admin_audit_log.page_size, site_permissions(uid) & 4 <> 0, true);
 end;
 $$;
 
@@ -5069,8 +5105,9 @@ $$;
 
 -- 使用者的操作紀錄分頁：[{ id, actor, action, target_type, target_id, detail, group, created_at }]，id 由大到小；
 -- page_size 預設 20、上限 100。
--- site.user.roles 的 detail 另外附上 added_names / removed_names（身分組目前的名稱；已刪除的身分組不列）
-create function public.user_activity_page(p_uid uuid, p_before bigint, p_size int, p_with_email boolean)
+-- site.user.roles 的 detail 另外附上 added_names / removed_names（身分組目前的名稱；已刪除的身分組不列）。
+-- p_admin false（使用者看自己的）時不列管理員查看他的 2FA（site.user.totp.view），只有後台看得到
+create function public.user_activity_page(p_uid uuid, p_before bigint, p_size int, p_with_email boolean, p_admin boolean)
 returns jsonb
 language sql
 stable
@@ -5102,6 +5139,7 @@ as $$
   from (
     select * from audit_logs a
     where (p_before is null or a.id < p_before)
+      and (p_admin or a.action <> 'site.user.totp.view')
       and (
         (a.target_type = 'user' and a.target_id = p_uid::text and a.action <> 'site.user.delete')
         or (a.target_type = 'member' and a.target_id = p_uid::text
@@ -5260,7 +5298,7 @@ as $$
 declare
   uid uuid := require_uid();
 begin
-  return user_activity_page(uid, my_account_activity.before_id, my_account_activity.page_size, false);
+  return user_activity_page(uid, my_account_activity.before_id, my_account_activity.page_size, false, false);
 end;
 $$;
 
@@ -5301,7 +5339,7 @@ begin
   if not exists (select 1 from profiles p where p.id = p_target) then
     raise exception '找不到這位使用者';
   end if;
-  return user_activity_page(p_target, admin_user_activity.before_id, admin_user_activity.page_size, true);
+  return user_activity_page(p_target, admin_user_activity.before_id, admin_user_activity.page_size, true, true);
 end;
 $$;
 
@@ -7005,6 +7043,7 @@ revoke execute on function public.user_email(uuid) from public, anon, authentica
 revoke execute on function public.display_name(uuid) from public, anon, authenticated;
 revoke execute on function public.user_brief(uuid, boolean) from public, anon, authenticated;
 revoke execute on function public.audit(uuid, uuid, text, text, text, jsonb) from public, anon, authenticated;
+revoke execute on function public.audit_via_site(uuid, uuid) from public, anon, authenticated;
 revoke execute on function public.norm_color(text) from public, anon, authenticated;
 revoke execute on function public.norm_role_name(text) from public, anon, authenticated;
 revoke execute on function public.site_perm_name(bigint) from public, anon, authenticated;
@@ -7075,13 +7114,13 @@ revoke execute on function public.invite_invalid_reason(group_invites) from publ
 revoke execute on function public.new_invite_code() from public, anon, authenticated;
 revoke execute on function public.group_assert_not_encrypted(uuid) from public, anon, authenticated;
 revoke execute on function public.admin_user_json(uuid) from public, anon, authenticated;
-revoke execute on function public.audit_page(uuid, bigint, int, boolean) from public, anon, authenticated;
+revoke execute on function public.audit_page(uuid, bigint, int, boolean, boolean) from public, anon, authenticated;
 revoke execute on function public.invite_code_mask(text) from public, anon, authenticated;
 revoke execute on function public.group_audit_redact(jsonb, boolean) from public, anon, authenticated;
 revoke execute on function public.activity_actor() from public, anon, authenticated;
 revoke execute on function public.user_audit(uuid, uuid, text, jsonb) from public, anon, authenticated;
 revoke execute on function public.activity_value(text) from public, anon, authenticated;
-revoke execute on function public.user_activity_page(uuid, bigint, int, boolean) from public, anon, authenticated;
+revoke execute on function public.user_activity_page(uuid, bigint, int, boolean, boolean) from public, anon, authenticated;
 revoke execute on function public.login_history_page(uuid, bigint, int, boolean) from public, anon, authenticated;
 revoke execute on function public.profiles_activity() from public, anon, authenticated;
 revoke execute on function public.sync_signal(uuid[], text[]) from public, anon, authenticated;
