@@ -153,7 +153,7 @@ const VaultSettings = () => {
                 在這台裝置記住（登出或按「立即鎖定」就會忘記）
               </Checkbox>
               <Checkbox size="sm" color="danger" isSelected={understood} onValueChange={setUnderstood} classNames={{ label: "text-[15px]" }}>
-                我了解忘記密碼就無法救回金鑰，只能清空重新綁定
+                我了解密碼會另外用團隊離線保管的備援金鑰加密保存，忘記時可以寫信請團隊協助還原
               </Checkbox>
             </div>
             <button type="submit" className={actionClass} disabled={pending || !newPassphraseOk || !understood}>
@@ -225,7 +225,7 @@ const VaultSettings = () => {
         )}
       </div>
       <p className="mt-2 px-5 text-[13px] text-ink-muted">
-        加密套用在你擁有、已開啟加密的群組：金鑰會先在你的瀏覽器用這組密碼加密才存到伺服器，資料庫裡只剩密文，網站管理員也看不到。
+        加密套用在你擁有、已開啟加密的群組：金鑰會先在你的瀏覽器用這組密碼加密才存到伺服器，資料庫裡只剩密文，網站管理員也看不到。密碼會另外用團隊離線保管的備援金鑰加密保存，只在你本人申請或法律要求時才會用來還原。
         設定密碼時會順便加密你的預設群組（只有你一個成員時），其他群組到群組設定的「加密」開關切換；加密的群組只能有你一個成員，不能邀請其他人。
         名稱與類別不會加密。每次在新的裝置或登出後都要輸入密碼
       </p>

@@ -17,6 +17,9 @@ export const loadAdminUser = (userId: string) => rpc<AdminUserDetail>('admin_use
 export const updateAdminUser = (userId: string, name: string | null, username: string | null) =>
   rpcVoid('admin_update_user', { user_id: userId, name, username });
 
+// 全站擁有者的使用者 id（需要「進入後台」；還沒有擁有者時 null）
+export const loadSiteOwner = () => rpc<string | null>('site_owner');
+
 export const deleteAdminUser = (userId: string) => callApi<{ success: true }>('/api/admin/delete-user', { userId });
 
 // 使用者已登入的裝置（只能看，current 一律是 false）

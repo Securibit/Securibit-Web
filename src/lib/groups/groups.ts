@@ -1,5 +1,5 @@
 import { callApi, rpc, rpcVoid } from '@/lib/rpc';
-import { AddedMember, GroupAccount, GroupCodes, GroupDetail, GroupSummary } from '@/types/Group/Group';
+import { AddedMember, GroupAccount, GroupBan, GroupCodes, GroupDetail, GroupSummary } from '@/types/Group/Group';
 import { AuditLog, Overwrite, OverwriteTargetType, Result, RoleInput } from '@/types/Permission/Permission';
 import { TotpInput } from '@/types/Totp/Totp';
 import { normalizeSecret } from '@/lib/totp/crud';
@@ -45,6 +45,27 @@ export const setGroupEncrypted = (gid: string, encrypted: boolean, secrets: Reco
 
 export const kickMember = (gid: string, userId: string) => rpcVoid('group_kick', { gid, user_id: userId });
 
+// ---------- 封鎖名單（BAN_MEMBERS） ----------
+
+// 封鎖原因上限（同資料庫）
+export const BAN_REASON_MAX = 200;
+
+export const loadGroupBans = async (gid: string) => {
+  const result = await rpc<GroupBan[] | null>('group_bans', { gid });
+  return result.success ? { ...result, data: result.data ?? [] } : result;
+};
+
+/**
+ * 封鎖使用者；對方是成員時會一起移出群組。target：使用者 ID、@ID（可帶 @）或電子郵件
+ */
+export const banUser = (gid: string, target: string, reason: string) =>
+  rpcVoid('group_ban', { gid, target: target.trim(), reason: reason.trim() || null });
+
+export const updateBanReason = (gid: string, userId: string, reason: string) =>
+  rpcVoid('group_ban_update', { gid, user_id: userId, reason: reason.trim() });
+
+export const unbanUser = (gid: string, userId: string) => rpcVoid('group_unban', { gid, user_id: userId });
+
 /**
  * 全站管理員（MANAGE_GROUPS / ADMINISTRATOR）直接把使用者加進群組，不用邀請；加入後只有 @everyone 的權限。
  * target：電子郵件、@ID（可帶 @）或使用者 ID
@@ -87,8 +108,21 @@ const cleanItem = async (input: TotpInput, key?: CryptoKey) => ({
   secret: await encode(normalizeSecret(input.secret), key),
 });
 
-export const addGroupAccounts = async (gid: string, inputs: TotpInput[], key?: CryptoKey) =>
-  rpc<string[]>('group_account_add', { gid, items: await Promise.all(inputs.map((input) => cleanItem(input, key))) });
+// 資料庫一次最多收 500 筆，超過就分批送出（回傳全部新 id，順序同 inputs）
+const ADD_BATCH = 500;
+
+export const addGroupAccounts = async (gid: string, inputs: TotpInput[], key?: CryptoKey): Promise<Result<string[]>> => {
+  const items = await Promise.all(inputs.map((input) => cleanItem(input, key)));
+  const ids: string[] = [];
+  for (let start = 0; start < items.length; start += ADD_BATCH) {
+    const result = await rpc<string[]>('group_account_add', { gid, items: items.slice(start, start + ADD_BATCH) });
+    if (!result.success) {
+      return ids.length > 0 ? { success: false, message: `已新增 ${ids.length} 筆，其餘失敗：${result.message}` } : result;
+    }
+    ids.push(...(result.data ?? []));
+  }
+  return { success: true, data: ids };
+};
 
 export const updateGroupAccount = async (accountId: string, patch: Partial<TotpInput>, key?: CryptoKey) => {
   const cleaned: Partial<TotpInput> = { ...patch };

@@ -2,9 +2,19 @@
 
 import { createContext, useCallback, useEffect, useState } from "react";
 import useAuth from "@/components/auth/useAuth";
-import { resetVault, saveVault } from "@/lib/totp/crud";
+import { putVaultEscrow, resetVault, saveVault, vaultEscrowNeeded } from "@/lib/totp/crud";
 import { loadGroupAccountSecrets, loadMyGroups, setGroupEncrypted } from "@/lib/groups/groups";
-import { createVault, decryptText, encryptText, isEncrypted, unlockVault, verifyKey } from "@/lib/vault/crypto";
+import {
+  createVault,
+  decryptText,
+  encryptText,
+  isEncrypted,
+  isValidVault,
+  unlockVault,
+  VAULT_INVALID_MESSAGE,
+  verifyKey,
+} from "@/lib/vault/crypto";
+import { escrowEnvelope } from "@/lib/vault/escrow";
 import { deleteDeviceKey, loadDeviceKey, saveDeviceKey } from "@/lib/vault/keyStore";
 import { VaultActionResult, VaultContextValue, VaultInfo, VaultStatus } from "@/types/Vault/Vault";
 import { VaultProviderProps } from "@/types/Vault/VaultProvider";
@@ -12,6 +22,29 @@ import { VaultProviderProps } from "@/types/Vault/VaultProvider";
 export const VaultContext = createContext<VaultContextValue | null>(null);
 
 const WRONG_PASSPHRASE: VaultActionResult = { success: false, message: "密碼錯誤" };
+// 加密設定的版本或次數不合法（可能被竄改）：不拿來算金鑰
+const INVALID_VAULT: VaultActionResult = { success: false, message: VAULT_INVALID_MESSAGE };
+
+// 新密碼的託管密文；算不出來（瀏覽器不支援）時不帶，下次解鎖會再補
+const makeEscrow = async (uid: string, passphrase: string) => {
+  try {
+    return await escrowEnvelope(uid, passphrase);
+  } catch (error) {
+    console.error("建立託管密文失敗:", error);
+    return null;
+  }
+};
+
+// 解鎖成功後：這組密碼還沒有託管密文（舊版設定的）就補存一份；失敗只記 log，不影響解鎖
+const backfillEscrow = async (uid: string, passphrase: string) => {
+  try {
+    if (!(await vaultEscrowNeeded())) return;
+    const escrow = await escrowEnvelope(uid, passphrase);
+    if (!(await putVaultEscrow(escrow))) console.error("補存託管密文失敗");
+  } catch (error) {
+    console.error("補存託管密文失敗:", error);
+  }
+};
 
 // 解鎖狀態屬於哪個使用者、哪一組加密設定；任一個變了（換帳號、在別的裝置改密碼）就要重新確認
 interface KeyState {
@@ -93,11 +126,13 @@ const VaultProvider = (props: VaultProviderProps) => {
   const unlock = useCallback(
     async (passphrase: string, keep: boolean): Promise<VaultActionResult> => {
       if (!uid || !vault) return { success: false, message: "尚未啟用加密" };
+      if (!isValidVault(vault)) return INVALID_VAULT;
       const key = await unlockVault(vault, passphrase);
       if (!key) return WRONG_PASSPHRASE;
 
       await remember(uid, key, keep);
       setKeyState({ uid, check: vault.check, key });
+      void backfillEscrow(uid, passphrase);
       return { success: true };
     },
     [uid, vault]
@@ -114,7 +149,7 @@ const VaultProvider = (props: VaultProviderProps) => {
   // 呼叫端要先更新 keyState 再 refresh profile，否則新設定進來時會被當成「還沒確認」而先鎖住
   const rewrite = useCallback(
     async (
-      next: { info: VaultInfo; key: CryptoKey } | null,
+      next: { info: VaultInfo; key: CryptoKey; escrow: string | null } | null,
       decrypt: (secret: string) => Promise<string>
     ): Promise<VaultActionResult> => {
       if (!uid) return { success: false, message: "尚未登入" };
@@ -131,7 +166,7 @@ const VaultProvider = (props: VaultProviderProps) => {
         return { success: false, message: "有金鑰無法解密，可能是在其他裝置用舊密碼新增的。請先刪除顯示「金鑰錯誤」的項目再試一次。" };
       }
 
-      const saved = await saveVault(next?.info ?? null, secrets, vault?.check ?? null);
+      const saved = await saveVault(next?.info ?? null, secrets, vault?.check ?? null, next?.escrow ?? null);
       return saved.success ? { success: true } : saved;
     },
     [uid, vault]
@@ -142,8 +177,8 @@ const VaultProvider = (props: VaultProviderProps) => {
     async (passphrase: string, keep: boolean): Promise<VaultActionResult> => {
       if (!uid) return { success: false, message: "尚未登入" };
       const next = await createVault(passphrase);
-      // 還沒有加密的群組，只需要存加密設定
-      const saved = await saveVault(next.info, {}, vault?.check ?? null);
+      // 還沒有加密的群組，只需要存加密設定（連同新密碼的託管密文）
+      const saved = await saveVault(next.info, {}, vault?.check ?? null, await makeEscrow(uid, passphrase));
       if (!saved.success) return saved;
 
       await remember(uid, next.key, keep);
@@ -172,10 +207,11 @@ const VaultProvider = (props: VaultProviderProps) => {
   const changePassphrase = useCallback(
     async (currentPassphrase: string, nextPassphrase: string): Promise<VaultActionResult> => {
       if (!uid || !vault) return { success: false, message: "尚未啟用加密" };
+      if (!isValidVault(vault)) return INVALID_VAULT;
       const oldKey = await unlockVault(vault, currentPassphrase);
       if (!oldKey) return WRONG_PASSPHRASE;
 
-      const next = await createVault(nextPassphrase);
+      const next = { ...(await createVault(nextPassphrase)), escrow: await makeEscrow(uid, nextPassphrase) };
       const result = await rewrite(next, decryptWith(oldKey));
       if (!result.success) return result;
 
@@ -192,6 +228,7 @@ const VaultProvider = (props: VaultProviderProps) => {
   const disable = useCallback(
     async (passphrase: string): Promise<VaultActionResult> => {
       if (!uid || !vault) return { success: false, message: "尚未啟用加密" };
+      if (!isValidVault(vault)) return INVALID_VAULT;
       const key = await unlockVault(vault, passphrase);
       if (!key) return WRONG_PASSPHRASE;
 

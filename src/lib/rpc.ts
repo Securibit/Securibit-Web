@@ -4,7 +4,7 @@ import { Result } from '@/types/Permission/Permission';
 // 函式不存在（資料庫還沒更新）時的提示
 const MISSING_FUNCTION = 'PGRST202';
 const missingMessage = (fn: string) =>
-  `資料庫還沒有「${fn}」功能，請照最新的 database/init.sql 更新 Supabase。`;
+  `資料庫還沒有「${fn}」功能，請管理員更新資料庫。`;
 
 /** 呼叫 RPC，統一回傳 { success, data } / { success: false, message }（message 是資料庫給的中文訊息） */
 export const rpc = async <T>(fn: string, args: Record<string, unknown> = {}): Promise<Result<T>> => {
@@ -35,7 +35,13 @@ export const callApi = async <T>(path: string, body: unknown): Promise<Result<T>
       body: JSON.stringify(body),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) return { success: false, message: json.message || `請求失敗（${res.status}）` };
+    if (!res.ok) {
+      return {
+        success: false,
+        message: json.message || json.error || `請求失敗（${res.status}）`,
+        ...(typeof json.code === 'string' ? { code: json.code } : {}),
+      };
+    }
     return { success: true, data: json as T };
   } catch {
     return { success: false, message: '無法連線到伺服器' };

@@ -51,5 +51,5 @@ export interface AuditLog {
   created_at: string;
 }
 
-// lib 裡所有 RPC 包裝的回傳格式
-export type Result<T> = { success: true; data: T } | { success: false; message: string };
+// lib 裡所有 RPC 包裝的回傳格式；code 是自己的 API route 給的錯誤代碼（例如 reauth_required）
+export type Result<T> = { success: true; data: T } | { success: false; message: string; code?: string };

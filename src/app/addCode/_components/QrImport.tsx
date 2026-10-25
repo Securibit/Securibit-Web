@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCamera, faImage, faLink } from "@fortawesome/free-solid-svg-icons";
 import { decodeQrFromFile } from "@/lib/qr";
-import { parseImportText } from "@/lib/totp/importText";
+import { formatImportErrors, parseImportText } from "@/lib/totp/importText";
 import { QrImportProps } from "@/types/AddCode/QrImport";
 import CameraScanModal from "./CameraScanModal";
 import { showError } from "@/lib/errorDialog";
@@ -25,7 +25,9 @@ const QrImport = (props: QrImportProps) => {
   const importText = (text: string) => {
     const result = parseImportText(text);
     if (result.items.length === 0) {
-      showError("無法匯入", result.errors.join("\n"));
+      const details = [result.errors.length > 0 ? formatImportErrors(result.errors) : "沒有可匯入的內容", ...result.notes];
+      // 只有一行時不用行號
+      showError("無法匯入", result.errors.length === 1 && result.notes.length === 0 ? result.errors[0].reason : details.join("\n"));
       return false;
     }
     if (result.items.length === 1 && result.errors.length === 0 && !result.batch) {

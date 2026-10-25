@@ -2,12 +2,12 @@ import { Role } from '@/types/Permission/Permission';
 
 /*
  * 前端判斷「能不能管理」，只用來決定按鈕要不要顯示；真正的檢查在資料庫的 RPC。
- * 規則（Discord）：群組擁有者（或全站管理）、全站「最高位身分組的持有者」不受限；
- * 其他人（包含一般的全站 ADMINISTRATOR）只能管理 position 比自己最高身分組低的身分組與成員。
+ * 規則（Discord）：群組擁有者（或全站管理）、全站擁有者不受限（還沒有全站擁有者時是「最高位身分組的持有者」）；
+ * 其他人（包含全站 ADMINISTRATOR）只能管理 position 比自己最高身分組低的身分組與成員。
  */
 
 export interface Actor {
-  // 群組：擁有者 / 全站 ADMINISTRATOR / MANAGE_GROUPS；全站：最高位身分組的持有者（見 isSiteRoot）
+  // 群組：擁有者 / 全站 ADMINISTRATOR / MANAGE_GROUPS；全站：全站擁有者（見 siteUnrestricted）
   unrestricted: boolean;
   topPosition: number;
 }
@@ -18,6 +18,17 @@ export interface Actor {
  */
 export const isSiteRoot = (topPosition: number, roles: Pick<Role, 'position' | 'is_default' | 'member_count'>[]) =>
   topPosition > 0 && !roles.some((role) => !role.is_default && role.member_count > 0 && role.position > topPosition);
+
+/**
+ * 全站：不受階層限制的人（同 SQL 的 site_is_root）。有全站擁有者時只有擁有者；
+ * 還沒有擁有者（ownerId 為 null）時才看「最高位身分組的持有者」。ownerId 是 undefined（還沒讀到或讀不到）時當作受限
+ */
+export const siteUnrestricted = (
+  isOwner: boolean,
+  ownerId: string | null | undefined,
+  topPosition: number,
+  roles: Pick<Role, 'position' | 'is_default' | 'member_count'>[] | undefined
+) => isOwner || (ownerId === null && !!roles && isSiteRoot(topPosition, roles));
 
 /** 指派身分組時：新加入的身分組權限不能超過自己（permissions 是已展開的權限，管理員是全部） */
 export const canGrantRole = (actorPermissions: number, role: Pick<Role, 'permissions'>) =>

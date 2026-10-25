@@ -23,7 +23,7 @@
 
 | 名稱 | 值 | 說明 |
 |---|---|---|
-| `ADMINISTRATOR` | 1 | 管理員：擁有所有全站權限，且不受階層限制 |
+| `ADMINISTRATOR` | 1 | 擁有所有全站權限。請只給信任的人。（1.5 起不再不受階層限制，只有全站擁有者不受限，見 1.4） |
 | `VIEW_ADMIN` | 2 | 進入後台 |
 | `VIEW_USERS` | 4 | 查看使用者列表與基本資料 |
 | `MANAGE_USERS` | 8 | 修改使用者資料（名稱、@ID）、刪除使用者 |
@@ -33,8 +33,9 @@
 | `VIEW_AUDIT_LOG` | 128 | 查看全站操作紀錄 |
 | `CREATE_GROUPS` | 256 | 建立群組（`@everyone` 預設有） |
 | `MANAGE_GROUPS` | 512 | 查看與管理所有群組（在任何群組都視同擁有全部群組權限，但不能做「擁有者限定」的動作） |
+| `SEND_NOTIFICATIONS` | 1024 | 發送通知：後台發公告（重要、更新、推廣、其他）、預覽對象、看發送紀錄（0024，見第 8 節） |
 
-`SITE_ALL = 1023`。
+`SITE_ALL = 2047`（0024 起；之前是 1023）。網站 `src/lib/permissions/bits.ts`、App 的權限位元要一起改。
 
 ### 1.2 群組權限（group）
 
@@ -49,8 +50,9 @@
 | `MANAGE_ROLES` | 64 | | 管理身分組、指派身分組、設定驗證碼覆寫 |
 | `MANAGE_GROUP` | 128 | | 修改群組名稱與說明、撤銷別人的邀請 |
 | `VIEW_AUDIT_LOG` | 256 | | 查看群組操作紀錄 |
+| `BAN_MEMBERS` | 512 | | 封鎖成員：封鎖或解除封鎖使用者，被封鎖的人無法再透過邀請加入。只能封鎖身分組比自己低的成員。（0023） |
 
-`GROUP_ALL = 511`，可覆寫的位元 `GROUP_OVERWRITABLE = 14`（VIEW_CODES | VIEW_SECRETS | MANAGE_CODES）。
+`GROUP_ALL = 1023`（0023 起；之前是 511），可覆寫的位元 `GROUP_OVERWRITABLE = 14`（VIEW_CODES | VIEW_SECRETS | MANAGE_CODES），BAN_MEMBERS 不可覆寫。
 新群組的 `@everyone` 預設 `VIEW_CODES`（2）。
 
 ### 1.3 權限計算
@@ -84,7 +86,10 @@
   - 編輯身分組權限時，只能開啟自己有的位元（群組 ADMINISTRATOR 例外）。
   - 設定覆寫時，對身分組的覆寫要該身分組比自己低；對成員的覆寫要該成員比自己低；`@everyone` 都可以。
   - 全站 `ADMINISTRATOR` / `MANAGE_GROUPS` 在群組裡視同擁有者（但不能轉移擁有權、不能刪除群組以外……見各函式）。
-- **全站**：沒有擁有者。只有「最高位身分組的持有者」不受階層限制（0010 起；一般的 `ADMINISTRATOR` 也要遵守）；其他人照上面的規則。
+- **全站**（0023 起）：有一位**全站擁有者**（`site_owner`，只有一列），只有擁有者不受階層限制，可以管理所有人與所有身分組。
+  其他人（含擁有 `ADMINISTRATOR` 的人）只能管理**最高位置比自己低**的使用者、**position 比自己最高位置低**的身分組（含 `@everyone`，position 0）；
+  最高位置相同的管理員互相管不到；除了擁有者，沒有人能管理擁有者（不論擁有者的最高位置）。「只能開 / 指派自己有的位元」照舊。
+  還沒有擁有者（新專案尚未設定、或擁有者帳號已刪除）時，照 0010 的規則由「最高位身分組的持有者」不受限。
   另外保護：不能讓全站「最後一位」擁有 ADMINISTRATOR 的使用者失去它（刪身分組、改權限、移除指派、刪除使用者都要擋）。
 
 ## 2. 資料表
@@ -255,6 +260,34 @@ create table audit_logs (
 );
 
 alter table totp_accounts add foreign key (group_id) references groups(id) on delete cascade;
+
+-- 0023：群組封鎖名單
+create table group_bans (
+  group_id   uuid references groups(id) on delete cascade,
+  user_id    uuid references profiles(id) on delete cascade,
+  reason     text not null default '' check (char_length(reason) <= 200),
+  banned_by  uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (group_id, user_id)
+);
+-- 0023：全站擁有者（只有一列）；pending_email = 還沒註冊時先記的 email，登入且已驗證時接上
+create table site_owner (
+  id            boolean primary key default true check (id),
+  user_id       uuid references profiles(id) on delete set null,
+  pending_email text
+);
+-- 0023：加密密碼的託管密文（user_id 不設 FK，刪帳號後保留一年）；只有 service role 能讀
+create table vault_escrow (
+  id          bigserial primary key,
+  user_id     uuid not null,
+  email       text,
+  key_id      text not null,
+  envelope    text not null,     -- esc:v1:<kid>:<epk>:<iv>:<ct>
+  vault_check text not null,     -- 對應的 profiles.vault.check
+  created_at  timestamptz not null default now()
+);
+-- 0023：profiles.photo_custom boolean（自己上傳的大頭照）、login_history.session_id uuid（+ 索引 (user_id, session_id)）
 ```
 
 全部 `enable row level security`、不建 policy、`revoke all from anon, authenticated`。
@@ -263,6 +296,8 @@ alter table totp_accounts add foreign key (group_id) references groups(id) on de
 - `site_roles`：`@everyone`（position 0、is_default、permissions = 256 CREATE_GROUPS）、
   `管理員`（position 100、color `#e11d48`、permissions = 1 ADMINISTRATOR）。
 - `marryhan25648@gmail.com`：已有 profile 就直接指派「管理員」；同時寫進 `site_pending_roles`。
+  0023 也把他設成全站擁有者（還沒註冊時記成 `site_owner.pending_email`）。`database/init.sql` 的新專案一開始沒有擁有者，設定方式見檔案的第 17 段。
+- Storage（0023）：公開 bucket `avatars`，只有 service role（`/api/profile/photo`）寫入，不建使用者的 storage policy。
 - 重新定義 `ensure_profile()`：原本的邏輯不變，**最後**（profile 已存在也要執行）把 `site_pending_roles` 中 email 符合的指派掉並刪除。
   `handle_new_user` 觸發器也一樣補上。
 
@@ -271,6 +306,11 @@ alter table totp_accounts add foreign key (group_id) references groups(id) on de
 **操作紀錄要記的動作**（action 名稱）：
 - 全站：`site.role.create/update/delete/reorder`、`site.user.roles`、`site.user.update`、`site.user.delete`、
   `site.user.totp.view`、`site.user.totp.update`、`site.user.totp.delete`
+- 封鎖（0023，記在群組紀錄，target_type `user`、target_id = 被封鎖的使用者 id，也會列進對方的帳號操作紀錄）：
+  `group.member.ban`（detail `{ name, reason, was_member }`；封鎖成員時不另外記 `group.member.kick`）、
+  `group.member.ban.update`（detail `{ name, reason, old_reason }`）、`group.member.unban`（detail `{ name, reason }`，reason 是解除前的原因）
+- 刪除帳號（0023）：撤銷他的邀請連結、刪除他送出 / 寄給他的 Email 邀請時各記一筆 `group.invite.revoke`，
+  操作者 null（系統），detail `{ name, reason: 'account_deleted' }`（Email 邀請另有 `email`）
 - 群組：`group.create`、`group.update`、`group.transfer`、`group.role.create/update/delete/reorder`、
   `group.member.roles`、`group.member.kick`、`group.member.join`、`group.member.add`（0017）、`group.member.leave`、
   `group.invite.create/revoke`、`group.invite.email`、`group.account.create/update/delete`、
@@ -287,9 +327,10 @@ alter table totp_accounts add foreign key (group_id) references groups(id) on de
 
 `me_permissions() returns jsonb`
 ```json
-{ "permissions": 1023, "top_position": 100,
+{ "permissions": 2047, "top_position": 100, "is_owner": false,
   "roles": [{ "id": "...", "name": "管理員", "color": "#e11d48", "position": 100 }] }
 ```
+`is_owner`（0023）：自己是不是全站擁有者。
 `permissions` 已展開（有 ADMINISTRATOR 時是 SITE_ALL）。`roles` 不含 @everyone，依 position 由高到低。
 
 ### 3.2 群組
@@ -315,14 +356,18 @@ alter table totp_accounts add foreign key (group_id) references groups(id) on de
 | `group_account_add(gid, items jsonb)` | MANAGE_CODES（群組層級） | 新增的 id 陣列 `uuid[]`；items 同個人 `TotpInput` |
 | `group_account_update(account_id, patch jsonb)` | 該筆的 MANAGE_CODES | void；改 secret 不需要 VIEW_SECRETS |
 | `group_account_delete(account_id)` | 該筆的 MANAGE_CODES | void |
-| `group_accounts_reorder(gid, ids uuid[])` | MANAGE_CODES（群組層級） | void |
+| `group_accounts_reorder(gid, ids uuid[])` | MANAGE_CODES（群組層級） | void。0023 起只排呼叫者看得到（該筆有 VIEW_CODES）的驗證碼，排進它們原本佔的位置；看不到的位置不變，ids 裡看不到的 id 忽略 |
 | `group_set_category_order(gid, names text[])`（0020） | MANAGE_CODES（群組層級） | 整理後存進去的 `text[]`。names = 由前到後的類別順序（所有成員共用，存在 `groups.category_order`）；去頭尾空白、去空、去重（保留第一次出現的位置）；名稱超過 50 字、含逗號或頓號、超過 200 個 → raise。順序有變才記 `group.category.reorder`，並通知全體成員 `codes:<gid>` |
 | `group_account_secret(account_id)` | 該筆的 VIEW_SECRETS | 金鑰字串；記錄 `group.account.secret.view` |
 | `group_account_secrets(gid)` | — | `{ "<account_id>": "<secret>" }`，只含呼叫者有 VIEW_SECRETS 的；用來匯出 / 前端自己產碼；記錄一筆 secret.view（detail 帶數量） |
 | `group_account_overwrites(account_id)` | MANAGE_ROLES | `[{ target_type, target_id, allow, deny }]` |
 | `group_set_overwrite(account_id, target_type, target_id, allow bigint, deny bigint)` | MANAGE_ROLES + 階層 | void；allow、deny 都是 0 就刪除那筆覆寫；`allow & deny` 不可重疊 |
 | `group_codes_permitted(gid)` | 成員 | `uuid[]`：呼叫者有 VIEW_CODES 的驗證碼 id（給 `/api/groups/codes` 用） |
-| `group_audit_log(gid, before_id bigint, page_size int)` | VIEW_AUDIT_LOG | `[{ id, actor: SiteUserBrief, action, target_type, target_id, detail, created_at }]`，id 由大到小，before_id null 從最新開始 |
+| `group_audit_log(gid, before_id bigint, page_size int)` | VIEW_AUDIT_LOG | `[{ id, actor: SiteUserBrief, action, target_type, target_id, detail, created_at }]`，id 由大到小，before_id null 從最新開始。0023 起讀取時遮蔽（存的資料不變）：actor 的 email 只給 `group_sees_emails` 的人，其他人 detail 裡看起來像 email 的 `name` / `actor_name` / `email` 也是 null；邀請連結的邀請碼（`group.invite.*` 的 target_id、detail.name，以及 detail.code）一律只留前 4 碼 + `…` |
+| `group_bans(gid)`（0023） | BAN_MEMBERS | `[{ user_id, name, username, photo_url, email, reason, created_at, updated_at, banned_by: { id, name } \| null }]`，created_at 新到舊；email 只給 `group_sees_emails` 的人，否則 null |
+| `group_ban(gid, target text, reason text default null)`（0023） | BAN_MEMBERS | void。target 同 `group_add_member`（使用者 UUID、`@ID` / 不含 @ 的字串、email）；找不到時訊息同 `group_add_member`（「找不到這個 @ID」等）。reason 去頭尾空白、最多 200 字。不能封鎖自己（「不能封鎖自己」）、擁有者（「不能封鎖群組擁有者」）；已封鎖 →「這位使用者已經被封鎖」。對方是成員時要能管理他（「只能封鎖身分組比你低的成員」），並照 `group_kick` 的方式移出群組；另外刪除寄給他的 Email 邀請。加密的群組也可以封鎖 |
+| `group_ban_update(gid, user_id uuid, reason text)`（0023） | BAN_MEMBERS | void；沒有被封鎖 →「這位使用者沒有被封鎖」；原因沒變不記紀錄 |
+| `group_unban(gid, user_id uuid)`（0023） | BAN_MEMBERS | void；沒有被封鎖 →「這位使用者沒有被封鎖」 |
 
 `group_detail(gid)`：
 ```json
@@ -356,19 +401,19 @@ alter table totp_accounts add foreign key (group_id) references groups(id) on de
 |---|---|---|
 | `group_invite_create(gid, expires_in_hours int, max_uses int)` | CREATE_INVITE | 邀請碼 text。null = 不過期 / 不限次數 |
 | `group_invite_revoke(code text)` | 建立者，或 MANAGE_GROUP | void |
-| `group_invite_info(code text)` | 登入 | `{ valid, reason, group: { id, name, description, member_count }, inviter: SiteUserBrief, already_member }`。reason：`not_found` / `revoked` / `expired` / `used_up`，有效時為 null |
-| `group_join(code text)` | 登入 | 群組 id；已是成員直接回傳 id 不扣次數；成功時 uses + 1 |
-| `group_invite_user(gid, target text)` | CREATE_INVITE | void。target 是 email 或 `@ID`（開頭 @，或不含 @ 的字串都當 @ID）。@ID 找不到使用者 → raise「找不到這個 @ID」；email 可以是還沒註冊的人。已是成員 → raise；已邀請過 → 不重複新增 |
-| `group_add_member(gid, target text)`（0017） | 全站 MANAGE_GROUPS / ADMINISTRATOR | `{ id, name }`。不用邀請直接加入，只有 @everyone 的權限。target 是 email、`@ID` 或使用者 UUID；找不到、已是成員、加密的群組、email 未驗證 → raise。刪除對方在此群組的 Email 邀請，記 `group.member.add`（也列進對方的帳號操作紀錄） |
+| `group_invite_info(code text)` | 登入 | `{ valid, reason, group: { id, name, description, member_count }, inviter: SiteUserBrief, already_member, banned }`。reason：`not_found` / `revoked` / `expired` / `used_up`，有效時為 null；`banned`（0023）= 呼叫者被這個群組封鎖 |
+| `group_join(code text)` | 登入 | 群組 id；已是成員直接回傳 id 不扣次數；被封鎖 → raise「你已被這個群組封鎖，無法加入」；成功時 uses + 1 |
+| `group_invite_user(gid, target text)` | CREATE_INVITE | void。target 是 email 或 `@ID`（開頭 @，或不含 @ 的字串都當 @ID）。@ID 找不到使用者 → raise「找不到這個 @ID」；email 可以是還沒註冊的人。已是成員 → raise；對方被封鎖 → raise「這位使用者已被這個群組封鎖」；已邀請過 → 不重複新增 |
+| `group_add_member(gid, target text)`（0017） | 全站 MANAGE_GROUPS / ADMINISTRATOR | `{ id, name }`。不用邀請直接加入，只有 @everyone 的權限。target 是 email、`@ID` 或使用者 UUID；找不到、已是成員、被封鎖（「這位使用者已被這個群組封鎖」）、加密的群組、email 未驗證 → raise。刪除對方在此群組的 Email 邀請，記 `group.member.add`（也列進對方的帳號操作紀錄） |
 | `group_email_invite_cancel(invite_id uuid)` | 邀請者，或 CREATE_INVITE | void |
 | `my_invitations()` | 登入 | `[{ id, group: { id, name, description, member_count }, invited_by: SiteUserBrief, created_at }]`，比對 `auth.users.email`（小寫） |
-| `respond_invitation(invite_id uuid, accept boolean)` | 被邀請者本人 | 接受時回傳群組 id，拒絕回傳 null；兩者都刪除邀請 |
+| `respond_invitation(invite_id uuid, accept boolean)` | 被邀請者本人 | 接受時回傳群組 id，拒絕回傳 null；兩者都刪除邀請。接受時被封鎖 → raise「你已被這個群組封鎖，無法加入」（raise 時邀請不會刪除，可以改按拒絕） |
 
 ### 3.4 後台
 
 | 函式 | 權限 | 回傳 |
 |---|---|---|
-| `admin_users(search text, page_offset int, page_size int)` | VIEW_USERS | `{ total, users: [AdminUser] }`。search 比對 email / name / username（ilike），null 列全部；依 created 新到舊 |
+| `admin_users(search text, page_offset int, page_size int)` | VIEW_USERS | `{ total, users: [AdminUser], site_owner_id }`（`site_owner_id` 0023：全站擁有者的 id，沒有時 null）。search 比對 email / name / username（ilike），null 列全部；依 created 新到舊 |
 | `admin_user(user_id)` | VIEW_USERS | `AdminUser` 加 `groups: [{ id, name, is_owner }]` |
 | `admin_user_sessions(user_id)`（0020） | VIEW_USERS | 對方登入中的裝置，只能看、不能登出：格式同 `list_my_sessions()`（`[{ id, created_at, updated_at, refreshed_at, last_active_at, user_agent, ip, aal, current, device_name, platform, app_version }]`，依 last_active_at 新到舊），`current` 一律 false；管不到對方（階層不比對方高）時 `ip` 是 null（同 `admin_user_login_history`）；找不到 → raise「找不到這位使用者」 |
 | `admin_update_user(user_id, name text, username text)` | MANAGE_USERS + 階層 | void；username 規則同 set_username；null 代表不改，空字串代表清除 |
@@ -377,6 +422,7 @@ alter table totp_accounts add foreign key (group_id) references groups(id) on de
 | `admin_delete_user_totp(user_id, item_id)` | MANAGE_USER_TOTP | void |
 | `admin_can_delete_user(user_id) returns boolean` | — | MANAGE_USERS + 階層 + 不是自己 + 不是最後一位管理員 + 沒有擁有任何群組；給 `/api/admin/delete-user` 用（不通過時 raise 說明原因） |
 | `can_delete_self()` | 登入 | 自己刪除帳戶前檢查：還擁有群組、或是最後一位管理員時 raise；否則 true（`/api/delete-account` 用） |
+| `site_owner()`（0023） | VIEW_ADMIN | 全站擁有者的使用者 id（uuid），沒有時 null |
 | `site_roles_list()` | VIEW_ADMIN | `[{ id, name, color, position, permissions, is_default, member_count }]` 由高到低 |
 | `site_role_create(name, color, permissions)` | MANAGE_ROLES | id；position 規則同群組 |
 | `site_role_update(role_id, name, color, permissions)` | MANAGE_ROLES + 階層 + 只能開自己有的位元 | void |
@@ -391,8 +437,9 @@ alter table totp_accounts add foreign key (group_id) references groups(id) on de
 { "id": "...", "email": "...", "name": "...", "username": "...", "photo_url": "...",
   "creation_time": "...", "last_login_at": "...", "last_login_ip": "...", "last_login_device": "...",
   "last_active_at": "...",
-  "role_ids": ["..."], "top_position": 0, "totp_count": 3, "vault_enabled": false }
+  "role_ids": ["..."], "top_position": 0, "is_owner": false, "totp_count": 3, "vault_enabled": false }
 ```
+`is_owner`（0023）：這位使用者是不是全站擁有者（畫面顯示「擁有者」）。
 `last_active_at`（0020）：對方所有登入中 session（過了 not_after 的不算）的最後活動取最新的，算法同 `list_my_sessions`；沒有 session 時 null。
 
 ## 4. Next.js API route
@@ -469,7 +516,7 @@ src/app/admin/                     後台（總覽、使用者、使用者詳情
 - **權限中文名稱**以 `src/lib/permissions/bits.ts` 為準，SQL 的 `site_perm_name` / `group_perm_name`（錯誤訊息用）與它一致。
 - **position 只代表順序**：reorder、刪除身分組後會重新編號為 n..1，管理員的 position 不會一直是 100，不要寫死。
   reorder 的「管不到的不能動」比較的是排名，不是 position 數字。
-- 有 MANAGE_ROLES 的人都能編輯 `@everyone`（同 Discord），但一樣只能開自己有的位元。
+- 群組裡有 MANAGE_ROLES 的人都能編輯 `@everyone`（同 Discord），但一樣只能開自己有的位元。全站的 `@everyone` 0023 起也走階層（position 0，有任何身分組的人都管得到）。
 - `group_set_overwrite`：新開的「允許」只能是呼叫者在這筆驗證碼本身就有的權限，避免沒有 VIEW_SECRETS 的人對 @everyone 開允許來拿金鑰。
 - 未登入時：totp_* 回傳 null、`me_permissions` 回傳 null，其他 RPC raise「請先登入」。
 - 非成員呼叫 `group_codes_permitted`、`group_account_secrets` 會 raise「你不是這個群組的成員」；
@@ -483,9 +530,9 @@ src/app/admin/                     後台（總覽、使用者、使用者詳情
 - `@everyone` 的 id 固定 `00000000-0000-0000-0000-000000000000`，「管理員」固定 `00000000-0000-0000-0000-000000000001`。
 - `/api/delete-account` 刪除前呼叫 `can_delete_self()`。
 - **安全性規則**：
-  - **全站階層**：只有「最高位身分組的持有者」（`site_is_root`：自己有身分組，而且沒有任何人的最高身分組比自己高；
-    只看有人持有的身分組，最上面的身分組沒人時由下一個有人持有的身分組接手）不受階層限制。
-    一般 `ADMINISTRATOR` 仍有全部權限位元，但不能動比自己高或同位的身分組與使用者。前端 `isSiteRoot()` 同規則。
+  - **全站階層**（0023 起）：`site_is_root` 改成「有擁有者時只有擁有者」（`site_is_owner`）；還沒有擁有者時才照舊用「最高位身分組的持有者」
+    （自己有身分組，而且沒有任何人的最高身分組比自己高；只看有人持有的身分組）。`site_can_manage_user` 另外擋「對方是擁有者」。
+    一般 `ADMINISTRATOR` 仍有全部權限位元，但不能動比自己高或同位的身分組與使用者。前端 `isSiteRoot()` 同規則（用 `me_permissions.is_owner`）。
   - **後台 2FA**：`admin_user_totp`、`admin_update_user_totp`、`admin_delete_user_totp` 目標是自己，或 `site_can_manage_user` 管得到對方才行。
   - **指派身分組**：`group_set_member_roles`、`site_set_user_roles` 新加入的身分組，權限必須是呼叫者（已展開）權限的子集，
     超過時 raise「只能指派權限不超過你自己的身分組」。群組擁有者 / 全站管理例外；全站沒有例外（管理員本來就是全有），
@@ -499,14 +546,32 @@ src/app/admin/                     後台（總覽、使用者、使用者詳情
     （`claim_verified_email`）；未驗證時保留在暫存表，之後登入發現已驗證再套（舊資料搬進已存在的 profile，`migrated = true`）。
     `user_email()` 只回傳已驗證的 email，所以未驗證的人看不到、也不能接受 Email 邀請。`ensure_profile` 每次會把 `profiles.email` / `email_verified` 同步成 auth.users。
   - **profiles 欄位權限**：`authenticated` 只有 select 與 `update (name, photo_url, bg_photo_url, phone_number, creation_time, last_sign_in_time, migration_notified, updated_at)`；
-    不能 insert / delete，也不能直接改 email、email_verified、vault、username、last_login_*、migrated、totp。`user_brief`、`display_name` 的 email 改從 auth.users 取。
-  - **加密設定**：`totp_set_vault(new_vault, secrets, expected_check default null)`：鎖住自己那列後比對目前 `vault.check` 與 `expected_check`
+    不能 insert / delete，也不能直接改 email、email_verified、vault、username、last_login_*、migrated、totp、photo_custom。`user_brief`、`display_name` 的 email 改從 auth.users 取。
+  - **profiles 防護**（0023，`profiles_guard` before update 觸發器，只在 `current_user = 'authenticated'`，也就是使用者用 PostgREST 直接改時生效；
+    security definer 的 RPC 與 service role 不受影響）：creation_time、last_sign_in_time 一律維持原值（不報錯，舊版照送也沒關係）；
+    photo_url 只接受 `''` 或 Google 大頭照（`^https://[a-z0-9-]+\.googleusercontent\.com/`），`photo_custom` 為 true（自己上傳過）時維持原值；
+    bg_photo_url 只能設成 `''`；其他值都維持原值。name 去頭尾空白、超過 64 字截斷。上傳大頭照 / 背景圖走 `/api/profile/photo`（service role，會設 `photo_custom`）。
+  - **刪除帳號**（0023，`profiles_delete_owned_groups`）：刪掉只有自己的群組後，撤銷他建立的所有邀請連結（保留那一列）、刪除他送出與寄給他的 Email / @ID 邀請，
+    各記一筆 `group.invite.revoke`（reason `account_deleted`）。操作紀錄（actor 變 null）、登入紀錄與 `vault_escrow` 都保留。
+  - **驗證碼上限**（0023）：`group_account_add` / `totp_add` 一次最多 500 筆（「一次最多新增 500 筆驗證碼」）；新增或修改時名稱、類別最多 200 字、金鑰最多 2048 字。
+    群組名稱照舊最多 50 字；後台 `admin_update_user` 的名稱最多 64 字。接回舊資料（`profiles_totp_to_accounts`）不檢查。
+  - **legacy_import**：0023 起明確 `revoke all from anon, authenticated`（本來就有 RLS 擋）。
+  - **加密設定**：`totp_set_vault(new_vault, secrets, expected_check default null, escrow text default null)`（0023 加 escrow）：鎖住自己那列後比對目前 `vault.check` 與 `expected_check`
     （null 對 null 相同），不同就 raise「加密設定已在其他裝置變更，請重新整理」。加密設定有變時 secrets 必須涵蓋自己全部驗證碼；
-    有加密時送來的金鑰都要是 `enc:v1:`，停用時都要是明文；new_vault 必須有字串 `check`。
+    有加密時送來的金鑰都要是 `enc:v1:`，停用時都要是明文。0023 起 new_vault 必須是 `{ v: 1, salt: 16 bytes 的標準 base64（24 字含 ==）, iterations: 600000～5000000 的整數, check: 'enc:v1:...' }`，
+    否則 raise「加密設定格式不正確」。
+  - **加密密碼託管**（0023）：`escrow` 是新密碼的託管密文 `esc:v1:<kid>:<epk>:<iv>:<ct>`（格式見 `scripts/escrow.mjs`），格式不對 raise「託管資料格式不正確」；
+    有給而且不是停用時，同一個交易寫一列 `vault_escrow`（email 取 auth.users、vault_check = new_vault.check、key_id 取密文裡的 kid）。
+    `vault_escrow_put(escrow text) returns void`：補登，綁目前的 `profiles.vault.check`；沒有 vault → raise「還沒有設定加密密碼」；同一組 check 已有 10 筆時不再新增。
+    `vault_escrow_needed() returns boolean`：有 vault、而且沒有 vault_check = 目前 check 的列時 true。用加密密碼解鎖成功後呼叫，true 就用剛輸入的密碼補登（失敗不影響解鎖）。
+    `vault_escrow` 只有 service role 能 select / delete；`/api/record-login` 清登入紀錄時一併刪掉「帳號已不存在、超過一年」的列。
     `totp_add` / `totp_update`：已啟用加密時金鑰不是 `enc:v1:` 開頭就 raise（擋明文；舊密碼的密文仍擋不到）。
   - **邀請**：邀請碼 = 12 bytes 安全亂數（`extensions.gen_random_bytes`，沒有 pgcrypto 時用兩個 `gen_random_uuid` 的亂數部分）轉 URL 安全 base64，16 碼；
     `group_invite_create` 有效時間 null 時預設 7 天、最長 720 小時（30 天），前端「永不過期」改成「30 天」。既有的永不過期連結在執行 0010 時改成 30 天後到期。
-    成員離開或被踢時，撤銷他建立的邀請連結並刪除他送出的 Email / @ID 邀請。
+    成員離開、被踢或被封鎖時，撤銷他建立的邀請連結並刪除他送出的 Email / @ID 邀請。
+  - **封鎖名單**（0023）：`group_bans`。被封鎖的人：`group_join`、`respond_invitation`（接受）raise「你已被這個群組封鎖，無法加入」；
+    `group_invite_user`、`group_add_member` raise「這位使用者已被這個群組封鎖」；`group_invite_info` 照常回傳，多 `banned: true`。
+    `group_assert_not_encrypted` 0023 起不論有沒有加密都共享鎖住群組列，`group_ban` 用 for update 鎖群組列，所以封鎖和同時進行的加入互斥。
   - **成員 email**：`group_detail` 的成員、邀請建立者、Email 邀請者，以及 `group_invite_info` 的邀請者，只有擁有者 / 全站管理、
     或有 KICK_MEMBERS / MANAGE_ROLES 的人拿得到 email（`group_sees_emails`），其他成員是 null。
 
@@ -570,3 +635,89 @@ src/app/admin/                     後台（總覽、使用者、使用者詳情
 - 群組設定：擁有者多一組「預設與加密」——「設為預設群組」與「加密」開關（沒設定密碼、有其他成員、鎖定中時說明原因）；
   預設群組 / 唯一擁有的群組的「刪除群組」停用並說明；加密的群組停用「轉移擁有權」。加密的群組不顯示「邀請」分頁。
 - 帳戶設定的「金鑰加密」：說明加密套用在自己擁有、已開啟加密的群組，列出這些群組；設定密碼時順便加密預設群組（只有自己一個成員時）。
+
+## 8. 通知、公告、最低版本（0024）
+
+資料庫的實作在 `database/init.sql`「15. 通知、公告、最低版本」；給網站與 App 的完整 RPC 說明（回傳格式、每種通知的標題與內文）在
+這一節的最後。推播的 Edge Function 在 `edge-functions/push/index.ts`，部署方式見 README。
+
+### 8.1 通知種類
+
+三大類（`category`）：`system` 系統、`account` 帳戶、`feature` 功能。種類、預設與能不能關由 `notification_defaults()` 決定，
+網站與 App 的「通知」設定分頁照這個順序顯示。
+
+| type | 類別 | 誰收到 | 預設 | 可以關 | 接在哪裡 |
+|---|---|---|---|---|---|
+| `announce_important` | system | 後台指定的對象 | 開 | **不能** | `admin_broadcast_send` |
+| `announce_update` | system | 後台指定的對象 | 開 | 可以 | `admin_broadcast_send` |
+| `announce_promo` | system | 後台指定的對象 | 開 | 可以 | `admin_broadcast_send` |
+| `announce_other` | system | 後台指定的對象 | 開 | 可以 | `admin_broadcast_send` |
+| `new_login` | account | 本人；推播不送到登入的那台裝置 | 開 | 可以 | `login_history` 的 insert 觸發器（帳號的第一次登入不通知） |
+| `vault_changed` | account | 本人（設定、變更、關閉、重設金鑰加密密碼）；推播不送到做變更的那台裝置 | 開 | 可以 | `profiles_activity` 觸發器（`totp_set_vault`、`vault_reset`） |
+| `admin_changed_role` | account | 本人（後台改了他的網站身分組，或刪掉他持有的身分組） | 開 | 可以；後台也能整個關掉 | `site_set_user_roles`、`site_role_delete` |
+| `admin_changed_username` | account | 本人（後台改了他的 @ID） | 開 | 可以；後台也能整個關掉 | `admin_update_user` |
+| `admin_changed_codes` | account | 本人（後台修改、刪除他的驗證碼） | 開 | 可以；後台也能整個關掉 | `admin_update_user_totp`、`admin_delete_user_totp` |
+| `group_invite` | feature | 被邀請的人（Email／@ID 邀請，已註冊且 email 已驗證） | 開 | 可以 | `group_invite_user` |
+| `invite_answered` | feature | 發出邀請的人（接受、拒絕；邀請連結有人加入也算） | 開 | 可以 | `respond_invitation`、`group_join` |
+| `member_added` | feature | 被直接加入群組的人 | 開 | 可以 | `group_add_member` |
+| `member_removed` | feature | 被踢出的人 | 開 | 可以 | `group_kick` |
+| `member_banned` | feature | 被封鎖的人（不含原因） | 開 | 可以 | `group_ban` |
+| `group_roles_changed` | feature | 群組身分組被變更的人（含身分組被刪除時的持有者） | 開 | 可以 | `group_set_member_roles`、`group_role_delete` |
+| `ownership_received` | feature | 新擁有者 | 開 | 可以 | `group_transfer` |
+| `group_deleted` | feature | 除了刪除者以外的所有成員 | 開 | 可以 | `group_delete` |
+| `group_encryption_changed` | feature | 除了操作者以外的所有成員 | 開 | 可以 | `group_set_encrypted`、`totp_set_vault`（停用）、`vault_reset` |
+| `codes_changed` | feature | 看得到那幾筆驗證碼的成員，操作者除外 | **關** | 可以 | `group_add_items`（`group_account_add`、`totp_add`）、`group_account_delete`、`group_accounts_clear`、`totp_delete`、`totp_clear` |
+
+規則：
+- 自己做的動作不通知自己（`new_login`、`vault_changed` 除外）；後台改自己的帳號也不通知。
+- 標題與內文由資料庫產生（固定的中文句型），網站與 App 直接顯示。名稱用「名稱 → @ID → 一位使用者」，**不會出現 email**；
+  不放驗證碼、金鑰、封鎖原因、IP。
+- 「關掉」只影響推播與系統通知（`push_state = 'skipped'`），鈴鐺裡一樣有。`announce_important` 一律推。
+- `codes_changed` 合併：同一位操作者、同一個群組、10 分鐘內、收件人還沒讀的那一則，數量累加、時間更新，推播只在第一次送；
+  一次匯入多筆只產生一則。
+- 防灌：同一位操作者、同一種通知、同一位收件人一小時內最多 30 則，超過的不產生。
+- 有新通知、合併、標已讀時，收件人收到 `sync_signals` topic `notifications`。
+- 保留一年（`prune_retention`），刪帳號時一起刪除。公告紀錄（`broadcasts`）一律保留。
+- 新增一種通知時：加進 `notification_defaults()`、這張表、網站與 App 的通知分頁（見 `docs/security-rules.md`）。
+
+### 8.2 後台
+
+- 「發送通知」（`SEND_NOTIFICATIONS`，重要公告也一樣）：`admin_broadcast_preview`、`admin_broadcast_send`、`admin_broadcasts_list`。
+  一次最多 10,000 人，每人每小時最多發 20 次；寫 `audit_logs` `notification.broadcast`。
+  對象條件（全部可選、同時符合才算，至少要有一個）：使用者（`user_ids`）、全部使用者（`all_users`）、網站身分組（`site_role_ids`）、
+  平台（`platforms`：ios／android／macos／linux／windows／web）、指定裝置（`session_ids`）、版本範圍（`version_min`、`version_max`，含，semver，
+  預先發行比正式版舊）、最近幾天用過（`last_seen_days`）。有裝置條件時收件匣給「至少有一台符合的裝置」的人，推播只送符合的裝置；
+  沒有裝置條件時收件匣給所有符合的人，推播送他們所有裝置。`web` 指只用網站（沒有登入中的 App 裝置、有登入紀錄）。
+- 「通知設定」：`admin_site_settings_get`（VIEW_ADMIN）、`admin_site_settings_set`（**MANAGE_USERS**，ADMINISTRATOR 自然有；寫 `audit_logs` `site.settings.update`）。
+  - `notify_admin_changes`：`{ role, username, codes }`，後台修改帳號的三種通知要不要發（預設都開）。
+  - `min_app_version`：`{ version, message }` 或 null。App 開啟時用 `app_config()`（不用登入）讀，版本比它低就整頁「強制更新」；網站不受影響。
+
+### 8.3 推播
+
+- `session_devices.push_token`（≤ 4096）、`push_updated_at`：只能用 `register_push_token(p_token)` 寫到目前這個 session；
+  使用者直接改 `session_devices` 時這兩欄被忽略（`session_devices_guard`）。同一個 token 出現在新的 session 時，其他列的同一個 token 清掉；
+  session 登出、過期後 token 不再使用（`push_claim` 會清掉）。
+- 流程：`notifications` 有 pending 的 insert 之後（statement 層級觸發器）用 `pg_net` POST 到 `<Vault project_url>/functions/v1/push`，
+  header `x-push-secret`（Vault `push_webhook_secret`，migration 產生）。沒有 pg_net、Vault 或 secret 時安靜地跳過；失敗不擋原本的操作。
+  有 `pg_cron` 時每分鐘 `push_retry()` 補送。
+- Edge Function 用 service role 呼叫 `push_check_secret`、`push_claim`（最多 500 則，標成 `sending`；超過 5 分鐘沒回報的再給一次；
+  超過 1 天還沒送的標 `skipped`）、`push_finish`（標 `sent`、清掉 FCM 說無效的 token）。這三支只給 service role。
+- Android 通知頻道 = 類別（system／account／feature）；`announce_important` 用高優先。iOS 目前不推播，桌面 App 開著時依 sync_signals 自己跳系統通知。
+
+### 8.4 RPC
+
+| 函式 | 權限 | 說明 |
+|---|---|---|
+| `notifications_list(p_category text default null, p_before bigint default null, p_limit int default 30)` | 登入 | 自己的通知，新到舊：`[{ id, category, type, title, body, link, data, created_at, read_at, push_state }]`；`p_before` 是上一頁最後一筆的 id；`p_limit` 1～100 |
+| `notifications_unread_counts()` | 登入 | `{ total, system, account, feature }` |
+| `notifications_mark_read(p_ids bigint[] default null, p_category text default null)` | 登入 | 回傳標了幾則；都 null = 全部；兩個都給 = 交集；ids 最多 1000 |
+| `notification_prefs_get()` | 登入 | `[{ type, category, default, locked, enabled }]` |
+| `notification_prefs_set(p_overrides jsonb)` | 登入 | `{ "<type>": bool }` 合併到現有設定；未知的 type、關掉 important 的要求忽略；回傳同 get |
+| `register_push_token(p_token text)` | 登入 | 寫到目前 session 的 `session_devices`（沒有那列就建立）；null = 取消 |
+| `app_config()` | **anon** 與登入 | `{ min_app_version: { version, message } \| null }` |
+| `admin_broadcast_preview(p_filter jsonb)` | SEND_NOTIFICATIONS | `{ users, devices, push_devices, limit }` |
+| `admin_broadcast_send(p_kind, p_title, p_body, p_link, p_filter)` | SEND_NOTIFICATIONS | `{ broadcast_id, users, devices, push_devices }`；標題 1～100 字、內文 ≤ 500 字、連結只能是站內路徑 |
+| `admin_broadcasts_list(p_before bigint default null, p_limit int default 50)` | SEND_NOTIFICATIONS | `[{ id, kind, title, body, link, filter, created_by, created_at, user_count, device_count, push_count }]` |
+| `admin_site_settings_get()` | VIEW_ADMIN | `{ notify_admin_changes: { role, username, codes }, min_app_version }` |
+| `admin_site_settings_set(p_key, p_value)` | MANAGE_USERS | 回傳存進去的值 |
+| `push_check_secret(p_secret)`、`push_claim(p_limit)`、`push_finish(p_ids, p_bad_tokens)` | service role | Edge Function 專用 |

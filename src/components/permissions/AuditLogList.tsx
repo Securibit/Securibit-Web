@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@heroui/react";
 import Spinner from "@/components/ui/Loading/Spinner";
 import UserChip from "@/components/permissions/UserChip";
-import { auditActionText, auditChangeText } from "@/lib/permissions/auditActions";
+import { auditActionText, auditChangeText, SITE_SETTING_TEXT } from "@/lib/permissions/auditActions";
 import { showError } from "@/lib/errorDialog";
 import { formatDateTime } from "@/lib/utils";
 import { AuditLog } from "@/types/Permission/Permission";
@@ -17,13 +17,18 @@ const TARGET_TYPE_TEXT: Record<string, string> = {
   account: "驗證碼",
   invite: "邀請",
   group: "群組",
+  broadcast: "通知",
+  setting: "網站設定",
 };
 
 // 目標的簡短說明：類型 +（detail.name 或縮短的 id）
 const targetText = (log: AuditLog) => {
   if (!log.target_type && !log.target_id) return null;
   const type = log.target_type ? (TARGET_TYPE_TEXT[log.target_type] ?? log.target_type) : "";
-  const name = typeof log.detail?.name === "string" && log.detail.name ? `「${log.detail.name}」` : "";
+  const rawName = typeof log.detail?.name === "string" ? log.detail.name : "";
+  // 網站設定的 name 是 key，換成中文
+  const displayName = log.target_type === "setting" ? (SITE_SETTING_TEXT[rawName] ?? rawName) : rawName;
+  const name = displayName ? `「${displayName}」` : "";
   const id = !name && log.target_id ? (log.target_id.length > 12 ? `${log.target_id.slice(0, 8)}…` : log.target_id) : "";
   return [type, name || id].filter(Boolean).join(" ");
 };

@@ -67,7 +67,14 @@ export const parseOtpauthUri = (text: string): OtpauthResult => {
   const algorithm = toAlgorithm(params.get('algorithm'));
   if (!algorithm) return fail(`不支援 ${params.get('algorithm')} 演算法`);
 
-  const label = decodeURIComponent(url.pathname.replace(/^\//, '')).trim();
+  // 名稱裡的 % 編碼不完整（例如手打的連結）時用原本的文字，不要整行失敗
+  const rawLabel = url.pathname.replace(/^\//, '');
+  let label: string;
+  try {
+    label = decodeURIComponent(rawLabel).trim();
+  } catch {
+    label = rawLabel.trim();
+  }
   const name = composeName(label, params.get('issuer') ?? '');
   // category 不是標準參數，是本站匯出備份時加上的（多個類別用「,」串起來），其他 App 會忽略
   const category = normalizeCategories(params.get('category'));

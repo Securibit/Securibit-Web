@@ -105,7 +105,14 @@ const InviteClient = () => {
               )}
             </div>
 
-            {info.already_member ? (
+            {info.banned && !info.already_member ? (
+              <div className="flex w-full flex-col gap-2">
+                <p className="text-[15px] text-alarm">你已被這個群組封鎖</p>
+                <Button variant="light" radius="full" size="lg" fullWidth onPress={() => router.push("/groups")}>
+                  回到群組
+                </Button>
+              </div>
+            ) : info.already_member ? (
               <div className="flex w-full flex-col gap-2">
                 <p className="text-[13px] text-ink-muted">你已經是這個群組的成員</p>
                 <Button color="primary" radius="full" size="lg" fullWidth onPress={() => router.push(`/groups/${info.group?.id}`)}>
@@ -122,7 +129,7 @@ const InviteClient = () => {
                 </Button>
               </div>
             )}
-            {!info.already_member && <OpenInApp code={code} />}
+            {!info.already_member && !info.banned && <OpenInApp code={code} />}
           </>
         )}
       </div>

@@ -43,6 +43,7 @@
   - 使用者 ID、個人頁、登入紀錄與帳號操作紀錄
   - 已登入的裝置：可以登出單一裝置或其他所有裝置
 - **後台**：管理使用者、全站身分組與權限、所有群組，以及全站操作紀錄
+- **通知**：鈴鐺收件匣（系統、帳戶、功能三類）、每種通知可以自己開關；後台可以依身分組、平台、裝置、版本發公告，並設定 App 的最低版本；Android App 收得到推播
 - **即時同步**：群組、邀請與驗證碼有變動時，網站和 App 自動更新
 - **App 下載頁**：讀取 App 在 GitHub 的最新 Release，依訪客的平台排序
 
@@ -77,7 +78,23 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon_public_key>
 SUPABASE_SERVICE_ROLE_KEY=<service_role_key>
 ```
 
-### 3. start
+### 3. 推播（選用）
+資料庫有新的通知時，用 `pg_net` 呼叫 Edge Function [`edge-functions/push/index.ts`](./edge-functions/push/index.ts)，由它透過 Firebase Cloud Messaging 推播到 Android App。沒設定的話鈴鐺照常可用，只是不會推播。
+
+1. **Edge Function**：Dashboard → **Edge Functions** → 新增函式，名稱 `push`，貼上 `edge-functions/push/index.ts` 的內容後部署；在函式設定把 **Verify JWT 關掉**（改由資料庫帶的 `x-push-secret` 驗證）。
+2. **Secrets**：Edge Functions → **Secrets** 新增 `FCM_SERVICE_ACCOUNT`，值是 Firebase 服務帳戶的整個 JSON（Firebase Console → 專案設定 → 服務帳戶 → 產生新的私密金鑰）。`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY` 由 Supabase 自動提供。
+3. **Vault**：`init.sql`（或 migration 0024）已經在 Vault 產生 `push_webhook_secret`。專案網址請自己在 SQL Editor 執行一次（網址不進 repo）：
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+   ```
+4. **補送（建議）**：Database → **Extensions** 開啟 `pg_cron` 後執行下面這行，每分鐘補送沒送出去的推播（先開好 `pg_cron` 再跑 `init.sql` 的話會自動排好）：
+   ```sql
+   select cron.schedule('securibit-push-retry', '* * * * *', 'select public.push_retry()');
+   ```
+
+服務帳戶 JSON、Vault 的值都不要放進 repo。
+
+### 4. start
 ```bash
 pnpm i
 pnpm dev

@@ -9,7 +9,8 @@ import RoleAssignModal from "@/components/permissions/RoleAssignModal";
 import useAuth from "@/components/auth/useAuth";
 import { loadAdminUser, loadSiteRoles, setUserSiteRoles } from "@/lib/admin/admin";
 import { SITE } from "@/lib/permissions/bits";
-import { Actor, canManageMember, isSiteRoot, sortRoles } from "@/lib/permissions/hierarchy";
+import { Actor, canManageMember, siteUnrestricted, sortRoles } from "@/lib/permissions/hierarchy";
+import useSiteOwner from "@/components/auth/useSiteOwner";
 import { showError } from "@/lib/errorDialog";
 import { AdminUser } from "@/types/Admin/Admin";
 import { Role } from "@/types/Permission/Permission";
@@ -44,7 +45,7 @@ const rowClass = "flex w-full items-center gap-3 px-5 py-3 text-left text-[17px]
 // 別人個人頁面底部的「管理」：依全站權限與階層顯示（真正的檢查在資料庫的 RPC）
 const UserAdminActions = ({ target, onChanged }: UserAdminActionsProps) => {
   const router = useRouter();
-  const { can, permissions, topPosition } = useAuth();
+  const { can, permissions, topPosition, isSiteOwner } = useAuth();
 
   const canEdit = can(SITE.MANAGE_USERS);
   // 身分組清單（site_roles_list）要「進入後台」才讀得到
@@ -105,17 +106,19 @@ const UserAdminActions = ({ target, onChanged }: UserAdminActionsProps) => {
     };
   }, [needAdminUser, applyAdminUser, target.id]);
 
-  // 只有最高位身分組的持有者不受階層限制；身分組載入前（或讀不到）先當作受限
+  // 只有全站擁有者不受階層限制（還沒有擁有者時是最高位身分組的持有者）；資料載入前（或讀不到）先當作受限
+  const ownerId = useSiteOwner(needRoles);
   const actor = useMemo<Actor>(
-    () => ({ unrestricted: rolesLoaded && isSiteRoot(topPosition, roles), topPosition }),
-    [roles, rolesLoaded, topPosition]
+    () => ({ unrestricted: siteUnrestricted(isSiteOwner, ownerId, topPosition, rolesLoaded ? roles : undefined), topPosition }),
+    [isSiteOwner, ownerId, roles, rolesLoaded, topPosition]
   );
 
   if (!anyAction && !canOpenAdmin) return null;
   if (!rolesReady) return null;
 
   // 對方的位置比自己高或同位：不能管理（看後台詳情不受階層限制）
-  const manageable = canManageMember(actor, { top_position: topPositionOf(target) });
+  // 全站擁有者只有自己能管理
+  const manageable = canManageMember(actor, { top_position: topPositionOf(target), is_owner: !!ownerId && ownerId === target.id });
   const editUser = adminUser ?? (needAdminUser ? undefined : fromPublic(target));
   const adminHref = `/admin/users/${target.id}`;
 

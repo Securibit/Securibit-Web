@@ -7,7 +7,8 @@ import RoleEditor from "@/components/permissions/RoleEditor";
 import useAuth from "@/components/auth/useAuth";
 import { createSiteRole, deleteSiteRole, loadSiteRoles, reorderSiteRoles, updateSiteRole } from "@/lib/admin/admin";
 import { SITE, SITE_PERMISSIONS } from "@/lib/permissions/bits";
-import { Actor, isSiteRoot, sortRoles } from "@/lib/permissions/hierarchy";
+import { Actor, siteUnrestricted, sortRoles } from "@/lib/permissions/hierarchy";
+import useSiteOwner from "@/components/auth/useSiteOwner";
 import { showError } from "@/lib/errorDialog";
 import { Role } from "@/types/Permission/Permission";
 
@@ -21,13 +22,14 @@ const fetchRoles = async () => {
 
 // 全站身分組：有進入後台就能看（唯讀），有「管理身分組」才能修改
 const RolesClient = () => {
-  const { can, permissions, topPosition, refresh } = useAuth();
+  const { can, permissions, topPosition, isSiteOwner, refresh } = useAuth();
   const canManage = can(SITE.MANAGE_ROLES);
   const [roles, setRoles] = useState<Role[]>();
-  // 只有最高位身分組的持有者不受階層限制（一般管理員也要遵守）
+  // 只有全站擁有者不受階層限制（還沒有擁有者時是最高位身分組的持有者；管理員也要遵守）
+  const ownerId = useSiteOwner();
   const actor = useMemo<Actor>(
-    () => ({ unrestricted: isSiteRoot(topPosition, roles ?? []), topPosition }),
-    [roles, topPosition]
+    () => ({ unrestricted: siteUnrestricted(isSiteOwner, ownerId, topPosition, roles), topPosition }),
+    [isSiteOwner, ownerId, roles, topPosition]
   );
 
   // 失敗時保留畫面上原本的清單（第一次載入失敗就顯示空的）

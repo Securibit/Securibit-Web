@@ -18,6 +18,8 @@ export interface AdminUser {
   top_position: number;
   totp_count: number;
   vault_enabled: boolean;
+  // 全站擁有者（只有擁有者自己能管理）
+  is_owner?: boolean;
 }
 
 export interface AdminUserDetail extends AdminUser {
@@ -27,6 +29,8 @@ export interface AdminUserDetail extends AdminUser {
 export interface AdminUserPage {
   total: number;
   users: AdminUser[];
+  // 全站擁有者的 id（還沒有擁有者時 null）
+  site_owner_id?: string | null;
 }
 
 // admin_user_totp() 的一筆：已加密的 secret 是 null

@@ -22,12 +22,13 @@ import GroupMembers from "./GroupMembers";
 import GroupRoles from "./GroupRoles";
 import GroupInvites from "./GroupInvites";
 import GroupSettings from "./GroupSettings";
+import GroupBans from "./GroupBans";
 
-type TabKey = "codes" | "members" | "roles" | "invites" | "settings" | "audit";
+type TabKey = "codes" | "members" | "roles" | "invites" | "bans" | "settings" | "audit";
 
-const TAB_KEYS: TabKey[] = ["codes", "members", "roles", "invites", "settings", "audit"];
+const TAB_KEYS: TabKey[] = ["codes", "members", "roles", "invites", "bans", "settings", "audit"];
 
-// 群組內頁主體：依權限顯示 驗證碼 / 成員 / 身分組 / 邀請 / 設定 / 紀錄（/groups/[id] 與後台 /admin/groups/[id] 共用）
+// 群組內頁主體：依權限顯示 驗證碼 / 成員 / 身分組 / 邀請 / 封鎖名單 / 設定 / 紀錄（/groups/[id] 與後台 /admin/groups/[id] 共用）
 const GroupView = (props: GroupViewProps) => {
   const { gid, exitHref } = props;
   const router = useRouter();
@@ -84,6 +85,7 @@ const GroupView = (props: GroupViewProps) => {
     roles: true,
     // 加密的群組不能邀請其他人
     invites: hasAny(permissions, [GROUP.CREATE_INVITE, GROUP.MANAGE_GROUP]) && !detail.group.encrypted,
+    bans: has(permissions, GROUP.BAN_MEMBERS),
     settings: true,
     audit: has(permissions, GROUP.VIEW_AUDIT_LOG),
   };
@@ -164,6 +166,11 @@ const GroupView = (props: GroupViewProps) => {
         {visible.invites && (
           <Tab key="invites" title="邀請">
             <GroupInvites {...tabProps} />
+          </Tab>
+        )}
+        {visible.bans && (
+          <Tab key="bans" title="封鎖名單">
+            <GroupBans {...tabProps} />
           </Tab>
         )}
         <Tab key="settings" title="設定">

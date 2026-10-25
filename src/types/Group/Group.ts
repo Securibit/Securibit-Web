@@ -59,6 +59,20 @@ export interface GroupEmailInvite {
   created_at: string;
 }
 
+// group_bans() 的一筆：被封鎖的使用者（email 只有看得到成員電子郵件的人才有）
+export interface GroupBan {
+  user_id: string;
+  name: string;
+  username: string | null;
+  photo_url: string | null;
+  email: string | null;
+  reason: string;
+  created_at: string;
+  updated_at: string;
+  // 封鎖的人（帳號已刪除時為 null；name 可能是 null）
+  banned_by: { id: string; name: string | null } | null;
+}
+
 // group_detail()
 export interface GroupDetail {
   group: GroupInfo;
@@ -114,6 +128,8 @@ export interface InviteInfo {
   group: GroupBrief | null;
   inviter: UserBrief | null;
   already_member: boolean;
+  // 我被這個群組封鎖了（舊資料庫沒有這個欄位）
+  banned?: boolean;
 }
 
 // my_invitations() 的一筆

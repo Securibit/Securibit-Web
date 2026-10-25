@@ -10,7 +10,7 @@ import CategoryInput from "@/components/totp/CategoryInput";
 
 // 一次匯入多筆：列出解析到的驗證碼，可以取消勾選、統一指定類別（可多個）
 const BulkImportModal = (props: BulkImportModalProps) => {
-  const { items, errors, batch } = props.result;
+  const { items, errors, notes, batch } = props.result;
 
   // 金鑰和群組既有的重複標「已存在」，和清單裡前面的重複標「和第 N 筆相同」，都預設不勾
   // （分開標，不然清單裡自己重複的，例如 Google Authenticator 存了兩次，看起來像群組裡已經有）
@@ -102,12 +102,15 @@ const BulkImportModal = (props: BulkImportModalProps) => {
             />
           </div>
 
-          {errors.length > 0 && (
+          {(errors.length > 0 || notes.length > 0) && (
             <div className="text-[13px]">
-              <p className="text-alarm">以下內容無法匯入</p>
+              {errors.length > 0 && <p className="text-alarm">有 {errors.length} 行無法讀取，其他的照常匯入</p>}
               <ul className="mt-1 list-disc pl-5 text-ink-muted">
-                {errors.map((error, index) => (
-                  <li key={index} className="break-all">{error}</li>
+                {errors.map((error) => (
+                  <li key={`line-${error.line}`} className="break-all">第 {error.line} 行：{error.reason}</li>
+                ))}
+                {notes.map((note, index) => (
+                  <li key={`note-${index}`} className="break-all">{note}</li>
                 ))}
               </ul>
             </div>

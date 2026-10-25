@@ -5,6 +5,8 @@ import { Toaster } from "react-hot-toast";
 import AuthProvider from "./auth/AuthProvider";
 import AuthGate from "./auth/AuthGate";
 import VaultProvider from "./vault/VaultProvider";
+import NotificationsProvider from "./notifications/NotificationsProvider";
+import ImportantBanner from "./notifications/ImportantBanner";
 import ErrorDialogHost from "./ui/Modal/ErrorDialogHost";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
@@ -22,22 +24,25 @@ const Layout = ({ children }: LayoutData) => {
   return (
     <AuthProvider>
       <VaultProvider>
-        <div className="flex min-h-screen flex-col">
-          <Navbar />
-          <main className="flex-grow">
-            <AuthGate>{children}</AuthGate>
-          </main>
-          <Footer />
-        </div>
-        {/* 成功訊息用 toast，錯誤一律用要按確定的對話框 */}
-        <Toaster
-          toastOptions={{
-            style: { background: 'var(--bg)', color: 'var(--fg)', border: '1px solid var(--line)', borderRadius: 8 },
-            success: { iconTheme: { primary: 'var(--accent)', secondary: 'var(--accent-ink)' } },
-            error: { iconTheme: { primary: 'var(--alarm)', secondary: '#fff' } },
-          }}
-        />
-        <ErrorDialogHost />
+        <NotificationsProvider>
+          <div className="flex min-h-screen flex-col">
+            <Navbar />
+            <ImportantBanner />
+            <main className="flex-grow">
+              <AuthGate>{children}</AuthGate>
+            </main>
+            <Footer />
+          </div>
+          {/* 成功訊息用 toast，錯誤一律用要按確定的對話框 */}
+          <Toaster
+            toastOptions={{
+              style: { background: 'var(--bg)', color: 'var(--fg)', border: '1px solid var(--line)', borderRadius: 8 },
+              success: { iconTheme: { primary: 'var(--accent)', secondary: 'var(--accent-ink)' } },
+              error: { iconTheme: { primary: 'var(--alarm)', secondary: '#fff' } },
+            }}
+          />
+          <ErrorDialogHost />
+        </NotificationsProvider>
       </VaultProvider>
     </AuthProvider>
   );

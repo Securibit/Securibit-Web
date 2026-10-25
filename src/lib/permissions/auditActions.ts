@@ -22,6 +22,9 @@ export const AUDIT_ACTION_TEXT: Record<string, string> = {
   'group.member.join': '加入群組',
   'group.member.add': '直接加入成員',
   'group.member.leave': '離開群組',
+  'group.member.ban': '封鎖使用者',
+  'group.member.ban.update': '修改封鎖原因',
+  'group.member.unban': '解除封鎖',
   'group.invite.create': '建立邀請連結',
   'group.invite.revoke': '撤銷邀請連結',
   'group.invite.email': '邀請使用者',
@@ -46,6 +49,33 @@ export const AUDIT_ACTION_TEXT: Record<string, string> = {
   'user.vault.disable': '停用金鑰加密',
   'user.vault.reset': '重設加密密碼',
   'user.default_group': '變更預設群組',
+  // 通知與網站設定（0024；target_type 'broadcast' / 'setting'）
+  'notification.broadcast': '發送通知',
+  'site.settings.update': '修改網站設定',
+};
+
+// 網站設定的 key（site.settings.update 的 target_id / detail.name）對應的中文
+export const SITE_SETTING_TEXT: Record<string, string> = {
+  notify_admin_changes: '管理員修改帳號時通知本人',
+  min_app_version: '強制更新的最低 App 版本',
+};
+
+const ADMIN_CHANGE_TEXT: Record<string, string> = { role: '變更網站身分組', username: '修改 @ID', codes: '修改驗證碼' };
+
+// 網站設定的值，給操作紀錄顯示
+const settingValueText = (key: unknown, value: unknown) => {
+  if (key === 'min_app_version') {
+    if (!value || typeof value !== 'object') return '未設定';
+    const version = (value as { version?: unknown }).version;
+    return typeof version === 'string' && version ? version : '未設定';
+  }
+  if (key === 'notify_admin_changes' && value && typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .filter(([name]) => name in ADMIN_CHANGE_TEXT)
+      .map(([name, on]) => `${ADMIN_CHANGE_TEXT[name]}${on === false ? '關' : '開'}`)
+      .join('、');
+  }
+  return null;
 };
 
 export const auditActionText = (action: string) => AUDIT_ACTION_TEXT[action] ?? action;
@@ -53,7 +83,22 @@ export const auditActionText = (action: string) => AUDIT_ACTION_TEXT[action] ?? 
 // 帳號變更（user.*）的「舊值 → 新值」，給全站操作紀錄顯示；圖片網址太長不顯示
 const CHANGE_ACTIONS = new Set(['user.username', 'user.name', 'user.phone', 'user.email', 'user.default_group']);
 
+// 封鎖、修改封鎖原因：顯示原因
+const BAN_ACTIONS = new Set(['group.member.ban', 'group.member.ban.update']);
+
 export const auditChangeText = (action: string, detail: Record<string, unknown> | null | undefined) => {
+  if (action === 'notification.broadcast') {
+    const users = typeof detail?.user_count === 'number' ? detail.user_count : null;
+    return users === null ? null : `${users} 位使用者`;
+  }
+  if (action === 'site.settings.update') {
+    const before = settingValueText(detail?.name, detail?.old_value);
+    const after = settingValueText(detail?.name, detail?.value);
+    return after === null ? null : `${before ?? '（無）'} → ${after}`;
+  }
+  if (BAN_ACTIONS.has(action)) {
+    return typeof detail?.reason === 'string' && detail.reason ? `原因：${detail.reason}` : null;
+  }
   if (!CHANGE_ACTIONS.has(action) || !detail) return null;
   const show = (value: unknown) => (typeof value === 'string' && value ? value : '（無）');
   return `${show(detail.old)} → ${show(detail.new)}`;

@@ -25,24 +25,43 @@ export const isValidSecret = (secret: string) => isBase32(normalizeSecret(secret
  */
 
 // 函式不存在（資料庫還沒更新）
-const MISSING_MIGRATION = '資料庫還沒更新，請照最新的 database/init.sql 更新 Supabase。';
+const MISSING_MIGRATION = '這項功能需要更新資料庫，請聯絡管理員。';
 
 /**
  * 更新加密設定，並一次換掉多筆金鑰（設定密碼、改密碼、停用時用）。
  * secrets：{ 驗證碼 id: 新的 secret }；加密設定有變時要涵蓋「我擁有且已加密的群組」的全部驗證碼。
  * 停用（vault 為 null）時那些群組一起改成沒加密。
  * expectedCheck：送出前畫面上的 vault.check（未啟用為 null）；和資料庫不同代表別的裝置改過，資料庫會拒絕。
+ * escrow：新密碼的託管密文（esc:v1:…，src/lib/vault/escrow.ts），和加密設定在同一個交易裡存起來；停用時為 null
  */
 export const saveVault = async (
   vault: VaultInfo | null,
   secrets: Record<string, string>,
-  expectedCheck: string | null
+  expectedCheck: string | null,
+  escrow: string | null = null
 ): Promise<TotpResult> => {
-  const { data, error } = await supabase.rpc('totp_set_vault', { new_vault: vault, secrets, expected_check: expectedCheck });
+  const { data, error } = await supabase.rpc('totp_set_vault', {
+    new_vault: vault,
+    secrets,
+    expected_check: expectedCheck,
+    escrow,
+  });
   if (error?.code === 'PGRST202') return { success: false, message: MISSING_MIGRATION };
   if (error) return { success: false, message: error.message };
   if (data === null) return { success: false, message: '找不到使用者資料' };
   return { success: true, data: data as TotpItem[] };
+};
+
+// 目前的加密設定還沒有託管密文（舊版設定的密碼）時為 true
+export const vaultEscrowNeeded = async () => {
+  const { data, error } = await supabase.rpc('vault_escrow_needed');
+  return !error && data === true;
+};
+
+// 補存目前密碼的託管密文（綁定資料庫裡目前的 vault.check）
+export const putVaultEscrow = async (escrow: string) => {
+  const { error } = await supabase.rpc('vault_escrow_put', { escrow });
+  return !error;
 };
 
 // 忘記加密密碼：清空我擁有且已加密的群組裡的驗證碼，那些群組改成沒加密，並停用加密

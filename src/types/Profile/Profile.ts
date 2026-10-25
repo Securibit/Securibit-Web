@@ -9,6 +9,8 @@ export interface Profile {
   email: string;
   photoURL: string;
   bgPhotoURL: string;
+  // 大頭照是自己上傳的（登入時不再用 Google 的照片蓋掉）
+  photoCustom: boolean;
   emailVerified: boolean;
   phoneNumber: string;
   metadata: {

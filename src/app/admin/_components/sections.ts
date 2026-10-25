@@ -1,4 +1,4 @@
-import { faClockRotateLeft, faGauge, faPeopleGroup, faShieldHalved, faUsers } from "@fortawesome/free-solid-svg-icons";
+import { faBell, faClockRotateLeft, faGauge, faPaperPlane, faPeopleGroup, faShieldHalved, faUsers } from "@fortawesome/free-solid-svg-icons";
 import { SITE } from "@/lib/permissions/bits";
 import { AdminNavItem } from "@/types/Admin/AdminNav";
 
@@ -32,6 +32,21 @@ export const ADMIN_SECTIONS: AdminNavItem[] = [
     description: "查看與管理所有群組",
     icon: faPeopleGroup,
     permission: SITE.MANAGE_GROUPS,
+  },
+  {
+    href: "/admin/notifications",
+    text: "發送通知",
+    description: "發送公告與推廣通知給指定的使用者或裝置",
+    icon: faPaperPlane,
+    permission: SITE.SEND_NOTIFICATIONS,
+  },
+  {
+    href: "/admin/settings",
+    text: "通知設定",
+    description: "後台修改帳號時的通知與強制更新的最低 App 版本",
+    icon: faBell,
+    // 有進入後台就能看（唯讀），有「管理使用者」才能修改
+    permission: SITE.VIEW_ADMIN,
   },
   {
     href: "/admin/audit",

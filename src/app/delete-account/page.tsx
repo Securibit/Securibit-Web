@@ -12,15 +12,17 @@ export const metadata: Metadata = {
 const CONTACT = 'service@bityo.tw';
 
 const deleted = [
-  '帳戶資料：電子郵件、名稱、大頭照、@ID',
+  '帳戶資料：電子郵件、名稱、大頭照、@ID，以及你上傳的大頭照與背景圖',
   '只有你一個人的群組（包含預設群組）與其中所有的驗證碼金鑰',
-  '已登入的裝置',
-  '還沒處理的群組邀請',
+  '已登入的裝置，以及 App 用來接收推播的推播 token',
+  '所有通知與通知設定',
+  '還沒處理的群組邀請，你建立的邀請連結也會失效',
 ];
 
 const kept = [
   '登入紀錄（登入時間、IP 位址、裝置與當時的電子郵件）會保留到登入後滿一年才刪除，用來防止濫用',
   '在其他人的群組裡留下的操作紀錄會繼續保留，但不再連結到你的帳戶',
+  '有設定金鑰加密的話，加密密碼的備援密文會保留一年才刪除，用來處理法律要求；驗證碼已經刪除，它解不出任何驗證碼',
   '資料庫的備份會在保留期限屆滿後自動覆蓋',
 ];
 
@@ -76,6 +78,17 @@ const DeleteAccount = () => {
               請用帳戶的電子郵件寫信到{' '}
               <a href={`mailto:${CONTACT}?subject=${encodeURIComponent('刪除 Securibit 帳戶')}`} className="text-accent hover:underline">{CONTACT}</a>
               ，主旨寫「刪除 Securibit 帳戶」。確認是本人後，我們會在 30 天內刪除並回信通知你。
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="mb-2 px-5 text-[13px] font-normal text-ink-muted">只是不想收到通知</h2>
+          <div className="overflow-hidden rounded-[18px] border border-line/70 bg-surface px-5 py-4">
+            <p className="text-[15px] text-ink-muted">
+              不用刪除帳戶。到
+              <Link href="/me/update_info?tab=notifications" className="text-accent hover:underline">帳戶設定的「通知」分頁</Link>
+              ，每一種通知都可以關閉，包括公告與推廣通知；只有「重要公告」無法關閉。關閉後不會再跳出提醒，通知列表裡還是看得到，通知保留一年後自動刪除。
             </p>
           </div>
         </section>

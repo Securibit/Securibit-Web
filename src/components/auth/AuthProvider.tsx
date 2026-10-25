@@ -174,6 +174,7 @@ const AuthProvider = (props: AuthProviderProps) => {
         permissions: access.permissions,
         topPosition: access.top_position,
         siteRoles: access.roles,
+        isSiteOwner: access.is_owner === true,
         can,
         refresh,
         login,

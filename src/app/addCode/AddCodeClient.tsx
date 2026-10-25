@@ -19,7 +19,7 @@ import { readCodeScope, writeCodeScope } from "@/lib/codeScope";
 import { addGroupAccounts, loadGroupAccounts, loadGroupAccountSecrets, loadGroupDetail, loadMyGroups } from "@/lib/groups/groups";
 import { GROUP, has } from "@/lib/permissions/bits";
 import { normalizeSecret } from "@/lib/totp/crud";
-import { ImportTextResult } from "@/lib/totp/importText";
+import { formatImportErrors, importSummary, ImportTextResult } from "@/lib/totp/importText";
 import { TotpErrors, validateTotpInput } from "@/lib/totp/validate";
 import { GroupSummary } from "@/types/Group/Group";
 import { TOTP_DEFAULTS, TotpInput, TotpItem } from "@/types/Totp/Totp";
@@ -144,7 +144,10 @@ const AddCodeClient = () => {
       return false;
     }
     remember(inputs, result.data);
-    toast.success(`已匯入 ${inputs.length} 筆驗證碼`, { position: 'top-right' });
+    // 有讀不到的行：用對話框列出行號與原因，免得被提示一閃而過
+    const lineErrors = bulk?.errors ?? [];
+    if (lineErrors.length > 0) showError(importSummary(inputs.length, lineErrors), formatImportErrors(lineErrors));
+    else toast.success(importSummary(inputs.length, lineErrors), { position: 'top-right' });
     setLastAdded(describe(inputs));
     return true;
   };

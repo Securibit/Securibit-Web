@@ -1,7 +1,9 @@
 import { Profile } from '@/types/Profile/Profile';
 import { supabase } from '@/config/supabase';
 import { AppUser } from '@/types/authUser';
-import { rpc } from '@/lib/rpc';
+import { callApi, rpc } from '@/lib/rpc';
+import { Result } from '@/types/Permission/Permission';
+import { AuthPopupMessage } from '@/types/Auth/AuthPopup';
 
 // 將 profiles 資料列（snake_case）轉成 App 內部使用的 Profile
 export const rowToProfile = (row: any): Profile => ({
@@ -11,6 +13,7 @@ export const rowToProfile = (row: any): Profile => ({
   email: row.email ?? '',
   photoURL: row.photo_url ?? '',
   bgPhotoURL: row.bg_photo_url ?? '',
+  photoCustom: row.photo_custom === true,
   emailVerified: row.email_verified ?? false,
   phoneNumber: row.phone_number ?? '',
   metadata: {
@@ -180,7 +183,8 @@ export const getUserData = async (
   return { success: true, data: rowToProfile(data) };
 };
 
-// 更新使用者資料（0010 起 email / 驗證狀態不能直接改，以 auth.users 為準，ensure_profile 會同步）
+// 更新使用者資料（0010 起 email / 驗證狀態不能直接改，以 auth.users 為準，ensure_profile 會同步）。
+// 大頭照與背景圖改用 /api/profile/photo 上傳（資料庫只接受 Google 的大頭照網址或清空）
 export const submitChange = async (
   uid: string,
   updated: Partial<Profile>
@@ -199,17 +203,16 @@ export const submitChange = async (
   return { success: true };
 };
 
-// 同步 Google（auth）使用者資料至 profiles（email 與驗證狀態由 ensure_profile 從 auth.users 同步，這裡不寫）
-export const syncGoogleUserData = async (user: AppUser) => {
+// 同步 Google（auth）使用者資料至 profiles（email 與驗證狀態由 ensure_profile 從 auth.users 同步，這裡不寫）。
+// 自己上傳過大頭照（photoCustom）時不蓋掉；建立時間與最後登入時間由伺服器記錄（/api/record-login），不從瀏覽器寫
+export const syncGoogleUserData = async (user: AppUser, photoCustom: boolean) => {
   const { error } = await supabase
     .from('profiles')
     .update({
       name: user.displayName,
-      photo_url: user.photoURL,
+      ...(photoCustom ? {} : { photo_url: user.photoURL ?? '' }),
       // Google 帳號通常沒有電話，沒有時保留使用者自己填的
       ...(user.phoneNumber ? { phone_number: user.phoneNumber } : {}),
-      creation_time: user.metadata.creationTime,
-      last_sign_in_time: user.metadata.lastSignInTime,
       updated_at: new Date().toISOString(),
     })
     .eq('id', user.uid);
@@ -236,25 +239,43 @@ export const notifyMigrationOnce = async (uid: string): Promise<boolean> => {
   return false;
 };
 
-// 刪除帳戶（需 service_role，透過後端 API route 執行）
-export const deleteAccount = async (_user?: AppUser) => {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  const res = await fetch('/api/delete-account', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${session?.access_token ?? ''}`,
-    },
-  });
-
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(json.message || '刪除帳號失敗');
-  }
-
+// 刪除帳戶（需 service_role，透過後端 API route 執行）；10 分鐘內沒登入過會回 reauth_required（見 useReauth）
+export const deleteAccount = async (): Promise<Result<null>> => {
+  const result = await callApi<{ success: true }>('/api/delete-account', {});
+  if (!result.success) return result;
   await supabase.auth.signOut();
-  return { success: true };
+  return { success: true, data: null };
 };
+
+// 刪除帳號這類操作要求最近登入過，API 回這個代碼時要重新登入再試一次
+export const REAUTH_CODE = 'reauth_required';
+// 使用者在「重新登入」對話框按取消
+export const REAUTH_CANCELLED = 'reauth_cancelled';
+
+// 等重新登入的結果：同一個使用者拿到新的 session 回傳 true；換成別的帳號、取消、失敗或逾時回傳 false。
+// 要在呼叫 login() 之前開始等，才不會漏掉事件
+export const waitForReauth = (uid: string, oldToken: string, timeoutMs = 5 * 60 * 1000) =>
+  new Promise<'ok' | 'other-user' | 'failed'>((resolve) => {
+    const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(AUTH_CHANNEL) : null;
+    let done = false;
+    const finish = (value: 'ok' | 'other-user' | 'failed') => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      subscription.unsubscribe();
+      channel?.close();
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish('failed'), timeoutMs);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event !== 'SIGNED_IN' || !session || session.access_token === oldToken) return;
+      finish(session.user.id === uid ? 'ok' : 'other-user');
+    });
+    if (channel) {
+      channel.onmessage = (message: MessageEvent<AuthPopupMessage>) => {
+        if (message.data.type === 'cancelled' || message.data.type === 'error') finish('failed');
+      };
+    }
+  });

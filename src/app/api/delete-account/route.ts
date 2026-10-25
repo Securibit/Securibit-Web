@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticate, rpcError, serverError } from '@/lib/server/supabaseAdmin';
+import { authenticate, removeUserMedia, requireRecentLogin, rpcError, serverError } from '@/lib/server/supabaseAdmin';
 
 // 刪除自己的帳戶：需要 service_role 金鑰（僅後端，切勿外洩）才能刪除 auth 使用者
 export async function POST(req: NextRequest) {
   const auth = await authenticate(req);
   if (auth instanceof NextResponse) return auth;
+
+  // 要 10 分鐘內登入過（拿到別人沒登出的電腦也不能直接刪帳號）
+  const reauth = requireRecentLogin(auth);
+  if (reauth) return reauth;
 
   // 以 token 反查使用者，確保只能刪除「自己」
   const { admin, asUser } = auth;
@@ -22,6 +26,9 @@ export async function POST(req: NextRequest) {
   // profile 與底下資料會在同一個交易裡一起刪掉；失敗時整筆回滾，不會留下沒有 profile 的帳號
   const { error: deleteError } = await admin.auth.admin.deleteUser(uid);
   if (deleteError) return serverError('刪除帳戶失敗', deleteError);
+
+  // 上傳過的大頭照與背景圖一起刪掉
+  await removeUserMedia(admin, uid);
 
   return NextResponse.json({ success: true });
 }

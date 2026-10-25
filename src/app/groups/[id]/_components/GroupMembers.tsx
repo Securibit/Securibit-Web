@@ -6,32 +6,34 @@ import toast from "react-hot-toast";
 import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
-import { faEllipsis, faRightLeft, faTags, faUserMinus } from "@fortawesome/free-solid-svg-icons";
+import { faBan, faEllipsis, faRightLeft, faTags, faUserMinus } from "@fortawesome/free-solid-svg-icons";
 import ConfirmModal from "@/components/ui/Modal/ConfirmModal";
 import UserChip from "@/components/permissions/UserChip";
 import { userPageHref } from "@/lib/users/users";
 import RoleChip from "@/components/permissions/RoleChip";
 import RoleAssignModal from "@/components/permissions/RoleAssignModal";
 import useAuth from "@/components/auth/useAuth";
-import { addGroupMember, kickMember, setMemberRoles, transferGroup } from "@/lib/groups/groups";
+import { addGroupMember, banUser, kickMember, setMemberRoles, transferGroup } from "@/lib/groups/groups";
 import { GROUP, SITE, has } from "@/lib/permissions/bits";
 import { canManageMember, sortRoles } from "@/lib/permissions/hierarchy";
 import { showError } from "@/lib/errorDialog";
 import { formatDateTime } from "@/lib/utils";
 import { GroupMember } from "@/types/Group/Group";
 import { GroupMembersProps } from "@/types/Group/GroupMembers";
+import BanReasonModal from "./BanReasonModal";
 
-type MenuKey = "roles" | "transfer" | "kick";
+type MenuKey = "roles" | "transfer" | "kick" | "ban";
 
 const displayName = (member: GroupMember) =>
   member.name || (member.username ? `@${member.username}` : member.email || "這位成員");
 
-// 成員分頁：列表、指派身分組、移除、轉移擁有權；全站管理員可以直接新增成員
+// 成員分頁：列表、指派身分組、移除、封鎖、轉移擁有權；全站管理員可以直接新增成員
 const GroupMembers = ({ detail, actor, onChanged, adminMode }: GroupMembersProps) => {
   const { user, can } = useAuth();
   const gid = detail.group.id;
   const canAssign = has(detail.permissions, GROUP.MANAGE_ROLES);
   const canKick = has(detail.permissions, GROUP.KICK_MEMBERS);
+  const canBan = has(detail.permissions, GROUP.BAN_MEMBERS);
   // 直接加入只在後台：全站 MANAGE_GROUPS（ADMINISTRATOR 含在內）＋後台頁；前台群組頁一律走邀請，權責分開。加密的群組只能有擁有者一人
   const canAdd = !!adminMode && can(SITE.MANAGE_GROUPS) && !detail.group.encrypted;
 
@@ -40,6 +42,7 @@ const GroupMembers = ({ detail, actor, onChanged, adminMode }: GroupMembersProps
 
   const [assigning, setAssigning] = useState<GroupMember>();
   const [kicking, setKicking] = useState<GroupMember>();
+  const [banning, setBanning] = useState<GroupMember>();
   const [transferring, setTransferring] = useState<GroupMember>();
 
   // 身分組依高到低（@everyone 每個人都有，不顯示）
@@ -137,6 +140,7 @@ const GroupMembers = ({ detail, actor, onChanged, adminMode }: GroupMembersProps
             if (canAssign && manageable) menu.push({ key: "roles", label: "指派身分組", icon: faTags });
             if (detail.is_owner && !member.is_owner) menu.push({ key: "transfer", label: "轉移擁有權", icon: faRightLeft });
             if (canKick && manageable && !isSelf) menu.push({ key: "kick", label: "移出群組", icon: faUserMinus, danger: true });
+            if (canBan && manageable && !isSelf) menu.push({ key: "ban", label: "封鎖", icon: faBan, danger: true });
 
             return (
               <li key={member.id} className="flex items-center gap-3 px-5 py-3">
@@ -174,6 +178,7 @@ const GroupMembers = ({ detail, actor, onChanged, adminMode }: GroupMembersProps
                         if (key === "roles") setAssigning(member);
                         if (key === "transfer") setTransferring(member);
                         if (key === "kick") setKicking(member);
+                        if (key === "ban") setBanning(member);
                       }}
                     >
                       {(entry) => (
@@ -228,6 +233,26 @@ const GroupMembers = ({ detail, actor, onChanged, adminMode }: GroupMembersProps
           if (member) await handleKick(member);
         }}
       />
+
+      {banning && (
+        <BanReasonModal
+          key={banning.id}
+          isOpen
+          danger
+          title={`封鎖 ${displayName(banning)}`}
+          description="封鎖後對方會被移出群組，之後也無法再透過邀請加入，直到解除封鎖。"
+          confirmLabel="封鎖"
+          onClose={() => setBanning(undefined)}
+          onSave={async (reason) => {
+            const result = await banUser(gid, banning.id, reason);
+            if (result.success) {
+              toast.success(`已封鎖 ${displayName(banning)}`, { position: "top-right" });
+              await onChanged();
+            }
+            return result;
+          }}
+        />
+      )}
 
       <ConfirmModal
         isOpen={!!transferring}

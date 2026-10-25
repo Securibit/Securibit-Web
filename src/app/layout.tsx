@@ -1,5 +1,6 @@
 import '@/styles/globals.css'
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import { Inter_Tight, Noto_Sans_TC } from 'next/font/google'
 import NextTopLoader from 'nextjs-toploader'
 import SEO from '@/config/SEO.json'
@@ -19,13 +20,16 @@ export const metadata: Metadata = {
   icons: { icon: '/favicon.ico', apple: '/apple-touch-icon.png' },
 }
 
-const RootLayout = ({ children }: { children: React.ReactNode }) => {
+// 讀 proxy 產生的 CSP nonce（src/proxy.ts）：讀 headers() 也讓每個頁面都動態產生，Next.js 才能把 nonce 加到 script 上
+const RootLayout = async ({ children }: { children: React.ReactNode }) => {
+  const nonce = (await headers()).get('x-nonce') ?? undefined
+
   return (
     <html lang="zh-Hant" suppressHydrationWarning className={cn(interTight.variable, notoTc.variable)}>
       <body className="min-h-full font-sans">
         {/* 換頁時頂部的進度條 */}
         <NextTopLoader color="#17FFAC" height={2} showSpinner={false} shadow={false} />
-        <Providers>{children}</Providers>
+        <Providers nonce={nonce}>{children}</Providers>
       </body>
     </html>
   )

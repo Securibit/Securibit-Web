@@ -9,13 +9,23 @@ import { AuthPopupMessage } from "@/types/Auth/AuthPopup";
 
 type Status = 'loading' | 'done' | 'cancelled' | 'error';
 
-// 讀網址上的 OAuth 錯誤（Google 取消或設定錯誤時會帶 error / error_description）
+const EXPIRED_MESSAGE = '登入連結已過期，請重新登入';
+const FAILED_MESSAGE = '登入失敗，請再試一次';
+
+// 讀網址上的 OAuth 錯誤（Google 取消或設定錯誤時會帶 error / error_code）。
+// 只看錯誤代碼、換成固定的文字：error_description 是網址上的任意字串，別人可以塞假訊息騙使用者，一律不顯示
 const readUrlError = () => {
   const query = new URLSearchParams(window.location.search);
   const hash = new URLSearchParams(window.location.hash.slice(1));
-  const code = query.get('error') ?? hash.get('error');
-  const description = query.get('error_description') ?? hash.get('error_description');
-  return code ? { code, description: description ?? code } : null;
+  const error = query.get('error') ?? hash.get('error');
+  if (!error) return null;
+  const detail = query.get('error_code') ?? hash.get('error_code') ?? '';
+  if (detail === 'otp_expired' || detail === 'flow_state_expired' || /expired/i.test(detail) || /expired/i.test(error)) {
+    return { cancelled: false, message: EXPIRED_MESSAGE };
+  }
+  // 使用者在 Google 頁面按取消（Supabase 的 error_code 會是空的或 access_denied）
+  if (error === 'access_denied') return { cancelled: true, message: '你取消了登入' };
+  return { cancelled: false, message: FAILED_MESSAGE };
 };
 
 /**
@@ -34,13 +44,13 @@ const AuthCallbackClient = () => {
       const urlError = readUrlError();
       if (urlError) {
         // 使用者在 Google 頁面按取消不算錯誤，直接關掉
-        if (urlError.code === 'access_denied') {
+        if (urlError.cancelled) {
           send({ type: 'cancelled' });
           setStatus('cancelled');
           window.close();
         } else {
-          send({ type: 'error', message: urlError.description });
-          setError(urlError.description);
+          send({ type: 'error', message: urlError.message });
+          setError(urlError.message);
           setStatus('error');
         }
         return;
@@ -50,7 +60,9 @@ const AuthCallbackClient = () => {
       const { data, error: sessionError } = await supabase.auth.getSession();
       const session = data.session;
       if (sessionError || !session) {
-        const message = sessionError?.message ?? '沒有取得登入資訊，請再試一次';
+        // 原始錯誤只記在 console
+        if (sessionError) console.error('取得登入資訊失敗:', sessionError);
+        const message = sessionError ? FAILED_MESSAGE : '沒有取得登入資訊，請再試一次';
         send({ type: 'error', message });
         setError(message);
         setStatus('error');
@@ -86,7 +98,7 @@ const AuthCallbackClient = () => {
         )}
 
         {status === 'cancelled' && (
-          <p className="text-[17px] text-ink-muted">已取消登入，可以關閉這個視窗</p>
+          <p className="text-[17px] text-ink-muted">你取消了登入，可以關閉這個視窗</p>
         )}
 
         {status === 'error' && (

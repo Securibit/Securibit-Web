@@ -14,7 +14,8 @@ import RoleAssignModal from "@/components/permissions/RoleAssignModal";
 import useAuth from "@/components/auth/useAuth";
 import { loadAdminUser, loadAdminUserSessions, loadSiteRoles, setUserSiteRoles } from "@/lib/admin/admin";
 import { SITE, SITE_PERMISSIONS, permissionName } from "@/lib/permissions/bits";
-import { Actor, canManageMember, isSiteRoot, sortRoles } from "@/lib/permissions/hierarchy";
+import { Actor, canManageMember, siteUnrestricted, sortRoles } from "@/lib/permissions/hierarchy";
+import useSiteOwner from "@/components/auth/useSiteOwner";
 import { showError } from "@/lib/errorDialog";
 import { formatDateTime } from "@/lib/utils";
 import { AdminUserDetail } from "@/types/Admin/Admin";
@@ -54,16 +55,17 @@ const BackLink = () => (
 const UserDetailClient = (props: UserDetailClientProps) => {
   const { userId } = props;
   const router = useRouter();
-  const { user: me, can, permissions, topPosition, refresh } = useAuth();
+  const { user: me, can, permissions, topPosition, isSiteOwner, refresh } = useAuth();
   const allowed = can(SITE.VIEW_USERS);
   // undefined：載入中；null：找不到 / 載入失敗
   const [detail, setDetail] = useState<AdminUserDetail | null>();
   const [roles, setRoles] = useState<Role[]>([]);
   const [rolesLoaded, setRolesLoaded] = useState(false);
-  // 只有最高位身分組的持有者不受階層限制（一般管理員也要遵守）；身分組載入前先當作受限
+  // 只有全站擁有者不受階層限制（還沒有擁有者時是最高位身分組的持有者；管理員也要遵守）；資料載入前先當作受限
+  const ownerId = useSiteOwner(allowed);
   const actor = useMemo<Actor>(
-    () => ({ unrestricted: rolesLoaded && isSiteRoot(topPosition, roles), topPosition }),
-    [roles, rolesLoaded, topPosition]
+    () => ({ unrestricted: siteUnrestricted(isSiteOwner, ownerId, topPosition, rolesLoaded ? roles : undefined), topPosition }),
+    [isSiteOwner, ownerId, roles, rolesLoaded, topPosition]
   );
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -106,11 +108,14 @@ const UserDetailClient = (props: UserDetailClientProps) => {
   }
 
   const isSelf = me?.uid === detail.id;
+  // 全站擁有者只有自己能管理（舊資料庫沒有 is_owner 時用 site_owner() 比對）
+  const targetIsOwner = detail.is_owner ?? (!!ownerId && ownerId === detail.id);
+  const target = { top_position: detail.top_position, is_owner: targetIsOwner };
   // 修改資料、刪除：要「管理使用者」、階層比對方高，而且不是自己
-  const canManageUser = can(SITE.MANAGE_USERS) && !isSelf && canManageMember(actor, { top_position: detail.top_position });
-  const canAssignRoles = can(SITE.MANAGE_ROLES);
+  const canManageUser = can(SITE.MANAGE_USERS) && !isSelf && canManageMember(actor, target);
+  const canAssignRoles = can(SITE.MANAGE_ROLES) && (!targetIsOwner || isSiteOwner);
   // 2FA：自己的，或階層比對方高才看得到 / 改得到（資料庫同樣檢查）
-  const canReachTotp = isSelf || canManageMember(actor, { top_position: detail.top_position });
+  const canReachTotp = isSelf || canManageMember(actor, target);
   const userRoles = roles.filter((role) => detail.role_ids.includes(role.id));
 
   const copyId = async () => {
@@ -158,7 +163,12 @@ const UserDetailClient = (props: UserDetailClientProps) => {
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[22px] font-semibold">{detail.name || "（未命名）"}</p>
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="truncate text-[22px] font-semibold">{detail.name || "（未命名）"}</p>
+              {targetIsOwner && (
+                <span className="shrink-0 rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-accent" title="全站擁有者">擁有者</span>
+              )}
+            </div>
             <p className="truncate text-[15px] text-ink-muted">{detail.email || "沒有電子郵件"}</p>
           </div>
         </div>

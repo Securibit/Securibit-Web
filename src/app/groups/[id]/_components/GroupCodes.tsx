@@ -26,7 +26,7 @@ import {
   updateGroupAccount,
 } from "@/lib/groups/groups";
 import { GROUP, has } from "@/lib/permissions/bits";
-import { ImportTextResult } from "@/lib/totp/importText";
+import { formatImportErrors, importSummary, ImportTextResult } from "@/lib/totp/importText";
 import { showError } from "@/lib/errorDialog";
 import { cn } from "@/lib/utils";
 import { GroupAccount, GroupCodes as GroupCodesResult } from "@/types/Group/Group";
@@ -251,16 +251,19 @@ const GroupCodes = ({ detail, actor, onChanged, heading }: GroupCodesProps) => {
     [ordered, secrets]
   );
 
-  const handleAdd = async (inputs: TotpInput[]) => {
+  // notify：成功時跳提示（整批匯入有讀不到的行時由呼叫端改用對話框）
+  const handleAdd = async (inputs: TotpInput[], notify = true) => {
     const result = await addGroupAccounts(gid, inputs, key);
     if (!result.success) {
       showError("新增驗證碼失敗", result.message);
       return false;
     }
-    toast.success(
-      inputs.length === 1 ? `已新增「${inputs[0].name.trim()}」` : `已新增 ${inputs.length} 筆驗證碼`,
-      { position: "top-right" }
-    );
+    if (notify) {
+      toast.success(
+        inputs.length === 1 ? `已新增「${inputs[0].name.trim()}」` : `已新增 ${inputs.length} 筆驗證碼`,
+        { position: "top-right" }
+      );
+    }
     await fetchAccounts(true);
     return true;
   };
@@ -575,7 +578,13 @@ const GroupCodes = ({ detail, actor, onChanged, heading }: GroupCodesProps) => {
           existing={knownItems}
           categories={categories}
           onClose={() => setBulk(undefined)}
-          onConfirm={handleAdd}
+          onConfirm={async (inputs) => {
+            // 有讀不到的行：加完後用對話框列出行號與原因
+            const lineErrors = bulk.errors;
+            const ok = await handleAdd(inputs, lineErrors.length === 0);
+            if (ok && lineErrors.length > 0) showError(importSummary(inputs.length, lineErrors), formatImportErrors(lineErrors));
+            return ok;
+          }}
         />
       )}
 
@@ -586,7 +595,13 @@ const GroupCodes = ({ detail, actor, onChanged, heading }: GroupCodesProps) => {
       {exportOpen && <ExportModal items={exportItems} onClose={() => setExportOpen(false)} />}
 
       {shareTarget && (
-        <ShareToGroupModal key={shareTarget.id} item={shareTarget} excludeGroupId={gid} onClose={() => setShareTarget(undefined)} />
+        <ShareToGroupModal
+          key={shareTarget.id}
+          item={shareTarget}
+          excludeGroupId={gid}
+          sourceEncrypted={encrypted}
+          onClose={() => setShareTarget(undefined)}
+        />
       )}
 
       <ConfirmModal

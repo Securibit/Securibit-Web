@@ -116,6 +116,9 @@ const UsersClient = () => {
                 <li key={user.id}>
                   <Link href={`/admin/users/${user.id}`} className="flex items-center gap-4 px-5 py-3 hover:bg-surface-1">
                     <UserChip user={user} showEmail className="min-w-0 flex-1" />
+                    {(user.is_owner || data.site_owner_id === user.id) && (
+                      <span className="shrink-0 rounded-full bg-surface-1 px-2.5 py-0.5 text-[13px] text-accent" title="全站擁有者">擁有者</span>
+                    )}
                     {userRoles.length > 0 && (
                       <div className="hidden max-w-56 flex-wrap justify-end gap-1 sm:flex">
                         {userRoles.map((role) => (

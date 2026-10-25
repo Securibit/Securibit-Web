@@ -132,6 +132,14 @@
         "title": "操作紀錄",
         "description": "後台：全站操作紀錄"
     },
+    "AdminNotify": {
+        "title": "發送通知",
+        "description": "後台：發送公告與推廣通知"
+    },
+    "AdminSettings": {
+        "title": "通知設定",
+        "description": "後台：後台修改帳號時的通知與最低 App 版本"
+    },
     "UserPage": {
         "title": "使用者",
         "description": "使用者的個人頁面"

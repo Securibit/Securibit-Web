@@ -4,28 +4,31 @@
 -- 用途：在「全新、空白」的 Supabase 專案建立完整的 schema（資料表、函式、觸發器、
 --       RLS policy、權限、Realtime publication 與內建種子資料）。
 -- 用法：到 Supabase 後台 → SQL Editor，整份貼上執行一次即可（不要重複執行）。
--- 內容：等同於依序套用開發時的 0001 ～ 0022 migration 之後的最終狀態，
+-- 內容：等同於依序套用開發時的 0001 ～ 0024 migration 之後的最終狀態，
 --       但只保留最終結果，不含搬移舊資料的步驟。
 --       已經有資料的專案不要執行這份（資料表已存在會失敗）。
 -- 依賴：Supabase 內建的 auth schema（auth.users、auth.sessions、auth.uid()、auth.jwt()）、
 --       anon / authenticated / service_role 角色、extensions schema 與 supabase_realtime publication。
+--       推播（選用）：pg_net、Supabase Vault（project_url、push_webhook_secret）、pg_cron（每分鐘補送），沒有就略過。
 --
 -- 權限模型（規格：docs/groups-and-permissions.md）
 -- - 全站身分組：Discord 式 bitfield，多身分組權限 OR，有 @everyone、有階層
 -- - 群組：等於 Discord 的伺服器；群組裡的每筆驗證碼等於頻道，可設定允許 / 拒絕覆寫
 -- - 除了 profiles、sync_signals、session_devices 之外，資料表都開 RLS 且不建 policy，
 --   讀寫一律走 security definer 的 RPC，權限在函式裡檢查。
+-- - 全站擁有者（site_owner）是唯一不受全站階層限制的人；群組擁有者不受群組階層限制。
 --
 -- 全站權限：1 ADMINISTRATOR、2 VIEW_ADMIN、4 VIEW_USERS、8 MANAGE_USERS、16 VIEW_USER_TOTP、
---           32 MANAGE_USER_TOTP、64 MANAGE_ROLES、128 VIEW_AUDIT_LOG、256 CREATE_GROUPS、512 MANAGE_GROUPS
---           SITE_ALL = 1023
+--           32 MANAGE_USER_TOTP、64 MANAGE_ROLES、128 VIEW_AUDIT_LOG、256 CREATE_GROUPS、512 MANAGE_GROUPS、
+--           1024 SEND_NOTIFICATIONS
+--           SITE_ALL = 2047
 -- 群組權限：1 ADMINISTRATOR、2 VIEW_CODES、4 VIEW_SECRETS、8 MANAGE_CODES、16 CREATE_INVITE、
---           32 KICK_MEMBERS、64 MANAGE_ROLES、128 MANAGE_GROUP、256 VIEW_AUDIT_LOG
---           GROUP_ALL = 511，可覆寫 GROUP_OVERWRITABLE = 14
+--           32 KICK_MEMBERS、64 MANAGE_ROLES、128 MANAGE_GROUP、256 VIEW_AUDIT_LOG、512 BAN_MEMBERS
+--           GROUP_ALL = 1023，可覆寫 GROUP_OVERWRITABLE = 14
 --
 -- 段落：
 --   1. 擴充套件
---   2. 資料表（個人資料／全站身分組／群組／驗證碼／邀請／稽核紀錄／即時同步／登入裝置）
+--   2. 資料表（個人資料／全站身分組／群組／驗證碼／邀請／稽核紀錄／即時同步／登入裝置／通知）
 --   3. 共用 helper
 --   4. 全站身分組與權限
 --   5. 個人資料與 @ID
@@ -38,9 +41,10 @@
 --  12. 稽核紀錄與登入紀錄
 --  13. 即時同步
 --  14. 登入裝置
---  15. 權限設定（GRANT / REVOKE）
---  16. 種子資料
---  17. （選用）指定第一位管理員
+--  15. 通知、公告、最低版本
+--  16. 權限設定（GRANT / REVOKE）
+--  17. 種子資料（含 Storage bucket、推播用的 Vault secret 與排程）
+--  18. （選用）指定第一位管理員與全站擁有者
 -- ============================================================
 
 
@@ -51,6 +55,16 @@
 -- pgcrypto：new_invite_code 用 extensions.gen_random_bytes 產生邀請碼（Supabase 預設已裝在 extensions schema）。
 -- 沒有 pgcrypto 時 new_invite_code 會自動改用 gen_random_uuid。
 create extension if not exists pgcrypto with schema extensions;
+
+-- pg_net：通知有新的推播時，資料庫用它非同步呼叫 Edge Function push（見「15. 通知」）。
+-- 沒有 pg_net 的環境（例如本機 PGlite 測試）略過，推播就只是留在 pending，其他功能照常
+do $$
+begin
+  create extension if not exists pg_net;
+exception when others then
+  raise notice '沒有 pg_net，略過推播呼叫：%', sqlerrm;
+end;
+$$;
 
 
 -- ============================================================
@@ -65,7 +79,7 @@ create table public.profiles (
   email              text,                             -- 一律以 auth.users.email 為準（ensure_profile 同步）
   name               text,
   photo_url          text,
-  bg_photo_url       text default 'https://img.freepik.com/free-photo/abstract-luxury-plain-blur-grey-black-gradient-used-as-background-studio-wall-display-your-products_1258-63747.jpg?w=2000',
+  bg_photo_url       text default '',                -- 空字串 = 前端用內建的漸層
   email_verified     boolean default false,
   phone_number       text default '',
   creation_time      text default '',
@@ -90,13 +104,16 @@ create table public.profiles (
   -- 預設群組：不加 FK（群組刪除時由 RPC 處理預設；也避免刪帳號時 FK 動作改到正在刪除的 profile）。
   -- 只能指向自己擁有的群組（profiles_default_group_guard 觸發器）
   default_group_id   uuid,
+  -- 自己上傳的大頭照（/api/profile/photo）：true 時舊版前端每次登入送來的 Google 大頭照不會蓋掉它
+  photo_custom       boolean not null default false,
   constraint profiles_username_format check (username is null or username ~ '^[a-z0-9_.]{3,32}$')
 );
 create unique index profiles_username_key on public.profiles (username);
 
 alter table public.profiles enable row level security;
 
--- 使用者只能讀、改自己那列（能改哪些欄位見「15. 權限設定」）；新增 / 刪除 profile 只由觸發器、ensure_profile 與後端處理
+-- 使用者只能讀、改自己那列（能改哪些欄位見「15. 權限設定」，改的值由 profiles_guard 觸發器把關）；
+-- 新增 / 刪除 profile 只由觸發器、ensure_profile 與後端處理
 create policy "profiles_select_own"
   on public.profiles for select
   using (auth.uid() = id);
@@ -148,6 +165,14 @@ create table public.site_pending_roles (
   primary key (email, role_id)
 );
 
+-- 全站擁有者（只有一列）：唯一不受全站階層限制的人；還沒有擁有者時由「最高位身分組的持有者」不受限。
+-- pending_email：還沒註冊時先記 email（小寫），第一次登入且 email 已驗證時（apply_pending_roles）接上
+create table public.site_owner (
+  id            boolean primary key default true check (id),
+  user_id       uuid references public.profiles (id) on delete set null,
+  pending_email text
+);
+
 -- ---------- 群組 ----------
 
 -- 群組。每個使用者都有一個預設群組（profiles.default_group_id，原本的「我的驗證碼」）。
@@ -197,6 +222,18 @@ create table public.group_member_roles (
   foreign key (group_id, user_id) references public.group_members (group_id, user_id) on delete cascade
 );
 create index group_member_roles_role_idx on public.group_member_roles (role_id);
+
+-- 封鎖名單：被封鎖的人不能再透過邀請連結、Email / @ID 邀請加入，也不能被全站管理員直接加入
+create table public.group_bans (
+  group_id   uuid references public.groups (id) on delete cascade,
+  user_id    uuid references public.profiles (id) on delete cascade,
+  reason     text not null default '' check (char_length(reason) <= 200),
+  banned_by  uuid references public.profiles (id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (group_id, user_id)
+);
+create index group_bans_user_idx on public.group_bans (user_id);
 
 -- ---------- 驗證碼 ----------
 
@@ -282,7 +319,7 @@ create index audit_logs_group_idx on public.audit_logs (group_id, id desc);
 create index audit_logs_target_idx on public.audit_logs (target_type, target_id, id desc);
 create index audit_logs_actor_idx on public.audit_logs (actor_id, id desc);
 
--- 登入紀錄（量大，獨立一張表）：每次登入一筆，由 /api/record-login 用 service role 寫入。
+-- 登入紀錄（量大，獨立一張表）：每次登入一筆（同一個 session 只記一筆），由 /api/record-login 用 service role 寫入。
 -- 為了追查重複開帳號、濫用後刪帳號，刪除帳號後仍保留：user_id 不設 FK（不跟著 profile 刪），
 -- 並記下登入當時的 email；一律保留一年，由 /api/record-login 每次寫入時刪掉一年前的紀錄
 create table public.login_history (
@@ -293,10 +330,27 @@ create table public.login_history (
   device      text,          -- 「OS · 瀏覽器」
   user_agent  text,          -- 完整 user-agent（截斷 512 字）
   provider    text,          -- 登入方式：google / email（auth user 的 app_metadata.provider）
-  email       text           -- 登入當時的 email（帳號刪除後靠它辨識是誰）
+  email       text,          -- 登入當時的 email（帳號刪除後靠它辨識是誰）
+  session_id  uuid           -- access token 的 session_id claim；同一個 session 已經有紀錄就不再新增
 );
 create index login_history_user_idx on public.login_history (user_id, created_at desc);
 create index login_history_created_idx on public.login_history (created_at);
+create index login_history_session_idx on public.login_history (user_id, session_id);
+
+-- 加密密碼的託管密文（esc:v1:...，用團隊的公鑰加密，只有離線的私鑰解得開；格式見 scripts/escrow.mjs）。
+-- 設定 / 變更加密密碼時由 totp_set_vault 寫入，舊資料由 vault_escrow_put 補登。
+-- user_id 不設 FK：刪除帳號時記下 account_deleted_at，之後保留一年，由 prune_retention()（/api/record-login 呼叫）刪掉
+create table public.vault_escrow (
+  id          bigserial primary key,
+  user_id     uuid not null,
+  email       text,                                    -- 寫入當時的 email（帳號刪除後靠它辨識是誰）
+  key_id      text not null,                           -- 團隊公鑰的 key id（esc:v1:<kid>:...）
+  envelope    text not null,
+  vault_check text not null,                           -- 這組密碼對應的 profiles.vault.check
+  created_at  timestamptz not null default now(),
+  account_deleted_at timestamptz                       -- 帳號刪除的時間（profiles_delete_owned_groups 寫入）；null = 帳號還在
+);
+create index vault_escrow_user_idx on public.vault_escrow (user_id, created_at);
 
 -- ---------- 即時同步 ----------
 
@@ -329,9 +383,15 @@ create table public.session_devices (
   app_version   text check (char_length(app_version) <= 32),
   created_at    timestamptz not null default now(),
   -- App 啟動、登入、換 token 時更新
-  last_seen_at  timestamptz not null default now()
+  last_seen_at  timestamptz not null default now(),
+  -- 推播 token（Android 的 FCM token）：只能透過 register_push_token 寫（session_devices_guard 擋直接改）；
+  -- 同一個 token 只會留在一列（換帳號登入時清掉舊的那列）
+  push_token      text check (char_length(push_token) <= 4096),
+  push_updated_at timestamptz
 );
 create index session_devices_user_idx on public.session_devices (user_id);
+-- token 可能很長，用 md5 建唯一索引（同一個 token 只能在一列）
+create unique index session_devices_push_token_key on public.session_devices (md5(push_token)) where push_token is not null;
 
 -- RLS：只能讀自己的、只能寫「目前這個 session」的那一列（別的 session 的裝置資料改不到）
 create policy "session_devices_select_own"
@@ -347,6 +407,64 @@ create policy "session_devices_update_own"
   using (user_id = auth.uid() and session_id = (nullif(auth.jwt() ->> 'session_id', '')::uuid))
   with check (user_id = auth.uid() and session_id = (nullif(auth.jwt() ->> 'session_id', '')::uuid));
 
+-- ---------- 通知、公告、全站設定 ----------
+
+-- 全站設定（key → jsonb）：notify_admin_changes（後台修改帳號時要不要通知本人）、min_app_version（App 最低版本）
+create table public.site_settings (
+  key        text primary key,
+  value      jsonb not null default 'null'::jsonb,
+  updated_by uuid references public.profiles (id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+
+-- 後台發的公告（操作紀錄，一律保留）；filter 是發送時的對象條件
+create table public.broadcasts (
+  id           bigint generated always as identity primary key,
+  kind         text not null check (kind in ('important', 'update', 'promo', 'other')),
+  title        text not null check (char_length(title) between 1 and 100),
+  body         text not null default '' check (char_length(body) <= 500),
+  link         text check (char_length(link) <= 500 and link ~ '^/' and link !~ '^//'),
+  filter       jsonb not null default '{}'::jsonb,
+  created_by   uuid references public.profiles (id) on delete set null,
+  created_at   timestamptz not null default now(),
+  user_count   int not null default 0,
+  device_count int not null default 0,
+  push_count   int not null default 0
+);
+create index broadcasts_created_idx on public.broadcasts (created_by, created_at desc);
+
+-- 每位使用者的通知（鈴鐺）。標題與內文由資料庫產生（固定的中文句型），網站與 App 直接顯示。
+-- push_state：pending 等推播、sending Edge Function 領取中、sent 處理完、skipped 不推播（使用者關掉這一種，或太舊）
+-- push_sessions：公告有裝置條件時只推播到這些 session（null = 他所有的裝置）；exclude_session：推播不送的 session
+-- 保留一年（prune_retention）；刪帳號時跟著刪除
+create table public.notifications (
+  id              bigint generated always as identity primary key,
+  user_id         uuid not null references public.profiles (id) on delete cascade,
+  category        text not null check (category in ('system', 'account', 'feature')),
+  type            text not null check (char_length(type) <= 64),
+  title           text not null check (char_length(title) <= 100),
+  body            text not null default '' check (char_length(body) <= 500),
+  link            text check (char_length(link) <= 500 and link ~ '^/' and link !~ '^//'),
+  data            jsonb not null default '{}'::jsonb,
+  broadcast_id    bigint references public.broadcasts (id) on delete set null,
+  exclude_session uuid,
+  push_sessions   uuid[],
+  created_at      timestamptz not null default now(),
+  read_at         timestamptz,
+  push_state      text not null default 'pending' check (push_state in ('pending', 'sending', 'sent', 'skipped')),
+  push_claimed_at timestamptz
+);
+create index notifications_user_idx on public.notifications (user_id, created_at desc);
+create index notifications_push_idx on public.notifications (push_state, created_at) where push_state in ('pending', 'sending');
+create index notifications_created_idx on public.notifications (created_at);
+
+-- 每位使用者的通知開關：overrides 只存和預設不同的（{ "<type>": true | false }）
+create table public.notification_prefs (
+  user_id    uuid primary key references public.profiles (id) on delete cascade,
+  overrides  jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 -- ---------- Row Level Security ----------
 -- 上面有 policy 的三張表（profiles、sync_signals、session_devices）以外都不建 policy：
 -- 一般使用者無法直接讀寫，一律走 security definer 的 RPC
@@ -355,17 +473,24 @@ alter table public.totp_secrets enable row level security;
 alter table public.site_roles enable row level security;
 alter table public.site_user_roles enable row level security;
 alter table public.site_pending_roles enable row level security;
+alter table public.site_owner enable row level security;
 alter table public.groups enable row level security;
 alter table public.group_roles enable row level security;
 alter table public.group_members enable row level security;
 alter table public.group_member_roles enable row level security;
+alter table public.group_bans enable row level security;
 alter table public.group_invites enable row level security;
 alter table public.group_email_invites enable row level security;
 alter table public.group_account_overwrites enable row level security;
 alter table public.audit_logs enable row level security;
 alter table public.login_history enable row level security;
+alter table public.vault_escrow enable row level security;
 alter table public.sync_signals enable row level security;
 alter table public.session_devices enable row level security;
+alter table public.site_settings enable row level security;
+alter table public.broadcasts enable row level security;
+alter table public.notifications enable row level security;
+alter table public.notification_prefs enable row level security;
 
 
 -- ============================================================
@@ -482,7 +607,9 @@ $$;
 
 -- ============================================================
 -- 4. 全站身分組與權限
--- 階層：只有「最高位身分組的持有者」不受限（一般 ADMINISTRATOR 也要遵守階層）；
+-- 階層：只有全站擁有者（site_owner）不受限；其他人（含 ADMINISTRATOR）只能管理最高身分組比自己低的使用者、
+-- 比自己最高身分組低的身分組，同位的互相管不到，除了擁有者沒有人能管理擁有者。
+-- 還沒有擁有者時，照舊由「最高位身分組的持有者」不受限。
 -- 最後一位管理員保護：拿掉最後一位擁有 ADMINISTRATOR 的使用者時 raise（整個 RPC 回滾）
 -- ============================================================
 
@@ -496,6 +623,7 @@ as $$
     when 1 then '管理員' when 2 then '進入後台' when 4 then '查看使用者' when 8 then '管理使用者'
     when 16 then '查看使用者的 2FA' when 32 then '管理使用者的 2FA' when 64 then '管理身分組'
     when 128 then '查看操作紀錄' when 256 then '建立群組' when 512 then '管理所有群組'
+    when 1024 then '發送通知'
     else p_bit::text end;
 $$;
 
@@ -518,9 +646,9 @@ begin
   where r.is_default
      or r.id in (select ur.role_id from site_user_roles ur where ur.user_id = p_uid);
   if perms & 1 <> 0 then
-    return 1023;
+    return 2047;
   end if;
-  return perms & 1023;
+  return perms & 2047;
 end;
 $$;
 
@@ -538,8 +666,19 @@ as $$
   where ur.user_id = p_uid and not r.is_default;
 $$;
 
--- 是否為「最高位身分組的持有者」：自己有身分組，而且沒有人的最高身分組比自己高
--- （只看有人持有的身分組，避免最上面的身分組沒人時整個後台沒人管得到）
+-- 是否為全站擁有者
+create function public.site_is_owner(p_uid uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p_uid is not null and exists (select 1 from site_owner o where o.user_id = p_uid);
+$$;
+
+-- 不受全站階層限制的人：有擁有者時只有擁有者；還沒有擁有者時是「最高位身分組的持有者」：
+-- 自己有身分組，而且沒有人的最高身分組比自己高（只看有人持有的身分組，避免最上面的身分組沒人時整個後台沒人管得到）
 create function public.site_is_root(p_uid uuid)
 returns boolean
 language sql
@@ -547,12 +686,15 @@ stable
 security definer
 set search_path = public
 as $$
-  select site_top_position(p_uid) > 0
+  select case
+    when exists (select 1 from site_owner o where o.user_id is not null) then site_is_owner(p_uid)
+    else site_top_position(p_uid) > 0
      and site_top_position(p_uid) >= (
        select coalesce(max(r.position), 0)
        from site_user_roles ur join site_roles r on r.id = ur.role_id
        where not r.is_default
-     );
+     )
+  end;
 $$;
 
 -- 沒有指定的全站權限就 raise；回傳展開後的權限
@@ -573,7 +715,7 @@ begin
 end;
 $$;
 
--- 全站階層：能不能管理這個 position 的身分組（最高位身分組的持有者不受限）
+-- 全站階層：能不能管理這個 position 的身分組（擁有者不受限）
 create function public.site_can_manage_position(p_uid uuid, p_position int)
 returns boolean
 language sql
@@ -584,7 +726,7 @@ as $$
   select site_is_root(p_uid) or p_position < site_top_position(p_uid);
 $$;
 
--- 全站階層：能不能管理這位使用者（最高位身分組的持有者不受限）
+-- 全站階層：能不能管理這位使用者（擁有者不受限；其他人只能管最高身分組比自己低的人，而且管不到擁有者）
 create function public.site_can_manage_user(p_uid uuid, p_target uuid)
 returns boolean
 language sql
@@ -592,7 +734,8 @@ stable
 security definer
 set search_path = public
 as $$
-  select site_is_root(p_uid) or site_top_position(p_target) < site_top_position(p_uid);
+  select site_is_root(p_uid)
+      or (not site_is_owner(p_target) and site_top_position(p_target) < site_top_position(p_uid));
 $$;
 
 -- 目前擁有全站 ADMINISTRATOR 的使用者數量
@@ -649,7 +792,7 @@ as $$
   where r.id = s.id and r.position <> s.rn;
 $$;
 
--- 自己的全站權限（已展開）、最高位置、身分組（不含 @everyone，由高到低）；未登入回傳 null
+-- 自己的全站權限（已展開）、最高位置、是不是全站擁有者、身分組（不含 @everyone，由高到低）；未登入回傳 null
 create function public.me_permissions()
 returns jsonb
 language plpgsql
@@ -666,6 +809,7 @@ begin
   return jsonb_build_object(
     'permissions', site_permissions(uid),
     'top_position', site_top_position(uid),
+    'is_owner', site_is_owner(uid),
     'roles', coalesce((
       select jsonb_agg(jsonb_build_object('id', r.id, 'name', r.name, 'color', r.color, 'position', r.position)
                        order by r.position desc, r.created_at)
@@ -673,6 +817,22 @@ begin
       where ur.user_id = uid and not r.is_default
     ), '[]'::jsonb)
   );
+end;
+$$;
+
+-- 全站擁有者的使用者 id（VIEW_ADMIN；還沒有擁有者時 null），後台顯示「擁有者」用
+create function public.site_owner()
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+begin
+  perform site_require(uid, 2);
+  return (select o.user_id from site_owner o limit 1);
 end;
 $$;
 
@@ -711,7 +871,7 @@ declare
   uid uuid := require_uid();
   p_name text := norm_role_name(site_role_create.name);
   p_color text := norm_color(site_role_create.color);
-  p_perms bigint := coalesce(site_role_create.permissions, 0) & 1023;
+  p_perms bigint := coalesce(site_role_create.permissions, 0) & 2047;
   mine bigint;
   rid uuid;
 begin
@@ -728,7 +888,8 @@ begin
 end;
 $$;
 
--- 編輯全站身分組（MANAGE_ROLES + 階層 + 只能開自己有的位元）；@everyone 只能改 permissions；最後一位管理員保護
+-- 編輯全站身分組（MANAGE_ROLES + 階層 + 只能開自己有的位元）；@everyone 只能改 permissions（position 0，有身分組的人都管得到）；
+-- 最後一位管理員保護
 create function public.site_role_update(role_id uuid, name text, color text, permissions bigint)
 returns void
 language plpgsql
@@ -749,11 +910,11 @@ begin
     raise exception '找不到這個身分組';
   end if;
   mine := site_require(uid, 64);
-  if not r.is_default and not site_can_manage_position(uid, r.position) then
+  if not site_can_manage_position(uid, r.position) then
     raise exception '只能管理比你目前最高身分組還低的身分組 / 成員';
   end if;
 
-  p_perms := coalesce(site_role_update.permissions, r.permissions) & 1023;
+  p_perms := coalesce(site_role_update.permissions, r.permissions) & 2047;
   if p_perms & ~r.permissions & ~mine <> 0 then
     raise exception '只能開啟你自己擁有的權限';
   end if;
@@ -783,6 +944,7 @@ declare
   uid uuid := require_uid();
   r site_roles%rowtype;
   admins bigint := site_admin_count();
+  holders uuid[];
 begin
   select * into r from site_roles where id = site_role_delete.role_id;
   if r.id is null then
@@ -795,15 +957,22 @@ begin
   if not site_can_manage_position(uid, r.position) then
     raise exception '只能管理比你目前最高身分組還低的身分組 / 成員';
   end if;
+  holders := array(select ur.user_id from site_user_roles ur where ur.role_id = r.id);
   delete from site_roles x where x.id = r.id;
   perform site_assert_admin_left(admins);
   perform site_roles_renumber();
   perform audit(null, uid, 'site.role.delete', 'role', r.id::text, jsonb_build_object('name', r.name));
+  -- 持有這個身分組的人：網站身分組變了（後台可以整個關掉）
+  if notify_admin_change_enabled('role') then
+    perform notify(holders, 'admin_changed_role', '網站身分組已變更',
+                   format('%s 刪除了網站身分組「%s」。', notify_name(uid), r.name), '/me/update_info',
+                   jsonb_build_object('actor_id', uid, 'role_id', r.id, 'role_name', r.name, 'deleted', true));
+  end if;
 end;
 $$;
 
 -- 全站身分組排序（MANAGE_ROLES）：role_ids = 由高到低的完整順序（不含 @everyone）；
--- 最高位身分組的持有者不受限，其他人（含一般管理員）管不到的身分組排名不能變
+-- 擁有者不受限，其他人（含一般管理員）管不到的身分組排名不能變
 create function public.site_roles_reorder(role_ids uuid[])
 returns void
 language plpgsql
@@ -851,7 +1020,7 @@ end;
 $$;
 
 -- 指派使用者全站身分組（MANAGE_ROLES + 階層）：只改呼叫者管得到的身分組，管不到的維持原樣；
--- 最高位身分組的持有者不受階層限制；新加入的身分組權限必須是自己權限的子集（ADMINISTRATOR 視為全有）；
+-- 擁有者不受階層限制；新加入的身分組權限必須是自己權限的子集（ADMINISTRATOR 視為全有）；
 -- 最後一位管理員保護
 create function public.site_set_user_roles(user_id uuid, role_ids uuid[])
 returns void
@@ -895,7 +1064,7 @@ begin
     raise exception '只能管理比你目前最高身分組還低的身分組 / 成員';
   end if;
   -- site_permissions 已把 ADMINISTRATOR 展開成全部；最高位持有者也不能指派自己沒有的權限（避免自己升權）
-  if exists (select 1 from site_roles r where r.id = any (coalesce(added, '{}')) and r.permissions & 1023 & ~mine <> 0) then
+  if exists (select 1 from site_roles r where r.id = any (coalesce(added, '{}')) and r.permissions & 2047 & ~mine <> 0) then
     raise exception '只能指派權限不超過你自己的身分組';
   end if;
 
@@ -915,12 +1084,23 @@ begin
   if coalesce(array_length(added, 1), 0) + coalesce(array_length(removed, 1), 0) > 0 then
     perform audit(null, uid, 'site.user.roles', 'user', p_target::text,
                   jsonb_build_object('name', display_name(p_target), 'added', coalesce(added, '{}'), 'removed', coalesce(removed, '{}')));
+    -- 通知本人（後台可以整個關掉；改自己的不通知）
+    if p_target <> uid and notify_admin_change_enabled('role') then
+      perform notify(array[p_target], 'admin_changed_role', '網站身分組已變更',
+        format('%s 變更了你的網站身分組（%s）。', notify_name(uid), array_to_string(array_remove(array[
+          '新增：' || (select string_agg(r.name, '、' order by r.position desc) from site_roles r where r.id = any (coalesce(added, '{}'))),
+          '移除：' || (select string_agg(r.name, '、' order by r.position desc) from site_roles r where r.id = any (coalesce(removed, '{}')))
+        ], null), '；')),
+        '/me/update_info',
+        jsonb_build_object('actor_id', uid, 'added', coalesce(added, '{}'), 'removed', coalesce(removed, '{}')));
+    end if;
   end if;
 end;
 $$;
 
 -- 把 site_pending_roles 中 email 符合的身分組指派給使用者並刪除；
--- 有指派到身分組時記一筆 site.user.roles（操作者 null = 系統）
+-- 有指派到身分組時記一筆 site.user.roles（操作者 null = 系統）。
+-- 還沒有擁有者、而且 site_owner.pending_email 是這個 email 時，接上全站擁有者
 create function public.apply_pending_roles(p_uid uuid, p_email text)
 returns void
 language plpgsql
@@ -942,6 +1122,10 @@ begin
   )
   select array_agg(ins.role_id) into added from ins;
   delete from site_pending_roles where email = e;
+
+  -- 還沒有擁有者、而且 pending_email 是這個 email：接上擁有者
+  update site_owner o set user_id = p_uid, pending_email = null
+  where o.user_id is null and o.pending_email = e;
 
   if added is not null then
     perform audit(null, null, 'site.user.roles', 'user', p_uid::text, jsonb_build_object(
@@ -1047,6 +1231,47 @@ $$;
 create trigger profiles_username_guard
   before insert or update of username on public.profiles
   for each row execute function public.profiles_username_guard();
+
+-- 使用者直接改 profiles（PostgREST，current_user = authenticated）時把關，security definer 的 RPC、觸發器與 service role 不受影響：
+-- - creation_time、last_sign_in_time 一律維持原值（由後端寫；舊版前端還會送，靜靜地忽略）
+-- - photo_url 只接受空字串或 Google 的大頭照網址；自己上傳過（photo_custom）就維持原值
+-- - bg_photo_url 只能清空；上傳大頭照與背景圖走 /api/profile/photo（service role）
+-- - name 去頭尾空白、最多 64 字（超過截斷）
+-- 不是 security definer：要看到呼叫者自己的 current_user
+create function public.profiles_guard()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  -- 只管使用者用 PostgREST 直接改自己那列；security definer 的 RPC、觸發器與 service role 不受影響
+  if current_user <> 'authenticated' then
+    return new;
+  end if;
+  -- 建立 / 登入時間由後端寫；舊版前端還會送，靜靜地維持原值
+  new.creation_time := old.creation_time;
+  new.last_sign_in_time := old.last_sign_in_time;
+  new.photo_custom := old.photo_custom;
+  -- 大頭照只接受空字串或 Google 的網址；自己上傳過的（photo_custom）不會被舊版前端每次登入送來的 Google 大頭照蓋掉
+  if new.photo_url is distinct from old.photo_url
+     and (old.photo_custom
+          or not (coalesce(new.photo_url, '') = '' or new.photo_url ~ '^https://[a-z0-9-]+\.googleusercontent\.com/')) then
+    new.photo_url := old.photo_url;
+  end if;
+  -- 背景圖只能清空（上傳走 /api/profile/photo）
+  if new.bg_photo_url is distinct from old.bg_photo_url and coalesce(new.bg_photo_url, '') <> '' then
+    new.bg_photo_url := old.bg_photo_url;
+  end if;
+  if new.name is distinct from old.name then
+    new.name := left(trim(new.name), 64);
+  end if;
+  return new;
+end;
+$$;
+
+create trigger profiles_guard
+  before update on public.profiles
+  for each row execute function public.profiles_guard();
 
 -- 設定自己的 @ID；null 或空字串代表清除；回傳存進去的值
 create function public.set_username(new_username text)
@@ -1236,7 +1461,7 @@ begin
     new.email,
     coalesce(new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name'),
     coalesce(new.raw_user_meta_data ->> 'avatar_url', new.raw_user_meta_data ->> 'picture'),
-    'https://img.freepik.com/free-photo/abstract-luxury-plain-blur-grey-black-gradient-used-as-background-studio-wall-display-your-products_1258-63747.jpg?w=2000',
+    '',
     (new.email_confirmed_at is not null),
     '',
     coalesce(new.created_at::text, ''),
@@ -1284,7 +1509,7 @@ begin
     u.email,
     coalesce(u.raw_user_meta_data ->> 'full_name', u.raw_user_meta_data ->> 'name'),
     coalesce(u.raw_user_meta_data ->> 'avatar_url', u.raw_user_meta_data ->> 'picture'),
-    'https://img.freepik.com/free-photo/abstract-luxury-plain-blur-grey-black-gradient-used-as-background-studio-wall-display-your-products_1258-63747.jpg?w=2000',
+    '',
     (u.email_confirmed_at is not null),
     '',
     coalesce(u.created_at::text, ''),
@@ -1360,7 +1585,7 @@ as $$
   select case p_bit
     when 1 then '群組管理員' when 2 then '查看驗證碼' when 4 then '查看金鑰' when 8 then '管理驗證碼'
     when 16 then '邀請成員' when 32 then '移除成員' when 64 then '管理身分組'
-    when 128 then '管理群組' when 256 then '查看操作紀錄'
+    when 128 then '管理群組' when 256 then '查看操作紀錄' when 512 then '封鎖成員'
     else p_bit::text end;
 $$;
 
@@ -1403,7 +1628,7 @@ begin
     return 0;
   end if;
   if group_is_super(p_gid, p_uid) then
-    return 511;
+    return 1023;
   end if;
   if not group_is_member(p_gid, p_uid) then
     return 0;
@@ -1414,9 +1639,9 @@ begin
     and (r.is_default
          or r.id in (select mr.role_id from group_member_roles mr where mr.group_id = p_gid and mr.user_id = p_uid));
   if perms & 1 <> 0 then
-    return 511;
+    return 1023;
   end if;
-  return perms & 511;
+  return perms & 1023;
 end;
 $$;
 
@@ -1676,17 +1901,54 @@ create trigger groups_owner_guard
   for each row execute function public.groups_owner_guard();
 
 -- 刪除 profile（刪帳號）前，先刪掉只有自己一個成員的群組（groups.owner_id 沒有 cascade）。
--- 還有其他成員的群組不動：can_delete_self / admin_can_delete_user 會先擋，漏網時由 FK 擋下整筆刪除
+-- 還有其他成員的群組不動：can_delete_self / admin_can_delete_user 會先擋，漏網時由 FK 擋下整筆刪除。
+-- 接著撤銷他建立的邀請連結（保留那一列）、刪除他送出與寄給他的 Email / @ID 邀請，
+-- 各記一筆 group.invite.revoke（操作者 null = 系統、detail.reason = 'account_deleted'）；操作紀錄與託管密文都保留，
+-- 託管密文記下 account_deleted_at（prune_retention 在一年後才刪）
 create function public.profiles_delete_owned_groups()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  emails text[];
 begin
   delete from groups g
   where g.owner_id = old.id
     and not exists (select 1 from group_members m where m.group_id = g.id and m.user_id <> old.id);
+
+  -- 他建立的邀請連結：撤銷（保留那一列，created_by 由 FK 改成 null）
+  with revoked as (
+    update group_invites i set revoked_at = now()
+    where i.created_by = old.id and i.revoked_at is null
+    returning i.group_id, i.code
+  )
+  insert into audit_logs (group_id, actor_id, action, target_type, target_id, detail)
+  select x.group_id, null, 'group.invite.revoke', 'invite', x.code,
+         jsonb_build_object('name', x.code, 'reason', 'account_deleted')
+  from revoked x;
+
+  -- 他送出的、寄給他的 Email / @ID 邀請：刪除
+  emails := array_remove(array[
+    user_email(old.id),
+    lower(old.email),
+    (select lower(u.email) from auth.users u where u.id = old.id)
+  ], null);
+  with removed as (
+    delete from group_email_invites e
+    where e.invited_by = old.id or e.email = any (emails)
+    returning e.group_id, e.id, e.email
+  )
+  insert into audit_logs (group_id, actor_id, action, target_type, target_id, detail)
+  select x.group_id, null, 'group.invite.revoke', 'invite', x.id::text,
+         jsonb_build_object('name', x.email, 'email', x.email, 'reason', 'account_deleted')
+  from removed x;
+
+  -- 託管密文保留：記下帳號刪除的時間，prune_retention 在一年後才刪
+  update vault_escrow v set account_deleted_at = now()
+  where v.user_id = old.id and v.account_deleted_at is null;
+
   return old;
 end;
 $$;
@@ -1926,6 +2188,7 @@ declare
   uid uuid := require_uid();
   p_gid uuid := group_delete.gid;
   g groups%rowtype;
+  members uuid[];
 begin
   select * into g from groups where id = p_gid;
   if g.id is null then
@@ -1943,6 +2206,7 @@ begin
     end if;
   end if;
 
+  members := array(select m.user_id from group_members m where m.group_id = p_gid);
   delete from groups where id = p_gid;
 
   if exists (select 1 from profiles p where p.id = g.owner_id and p.default_group_id = p_gid) then
@@ -1953,6 +2217,9 @@ begin
   end if;
 
   perform audit(null, uid, 'group.delete', 'group', p_gid::text, jsonb_build_object('name', g.name, 'owner_id', g.owner_id));
+  -- 通知其他成員（刪除者除外）
+  perform notify(members, 'group_deleted', '群組已刪除', format('%s 刪除了群組「%s」。', notify_name(uid), g.name), null,
+                 jsonb_build_object('group_id', p_gid, 'actor_id', uid));
 end;
 $$;
 
@@ -1998,6 +2265,9 @@ begin
   perform audit(p_gid, uid, 'group.transfer', 'member', p_new::text,
                 jsonb_build_object('name', display_name(p_new), 'group_name', (select name from groups where id = p_gid),
                                    'from', uid, 'to', p_new));
+  perform notify(array[p_new], 'ownership_received', '你成為群組擁有者',
+                 format('%s 把「%s」的擁有權轉移給你。', notify_name(uid), (select name from groups where id = p_gid)),
+                 '/groups/' || p_gid::text, jsonb_build_object('group_id', p_gid, 'actor_id', uid));
 end;
 $$;
 
@@ -2080,13 +2350,250 @@ begin
   delete from group_email_invites e where e.group_id = p_gid and e.invited_by = p_target;
   delete from group_members m where m.group_id = p_gid and m.user_id = p_target;
   perform audit(p_gid, uid, 'group.member.kick', 'member', p_target::text, jsonb_build_object('name', display_name(p_target)));
+  perform notify(array[p_target], 'member_removed', '已被移出群組',
+                 format('你已被移出「%s」。', (select name from groups where id = p_gid)), null,
+                 jsonb_build_object('group_id', p_gid, 'actor_id', uid));
+end;
+$$;
+
+-- ---------- 封鎖名單（BAN_MEMBERS）----------
+
+-- 這位使用者是否被這個群組封鎖
+create function public.group_is_banned(p_gid uuid, p_uid uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from group_bans b where b.group_id = p_gid and b.user_id = p_uid);
+$$;
+
+-- 用 email、@ID（可帶 @）或使用者 UUID 找使用者（規則與錯誤訊息同 group_add_member）；找不到就 raise
+create function public.group_find_user(p_target text)
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  t text := trim(coalesce(p_target, ''));
+  target_uid uuid;
+  e text;
+begin
+  if t = '' then
+    raise exception '請輸入電子郵件、@ID 或使用者 ID';
+  end if;
+
+  -- 使用者 UUID（有沒有連字號都可以）；找不到時再當 @ID 找（舊的 @ID 可能剛好是 32 位十六進位）
+  if t !~ '^@' and replace(lower(t), '-', '') ~ '^[0-9a-f]{32}$' then
+    select p.id into target_uid from profiles p where p.id = replace(lower(t), '-', '')::uuid;
+    if target_uid is null then
+      select p.id into target_uid from profiles p where p.username = username_normalize(t);
+    end if;
+    if target_uid is null then
+      raise exception '找不到這位使用者';
+    end if;
+  elsif t like '@%' or position('@' in t) = 0 then
+    select p.id into target_uid from profiles p where p.username = username_normalize(t);
+    if target_uid is null then
+      raise exception '找不到這個 @ID';
+    end if;
+  else
+    e := lower(t);
+    if e !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+      raise exception 'Email 格式不正確';
+    end if;
+    -- 已驗證的 auth.users 優先；沒有 auth.users 那列的 profile 才用 profiles.email（同 user_email）
+    select p.id into target_uid
+    from auth.users u join profiles p on p.id = u.id
+    where lower(u.email) = e
+    order by (u.email_confirmed_at is not null) desc, u.created_at
+    limit 1;
+    if target_uid is null then
+      select p.id into target_uid
+      from profiles p
+      where lower(p.email) = e and not exists (select 1 from auth.users u where u.id = p.id)
+      order by p.id
+      limit 1;
+    end if;
+    if target_uid is null then
+      raise exception '找不到使用這個電子郵件的使用者';
+    end if;
+  end if;
+  return target_uid;
+end;
+$$;
+
+-- 封鎖名單（BAN_MEMBERS），新到舊：[{ user_id, name, username, photo_url, email, reason, created_at, updated_at,
+--   banned_by: { id, name } | null }]；email 只給看得到成員 email 的人（group_sees_emails），否則 null
+create function public.group_bans(gid uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+  p_gid uuid := group_bans.gid;
+  with_email boolean;
+begin
+  perform group_require(p_gid, uid, 512);
+  with_email := group_sees_emails(p_gid, uid);
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'user_id', b.user_id,
+      'name', p.name,
+      'username', p.username,
+      'photo_url', p.photo_url,
+      'email', case when with_email then coalesce(u.email, p.email) end,
+      'reason', b.reason,
+      'created_at', b.created_at,
+      'updated_at', b.updated_at,
+      'banned_by', case when b.banned_by is not null then jsonb_build_object(
+        'id', b.banned_by,
+        'name', case when with_email then display_name(b.banned_by)
+                     else (select coalesce(nullif(x.name, ''), x.username) from profiles x where x.id = b.banned_by) end
+      ) end
+    ) order by b.created_at desc, b.user_id)
+    from group_bans b
+    join profiles p on p.id = b.user_id
+    left join auth.users u on u.id = b.user_id
+    where b.group_id = p_gid
+  ), '[]'::jsonb);
+end;
+$$;
+
+-- 封鎖使用者（BAN_MEMBERS）：target 同 group_add_member（email、@ID 或使用者 UUID）；reason 最多 200 字。
+-- 不能封鎖自己、擁有者；已經封鎖過就 raise。對方是成員時階層同 group_kick，並照 group_kick 的方式移出群組
+-- （刪掉他的成員覆寫、撤銷他建立的邀請連結、刪除他送出的 Email 邀請，不另外記 group.member.kick）；
+-- 另外刪除寄給他的 Email / @ID 邀請。加密的群組也可以封鎖。記 group.member.ban（target_type 'user'）
+create function public.group_ban(gid uuid, target text, reason text default null)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+  p_gid uuid := group_ban.gid;
+  p_reason text := trim(coalesce(group_ban.reason, ''));
+  target_uid uuid;
+  was_member boolean;
+begin
+  perform group_require(p_gid, uid, 512);
+  if char_length(p_reason) > 200 then
+    raise exception '封鎖原因最多 200 個字';
+  end if;
+  target_uid := group_find_user(group_ban.target);
+  if target_uid = uid then
+    raise exception '不能封鎖自己';
+  end if;
+  if exists (select 1 from groups g where g.id = p_gid and g.owner_id = target_uid) then
+    raise exception '不能封鎖群組擁有者';
+  end if;
+
+  -- 鎖住群組列：和同時進行的加入（group_join、respond_invitation、group_add_member 都會共享鎖群組列）互斥
+  perform 1 from groups g where g.id = p_gid for update;
+  if group_is_banned(p_gid, target_uid) then
+    raise exception '這位使用者已經被封鎖';
+  end if;
+
+  -- 是成員：階層同移除成員，照 group_kick 的方式移出（不另外記 group.member.kick）
+  was_member := group_is_member(p_gid, target_uid);
+  if was_member then
+    if not group_can_manage_member(p_gid, uid, target_uid) then
+      raise exception '只能封鎖身分組比你低的成員';
+    end if;
+    delete from group_account_overwrites o
+    using totp_accounts a
+    where a.id = o.account_id and a.group_id = p_gid and o.target_type = 'member' and o.target_id = target_uid;
+    update group_invites i set revoked_at = coalesce(i.revoked_at, now()) where i.group_id = p_gid and i.created_by = target_uid;
+    delete from group_email_invites e where e.group_id = p_gid and e.invited_by = target_uid;
+    delete from group_members m where m.group_id = p_gid and m.user_id = target_uid;
+  end if;
+
+  -- 寄給他的 Email / @ID 邀請（已驗證的 email、auth.users 與 profiles 上的 email 都算）
+  delete from group_email_invites e
+  where e.group_id = p_gid
+    and e.email = any (array[
+      user_email(target_uid),
+      (select lower(u.email) from auth.users u where u.id = target_uid),
+      (select lower(p.email) from profiles p where p.id = target_uid)
+    ]);
+
+  insert into group_bans (group_id, user_id, reason, banned_by)
+  values (p_gid, target_uid, p_reason, uid);
+
+  perform audit(p_gid, uid, 'group.member.ban', 'user', target_uid::text,
+                jsonb_build_object('name', display_name(target_uid), 'reason', p_reason, 'was_member', was_member));
+  -- 通知被封鎖的人（不含原因）
+  perform notify(array[target_uid], 'member_banned', '已被群組封鎖',
+                 format('你已被「%s」封鎖，無法再加入這個群組。', (select name from groups where id = p_gid)), null,
+                 jsonb_build_object('group_id', p_gid, 'actor_id', uid));
+end;
+$$;
+
+-- 修改封鎖原因（BAN_MEMBERS）；沒有變就不記紀錄。記 group.member.ban.update（detail 帶 reason、old_reason）
+create function public.group_ban_update(gid uuid, user_id uuid, reason text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+  p_gid uuid := group_ban_update.gid;
+  p_target uuid := group_ban_update.user_id;
+  p_reason text := trim(coalesce(group_ban_update.reason, ''));
+  old_reason text;
+begin
+  perform group_require(p_gid, uid, 512);
+  if char_length(p_reason) > 200 then
+    raise exception '封鎖原因最多 200 個字';
+  end if;
+  select b.reason into old_reason from group_bans b where b.group_id = p_gid and b.user_id = p_target for update;
+  if not found then
+    raise exception '這位使用者沒有被封鎖';
+  end if;
+  if old_reason = p_reason then
+    return;
+  end if;
+  update group_bans b set reason = p_reason, updated_at = now() where b.group_id = p_gid and b.user_id = p_target;
+  perform audit(p_gid, uid, 'group.member.ban.update', 'user', p_target::text,
+                jsonb_build_object('name', display_name(p_target), 'reason', p_reason, 'old_reason', old_reason));
+end;
+$$;
+
+-- 解除封鎖（BAN_MEMBERS）：之後可以再被邀請、用邀請連結加入。記 group.member.unban
+create function public.group_unban(gid uuid, user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+  p_gid uuid := group_unban.gid;
+  p_target uuid := group_unban.user_id;
+  old_reason text;
+begin
+  perform group_require(p_gid, uid, 512);
+  delete from group_bans b where b.group_id = p_gid and b.user_id = p_target returning b.reason into old_reason;
+  if not found then
+    raise exception '這位使用者沒有被封鎖';
+  end if;
+  perform audit(p_gid, uid, 'group.member.unban', 'user', p_target::text,
+                jsonb_build_object('name', display_name(p_target), 'reason', old_reason));
 end;
 $$;
 
 -- 全站管理員直接把使用者加進群組（全站 MANAGE_GROUPS / ADMINISTRATOR），不用邀請；回傳 { id, name }（name 是加入者的顯示名稱）。
 -- 群組內的管理者（含擁有者）沒有全站權限的不行，他們繼續用邀請連結 / Email 邀請。
 -- target 可以是 email、@ID（可帶 @）或使用者 UUID。
--- 擋：找不到使用者、已經是成員、加密的群組、對方 email 未驗證（只認已驗證的，同 user_email）。
+-- 擋：找不到使用者、已經是成員、被這個群組封鎖、加密的群組、對方 email 未驗證（只認已驗證的，同 user_email）。
 -- 加入後只有 @everyone 的權限；刪掉這位使用者在此群組待處理的 Email 邀請；
 -- 寫一筆群組操作紀錄 group.member.add（detail 帶 name = 加入者、actor_name = 操作者）
 create function public.group_add_member(gid uuid, target text)
@@ -2163,6 +2670,9 @@ begin
   if group_is_member(p_gid, target_uid) then
     raise exception '% 已經是群組成員', coalesce(display_name(target_uid), '對方');
   end if;
+  if group_is_banned(p_gid, target_uid) then
+    raise exception '這位使用者已被這個群組封鎖';
+  end if;
 
   -- 只認已驗證的 email：未驗證的帳號可能是別人冒用 email 註冊的
   e := user_email(target_uid);
@@ -2181,6 +2691,8 @@ begin
 
   perform audit(p_gid, uid, 'group.member.add', 'member', target_uid::text,
                 jsonb_build_object('name', display_name(target_uid), 'actor_name', display_name(uid), 'via', via));
+  perform notify(array[target_uid], 'member_added', '已加入群組', format('%s 把你加入了「%s」。', notify_name(uid), g.name),
+                 '/groups/' || p_gid::text, jsonb_build_object('group_id', p_gid, 'actor_id', uid));
 
   return jsonb_build_object('id', target_uid, 'name', display_name(target_uid));
 end;
@@ -2230,7 +2742,7 @@ begin
   if exists (select 1 from group_roles r where r.id = any (coalesce(added, '{}')) and not is_super and r.position >= top) then
     raise exception '只能管理比你目前最高身分組還低的身分組 / 成員';
   end if;
-  if exists (select 1 from group_roles r where r.id = any (coalesce(added, '{}')) and not is_super and r.permissions & 511 & ~mine <> 0) then
+  if exists (select 1 from group_roles r where r.id = any (coalesce(added, '{}')) and not is_super and r.permissions & 1023 & ~mine <> 0) then
     raise exception '只能指派權限不超過你自己的身分組';
   end if;
 
@@ -2250,6 +2762,10 @@ begin
   if coalesce(array_length(added, 1), 0) + coalesce(array_length(removed, 1), 0) > 0 then
     perform audit(p_gid, uid, 'group.member.roles', 'member', p_target::text,
                   jsonb_build_object('name', display_name(p_target), 'added', coalesce(added, '{}'), 'removed', coalesce(removed, '{}')));
+    perform notify(array[p_target], 'group_roles_changed', '群組身分組已變更',
+                   format('%s 變更了你在「%s」的身分組。', notify_name(uid), (select name from groups where id = p_gid)),
+                   '/groups/' || p_gid::text,
+                   jsonb_build_object('group_id', p_gid, 'actor_id', uid, 'added', coalesce(added, '{}'), 'removed', coalesce(removed, '{}')));
   end if;
 end;
 $$;
@@ -2266,7 +2782,7 @@ declare
   p_gid uuid := group_role_create.gid;
   p_name text := norm_role_name(group_role_create.name);
   p_color text := norm_color(group_role_create.color);
-  p_perms bigint := coalesce(group_role_create.permissions, 0) & 511;
+  p_perms bigint := coalesce(group_role_create.permissions, 0) & 1023;
   mine bigint;
   rid uuid;
 begin
@@ -2308,7 +2824,7 @@ begin
     raise exception '只能管理比你目前最高身分組還低的身分組 / 成員';
   end if;
 
-  p_perms := coalesce(group_role_update.permissions, r.permissions) & 511;
+  p_perms := coalesce(group_role_update.permissions, r.permissions) & 1023;
   if p_perms & ~r.permissions & ~mine <> 0 then
     raise exception '只能開啟你自己擁有的權限';
   end if;
@@ -2336,6 +2852,7 @@ as $$
 declare
   uid uuid := require_uid();
   r group_roles%rowtype;
+  holders uuid[];
 begin
   select * into r from group_roles where id = group_role_delete.role_id;
   if r.id is null then
@@ -2348,10 +2865,16 @@ begin
   if not group_can_manage_position(r.group_id, uid, r.position) then
     raise exception '只能管理比你目前最高身分組還低的身分組 / 成員';
   end if;
+  holders := array(select mr.user_id from group_member_roles mr where mr.role_id = r.id);
   delete from group_account_overwrites o where o.target_type = 'role' and o.target_id = r.id;
   delete from group_roles x where x.id = r.id;
   perform group_roles_renumber(r.group_id);
   perform audit(r.group_id, uid, 'group.role.delete', 'role', r.id::text, jsonb_build_object('name', r.name));
+  -- 持有這個身分組的成員：身分組變了
+  perform notify(holders, 'group_roles_changed', '群組身分組已變更',
+                 format('%s 刪除了「%s」的身分組「%s」。', notify_name(uid), (select name from groups where id = r.group_id), r.name),
+                 '/groups/' || r.group_id::text,
+                 jsonb_build_object('group_id', r.group_id, 'actor_id', uid, 'role_id', r.id, 'role_name', r.name, 'deleted', true));
 end;
 $$;
 
@@ -2519,7 +3042,36 @@ begin
 end;
 $$;
 
--- 套用 patch 到一筆驗證碼（只改 patch 裡有的欄位；secret 寫到 totp_secrets）
+-- 新增 / 修改驗證碼的上限：一次最多 500 筆、名稱與類別最多 200 字、金鑰最多 2048 字；超過就 raise。
+-- 只在使用者的 RPC 路徑檢查（group_add_items、totp_apply_patch），接回舊資料（profiles_totp_to_accounts）不擋
+create function public.totp_assert_caps(p_items jsonb)
+returns void
+language plpgsql
+immutable
+as $$
+begin
+  if p_items is null or jsonb_typeof(p_items) <> 'array' then
+    return;
+  end if;
+  if jsonb_array_length(p_items) > 500 then
+    raise exception '一次最多新增 500 筆驗證碼';
+  end if;
+  if exists (select 1 from jsonb_array_elements(p_items) e
+             where jsonb_typeof(e) = 'object' and char_length(totp_norm_text(e -> 'name', '')) > 200) then
+    raise exception '驗證碼名稱最多 200 個字';
+  end if;
+  if exists (select 1 from jsonb_array_elements(p_items) e
+             where jsonb_typeof(e) = 'object' and char_length(totp_norm_text(e -> 'category', '')) > 200) then
+    raise exception '類別最多 200 個字';
+  end if;
+  if exists (select 1 from jsonb_array_elements(p_items) e
+             where jsonb_typeof(e) = 'object' and char_length(totp_norm_text(e -> 'secret', '')) > 2048) then
+    raise exception '金鑰最多 2048 個字';
+  end if;
+end;
+$$;
+
+-- 套用 patch 到一筆驗證碼（只改 patch 裡有的欄位；secret 寫到 totp_secrets；檢查上限）
 create function public.totp_apply_patch(p_account uuid, p_patch jsonb)
 returns void
 language plpgsql
@@ -2530,6 +3082,7 @@ begin
   if p_patch is null or jsonb_typeof(p_patch) <> 'object' then
     return;
   end if;
+  perform totp_assert_caps(jsonb_build_array(p_patch));
 
   update totp_accounts a
   set name      = case when p_patch ? 'name' then totp_norm_text(p_patch -> 'name', '') else a.name end,
@@ -2667,7 +3220,7 @@ begin
 end;
 $$;
 
--- 新增驗證碼到群組（不檢查權限）：檢查金鑰格式、匯入、記錄；回傳新增的 id
+-- 新增驗證碼到群組（不檢查權限）：檢查上限與金鑰格式、匯入、記錄；回傳新增的 id
 create function public.group_add_items(p_gid uuid, p_items jsonb, p_uid uuid)
 returns uuid[]
 language plpgsql
@@ -2677,11 +3230,14 @@ as $$
 declare
   ids uuid[];
 begin
+  perform totp_assert_caps(p_items);
   perform group_assert_secret_format(p_gid, totp_items_secrets(p_items));
   ids := totp_import_items(null, p_gid, p_items, p_uid);
   insert into audit_logs (group_id, actor_id, action, target_type, target_id, detail)
   select p_gid, p_uid, 'group.account.create', 'account', a.id::text, jsonb_build_object('name', a.name)
   from totp_accounts a where a.id = any (ids);
+  -- 通知看得到這些驗證碼的其他成員（一次匯入多筆只產生一則）
+  perform notify_codes_changed(p_gid, p_uid, ids, cardinality(ids), 0);
   return ids;
 end;
 $$;
@@ -2712,7 +3268,7 @@ begin
 
   base := group_permissions(gid, p_uid);
   if base & 1 <> 0 then
-    return 511;
+    return 1023;
   end if;
   if not group_is_member(gid, p_uid) then
     return 0;
@@ -2875,12 +3431,15 @@ declare
 begin
   perform account_require(p_account, uid, 8);
   select * into a from totp_accounts where id = p_account;
+  -- 刪掉之前算：看得到這筆的其他成員
+  perform notify_codes_changed(a.group_id, uid, array[p_account], 0, 1);
   delete from totp_accounts where id = p_account;
   perform audit(a.group_id, uid, 'group.account.delete', 'account', p_account::text, jsonb_build_object('name', a.name));
 end;
 $$;
 
--- 群組驗證碼排序（群組層級 MANAGE_CODES）：ids 裡沒有的照原順序接在後面
+-- 群組驗證碼排序（群組層級 MANAGE_CODES）：看得到的驗證碼依 ids 排進「看得到的驗證碼原本佔的位置」，
+-- ids 裡沒有的照原順序接在後面；看不到的（單筆覆寫拒絕 VIEW_CODES）位置不變，ids 裡看不到的 id 直接忽略
 create function public.group_accounts_reorder(gid uuid, ids uuid[])
 returns void
 language plpgsql
@@ -2892,7 +3451,38 @@ declare
   p_gid uuid := group_accounts_reorder.gid;
 begin
   perform group_require(p_gid, uid, 8);
-  perform totp_reorder_items(null, p_gid, group_accounts_reorder.ids::text[]);
+  -- 看得到的驗證碼依 ids 的順序（沒列到的照原順序接在後面）排進「看得到的驗證碼原本佔的位置」；
+  -- 看不到的（單筆覆寫拒絕 VIEW_CODES）位置不變，ids 裡的看不到的 id 直接忽略
+  update totp_accounts a
+  set position = f.slot - 1
+  from (
+    with cur as (
+      select x.id,
+             row_number() over (order by x.position, x.created_at, x.id) as rn,
+             account_permissions(x.id, uid) & 2 <> 0 as visible
+      from totp_accounts x
+      where x.group_id = p_gid
+    ),
+    req as (
+      select u.id, min(u.ord) as ord
+      from unnest(coalesce(group_accounts_reorder.ids, '{}')) with ordinality as u(id, ord)
+      group by u.id
+    ),
+    vis_new as (
+      select c.id, row_number() over (order by q.ord nulls last, c.rn) as k
+      from cur c left join req q on q.id = c.id
+      where c.visible
+    ),
+    vis_slots as (
+      select c.rn, row_number() over (order by c.rn) as k
+      from cur c
+      where c.visible
+    )
+    select v.id, s.rn as slot from vis_new v join vis_slots s on s.k = v.k
+    union all
+    select c.id, c.rn from cur c where not c.visible
+  ) f
+  where a.id = f.id and a.position <> f.slot - 1;
 end;
 $$;
 
@@ -2961,9 +3551,13 @@ declare
   uid uuid := require_uid();
   p_gid uuid := group_accounts_clear.gid;
   n int;
+  ids uuid[];
 begin
   perform group_require(p_gid, uid, 8);
-  delete from totp_accounts a where a.group_id = p_gid and account_permissions(a.id, uid) & 8 <> 0;
+  ids := array(select a.id from totp_accounts a where a.group_id = p_gid and account_permissions(a.id, uid) & 8 <> 0);
+  -- 刪掉之前算：看得到其中至少一筆的其他成員
+  perform notify_codes_changed(p_gid, uid, ids, 0, cardinality(ids));
+  delete from totp_accounts a where a.id = any (ids);
   get diagnostics n = row_count;
   if n > 0 then
     perform audit(p_gid, uid, 'group.account.clear', 'group', p_gid::text,
@@ -3226,12 +3820,14 @@ set search_path = public
 as $$
 declare
   gid uuid := totp_default_group();
+  ids uuid[];
 begin
   if gid is null then
     return null;
   end if;
-  delete from totp_accounts a
-  where a.group_id = gid and a.id::text = lower(trim(totp_delete.item_id));
+  ids := array(select a.id from totp_accounts a where a.group_id = gid and a.id::text = lower(trim(totp_delete.item_id)));
+  perform notify_codes_changed(gid, auth.uid(), ids, 0, cardinality(ids));
+  delete from totp_accounts a where a.id = any (ids);
   return totp_group_items_json(gid);
 end;
 $$;
@@ -3245,11 +3841,14 @@ set search_path = public
 as $$
 declare
   gid uuid := totp_default_group();
+  ids uuid[];
 begin
   if gid is null then
     return null;
   end if;
-  delete from totp_accounts a where a.group_id = gid;
+  ids := array(select a.id from totp_accounts a where a.group_id = gid);
+  perform notify_codes_changed(gid, auth.uid(), ids, 0, cardinality(ids));
+  delete from totp_accounts a where a.id = any (ids);
   return '[]'::jsonb;
 end;
 $$;
@@ -3279,12 +3878,46 @@ $$;
 -- 鎖的順序一律「先鎖 profile 再鎖群組」，避免 totp_set_vault 與 group_set_encrypted 互相卡住。
 -- ============================================================
 
+-- 加密設定的格式：{ v: 1, salt: 16 bytes 的 base64, iterations: 600000～5000000, check: 'enc:v1:...' }
+create function public.vault_info_valid(v jsonb)
+returns boolean
+language sql
+immutable
+as $$
+  select coalesce(
+    jsonb_typeof(v) = 'object'
+    and jsonb_typeof(v -> 'v') = 'number' and (v -> 'v') = '1'::jsonb
+    and jsonb_typeof(v -> 'salt') = 'string' and (v ->> 'salt') ~ '^[A-Za-z0-9+/]{22}==$'
+    and jsonb_typeof(v -> 'iterations') = 'number'
+    and case when (v ->> 'iterations') ~ '^[0-9]{1,9}$'
+             then (v ->> 'iterations')::int between 600000 and 5000000 else false end
+    and jsonb_typeof(v -> 'check') = 'string' and (v ->> 'check') like 'enc:v1:%',
+    false);
+$$;
+
+-- 託管密文（esc:v1:<kid>:<epk>:<iv>:<ct>，base64）的 key id；格式不對就 raise
+create function public.vault_escrow_key_id(p_escrow text)
+returns text
+language plpgsql
+immutable
+as $$
+begin
+  if p_escrow is null or char_length(p_escrow) > 4096
+     or p_escrow !~ '^esc:v1:[0-9a-f]{16}:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$' then
+    raise exception '託管資料格式不正確';
+  end if;
+  return split_part(p_escrow, ':', 3);
+end;
+$$;
+
 -- 更新 vault 並一次換掉多筆金鑰（secrets：{ "<account id>": "<secret>" }），回傳預設群組的清單。
+-- new_vault 格式不對（vault_info_valid）就 raise「加密設定格式不正確」。
+-- escrow（選用，舊版不傳）：新密碼的託管密文，同一個交易寫進 vault_escrow（停用加密時忽略）。
 -- expected_check：呼叫端以為目前的 vault.check（未啟用為 null）；和資料庫不同代表別的裝置改過，raise。
 -- 加密設定有變（改密碼、停用）時 secrets 必須涵蓋「自己擁有且已加密的群組」的全部驗證碼；
 -- 有加密時金鑰都要是 enc:v1: 密文，停用時都要是明文，且那些群組一起改成沒加密。
 -- 啟用（原本沒有 vault）時還沒有加密的群組，只設定密碼；要加密哪個群組另外呼叫 group_set_encrypted。
-create function public.totp_set_vault(new_vault jsonb, secrets jsonb, expected_check text default null)
+create function public.totp_set_vault(new_vault jsonb, secrets jsonb, expected_check text default null, escrow text default null)
 returns jsonb
 language plpgsql
 security definer
@@ -3296,12 +3929,17 @@ declare
   v jsonb := nullif(totp_set_vault.new_vault, 'null'::jsonb);
   cur jsonb;
   enc uuid[];
+  kid text;
 begin
   if uid is null then
     return null;
   end if;
-  if v is not null and (jsonb_typeof(v) <> 'object' or coalesce(jsonb_typeof(v -> 'check'), '') <> 'string') then
+  if v is not null and not vault_info_valid(v) then
     raise exception '加密設定格式不正確';
+  end if;
+  -- 託管密文（選用；舊版不傳）：停用加密時沒有對應的 vault.check，不存
+  if totp_set_vault.escrow is not null and v is not null then
+    kid := vault_escrow_key_id(totp_set_vault.escrow);
   end if;
 
   -- 先鎖 profile 再鎖群組（和 group_set_encrypted 同順序）
@@ -3341,9 +3979,67 @@ begin
     insert into audit_logs (group_id, actor_id, action, target_type, target_id, detail)
     select g.id, uid, 'group.encryption.disable', 'group', g.id::text, jsonb_build_object('name', g.name)
     from groups g where g.id = any (enc);
+    -- 通知這些群組的其他成員（加密的群組只有擁有者一個成員，通常沒有人）
+    perform notify(array(select m.user_id from group_members m where m.group_id = g.id), 'group_encryption_changed',
+                   '群組加密已變更', format('%s 關閉了「%s」的加密。', notify_name(uid), g.name), '/groups/' || g.id::text,
+                   jsonb_build_object('group_id', g.id, 'actor_id', uid, 'encrypted', false))
+    from groups g where g.id = any (enc);
+  end if;
+
+  if kid is not null then
+    insert into vault_escrow (user_id, email, key_id, envelope, vault_check)
+    values (uid, (select u.email from auth.users u where u.id = uid), kid, totp_set_vault.escrow, v ->> 'check');
   end if;
 
   return totp_group_items_json(ensure_default_group(uid));
+end;
+$$;
+
+-- 補登託管密文：存成目前 profiles.vault.check 的那一組；還沒設定加密密碼就 raise。
+-- 同一組加密設定最多存 10 筆，超過時不再新增（不 raise）
+create function public.vault_escrow_put(escrow text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+  kid text := vault_escrow_key_id(vault_escrow_put.escrow);
+  cur jsonb;
+begin
+  -- 鎖住 profile：和 totp_set_vault 互斥，存進去的一定對應目前的 vault.check
+  select p.vault into cur from profiles p where p.id = uid for update;
+  if cur is null or coalesce(cur ->> 'check', '') = '' then
+    raise exception '還沒有設定加密密碼';
+  end if;
+  -- 同一組加密設定最多存 10 筆（避免重複呼叫灌資料）；超過時不再新增
+  if (select count(*) from vault_escrow e where e.user_id = uid and e.vault_check = cur ->> 'check') >= 10 then
+    return;
+  end if;
+  insert into vault_escrow (user_id, email, key_id, envelope, vault_check)
+  values (uid, (select u.email from auth.users u where u.id = uid), kid, vault_escrow_put.escrow, cur ->> 'check');
+end;
+$$;
+
+-- 目前的加密密碼是否還沒有託管密文（有 vault、但沒有 vault_check = 目前 vault.check 的列）；
+-- 用加密密碼解鎖成功後呼叫，true 時用剛輸入的密碼呼叫 vault_escrow_put
+create function public.vault_escrow_needed()
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+begin
+  return coalesce((
+    select coalesce(p.vault ->> 'check', '') <> ''
+       and not exists (select 1 from vault_escrow e where e.user_id = p.id and e.vault_check = p.vault ->> 'check')
+    from profiles p
+    where p.id = uid
+  ), false);
 end;
 $$;
 
@@ -3371,6 +4067,10 @@ begin
 
   insert into audit_logs (group_id, actor_id, action, target_type, target_id, detail)
   select g.id, uid, 'group.encryption.disable', 'group', g.id::text, jsonb_build_object('name', g.name, 'reset', true)
+  from groups g where g.id = any (enc);
+  perform notify(array(select m.user_id from group_members m where m.group_id = g.id), 'group_encryption_changed',
+                 '群組加密已變更', format('%s 關閉了「%s」的加密。', notify_name(uid), g.name), '/groups/' || g.id::text,
+                 jsonb_build_object('group_id', g.id, 'actor_id', uid, 'encrypted', false))
   from groups g where g.id = any (enc);
 end;
 $$;
@@ -3442,12 +4142,17 @@ begin
 
   perform audit(p_gid, uid, case when p_on then 'group.encryption.enable' else 'group.encryption.disable' end,
                 'group', p_gid::text, jsonb_build_object('name', g.name));
+  -- 通知其他成員（開啟時只剩擁有者，所以實際上只有關閉後才可能有人）
+  perform notify(array(select m.user_id from group_members m where m.group_id = p_gid), 'group_encryption_changed',
+                 '群組加密已變更',
+                 format('%s %s了「%s」的加密。', notify_name(uid), case when p_on then '開啟' else '關閉' end, g.name),
+                 '/groups/' || p_gid::text, jsonb_build_object('group_id', p_gid, 'actor_id', uid, 'encrypted', p_on));
 end;
 $$;
 
 
 -- ============================================================
--- 10. 邀請（加密的群組不能邀請、加入、接受邀請）
+-- 10. 邀請（加密的群組不能邀請、加入、接受邀請；被封鎖的人不能被邀請、加入、接受邀請）
 -- ============================================================
 
 -- 邀請連結是否有效：null = 有效，否則 'revoked' / 'expired' / 'used_up'
@@ -3489,17 +4194,20 @@ begin
 end;
 $$;
 
--- 加密的群組不能邀請其他人加入
+-- 加密的群組不能邀請其他人加入；不論有沒有加密都共享鎖住群組列
 create function public.group_assert_not_encrypted(p_gid uuid)
 returns void
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  enc boolean;
 begin
-  -- 共享鎖：和 group_set_encrypted 互斥（開啟加密時會檢查成員、撤銷邀請）
-  perform 1 from groups g where g.id = p_gid and g.encrypted for share;
-  if found then
+  -- 不論有沒有加密都先共享鎖住群組列：和 group_set_encrypted（開啟加密時會檢查成員、撤銷邀請）、
+  -- group_ban（封鎖時會移出成員）互斥
+  select g.encrypted into enc from groups g where g.id = p_gid for share;
+  if coalesce(enc, false) then
     raise exception '加密的群組不能邀請其他人加入';
   end if;
 end;
@@ -3564,7 +4272,7 @@ begin
 end;
 $$;
 
--- 邀請連結資訊（登入）：{ valid, reason, group, inviter, already_member }
+-- 邀請連結資訊（登入）：{ valid, reason, group, inviter, already_member, banned }（banned = 呼叫者被這個群組封鎖）
 -- 邀請者 email 只給有全站 VIEW_USERS、或在該群組看得到成員 email 的人
 create function public.group_invite_info(code text)
 returns jsonb
@@ -3580,7 +4288,8 @@ declare
 begin
   select * into i from group_invites x where x.code = trim(group_invite_info.code);
   if i.code is null then
-    return jsonb_build_object('valid', false, 'reason', 'not_found', 'group', null, 'inviter', null, 'already_member', false);
+    return jsonb_build_object('valid', false, 'reason', 'not_found', 'group', null, 'inviter', null, 'already_member', false,
+                              'banned', false);
   end if;
   reason := invite_invalid_reason(i);
   return jsonb_build_object(
@@ -3588,12 +4297,13 @@ begin
     'reason', reason,
     'group', group_brief(i.group_id),
     'inviter', user_brief(i.created_by, site_permissions(uid) & 4 <> 0 or group_sees_emails(i.group_id, uid)),
-    'already_member', group_is_member(i.group_id, uid)
+    'already_member', group_is_member(i.group_id, uid),
+    'banned', group_is_banned(i.group_id, uid)
   );
 end;
 $$;
 
--- 用邀請連結加入群組（登入）：已是成員直接回傳 id 不扣次數；成功時 uses + 1
+-- 用邀請連結加入群組（登入）：已是成員直接回傳 id 不扣次數；被封鎖就 raise；成功時 uses + 1
 create function public.group_join(code text)
 returns uuid
 language plpgsql
@@ -3605,14 +4315,19 @@ declare
   i group_invites%rowtype;
   reason text;
 begin
-  select * into i from group_invites x where x.code = trim(group_join.code) for update;
+  select * into i from group_invites x where x.code = trim(group_join.code);
   if i.code is null then
     raise exception '找不到這個邀請連結';
   end if;
   if group_is_member(i.group_id, uid) then
     return i.group_id;
   end if;
+  -- 鎖的順序：先共享鎖群組列、再鎖邀請連結（和 group_ban、group_set_encrypted 同順序，避免互相卡住）
   perform group_assert_not_encrypted(i.group_id);
+  select * into i from group_invites x where x.code = i.code for update;
+  if group_is_banned(i.group_id, uid) then
+    raise exception '你已被這個群組封鎖，無法加入';
+  end if;
   reason := invite_invalid_reason(i);
   if reason = 'revoked' then
     raise exception '這個邀請連結已被撤銷';
@@ -3626,11 +4341,17 @@ begin
   update group_invites x set uses = x.uses + 1 where x.code = i.code;
   delete from group_email_invites e where e.group_id = i.group_id and e.email = user_email(uid);
   perform audit(i.group_id, uid, 'group.member.join', 'member', uid::text, jsonb_build_object('name', display_name(uid), 'code', i.code));
+  -- 通知邀請連結的建立者
+  perform notify(array[i.created_by], 'invite_answered', '邀請已回覆',
+                 format('%s 透過你的邀請連結加入了「%s」。', notify_name(uid), (select g.name from groups g where g.id = i.group_id)),
+                 '/groups/' || i.group_id::text,
+                 jsonb_build_object('group_id', i.group_id, 'actor_id', uid, 'accepted', true, 'via', 'link'));
   return i.group_id;
 end;
 $$;
 
--- 用 Email 或 @ID 邀請（CREATE_INVITE）：@ID 找不到 → raise；email 可以是還沒註冊的人；已邀請過不重複新增
+-- 用 Email 或 @ID 邀請（CREATE_INVITE）：@ID 找不到 → raise；email 可以是還沒註冊的人；已邀請過不重複新增；
+-- 對方被這個群組封鎖 → raise
 create function public.group_invite_user(gid uuid, target text)
 returns void
 language plpgsql
@@ -3676,6 +4397,12 @@ begin
   ) then
     raise exception '對方已經是群組成員';
   end if;
+  if exists (
+    select 1 from group_bans b
+    where b.group_id = p_gid and (b.user_id = target_uid or user_email(b.user_id) = e)
+  ) then
+    raise exception '這位使用者已被這個群組封鎖';
+  end if;
 
   insert into group_email_invites (group_id, email, invited_by)
   values (p_gid, e, uid)
@@ -3685,6 +4412,16 @@ begin
     perform audit(p_gid, uid, 'group.invite.email', 'invite', new_id::text,
                   jsonb_build_object('name', case when via = 'username' then '@' || username_normalize(t) else e end,
                                      'email', e, 'via', via));
+    -- 通知被邀請的人（email 已驗證、對得上的使用者；還沒註冊就沒有人）
+    perform notify(
+      array(select x.id
+            from (select u.id from auth.users u where lower(u.email) = e
+                  union
+                  select p.id from profiles p where lower(p.email) = e) x
+            where user_email(x.id) = e),
+      'group_invite', '群組邀請',
+      format('%s 邀請你加入「%s」。', notify_name(uid), (select g.name from groups g where g.id = p_gid)),
+      '/groups', jsonb_build_object('group_id', p_gid, 'actor_id', uid, 'invite_id', new_id));
   end if;
 end;
 $$;
@@ -3739,7 +4476,7 @@ begin
 end;
 $$;
 
--- 回覆邀請（被邀請者本人）：接受回傳群組 id，拒絕回傳 null；兩者都刪除邀請（群組已加密時不能加入）
+-- 回覆邀請（被邀請者本人）：接受回傳群組 id，拒絕回傳 null；兩者都刪除邀請（群組已加密、被封鎖時不能加入）
 create function public.respond_invitation(invite_id uuid, accept boolean)
 returns uuid
 language plpgsql
@@ -3754,15 +4491,32 @@ begin
   if i.id is null or i.email is distinct from user_email(uid) then
     raise exception '找不到這個邀請';
   end if;
+  -- 接受：先共享鎖群組列再刪邀請（和 group_ban 同順序）；加密或被封鎖時 raise，邀請保留
+  -- （封鎖時已刪除寄給他的邀請，這裡只會遇到封鎖之後才直接寫進來的邀請）
+  if coalesce(respond_invitation.accept, false) and not group_is_member(i.group_id, uid) then
+    perform group_assert_not_encrypted(i.group_id);
+    if group_is_banned(i.group_id, uid) then
+      raise exception '你已被這個群組封鎖，無法加入';
+    end if;
+  end if;
   delete from group_email_invites x where x.id = i.id;
   if not coalesce(respond_invitation.accept, false) then
+    -- 通知邀請者：拒絕了
+    perform notify(array[i.invited_by], 'invite_answered', '邀請已回覆',
+                   format('%s 拒絕了你加入「%s」的邀請。', notify_name(uid), (select g.name from groups g where g.id = i.group_id)),
+                   '/groups/' || i.group_id::text,
+                   jsonb_build_object('group_id', i.group_id, 'actor_id', uid, 'accepted', false, 'via', 'email'));
     return null;
   end if;
   if not group_is_member(i.group_id, uid) then
-    perform group_assert_not_encrypted(i.group_id);
     insert into group_members (group_id, user_id) values (i.group_id, uid) on conflict do nothing;
     perform audit(i.group_id, uid, 'group.member.join', 'member', uid::text,
                   jsonb_build_object('name', display_name(uid), 'via', 'email', 'invited_by', i.invited_by));
+    -- 通知邀請者：接受了
+    perform notify(array[i.invited_by], 'invite_answered', '邀請已回覆',
+                   format('%s 接受了你的邀請，已加入「%s」。', notify_name(uid), (select g.name from groups g where g.id = i.group_id)),
+                   '/groups/' || i.group_id::text,
+                   jsonb_build_object('group_id', i.group_id, 'actor_id', uid, 'accepted', true, 'via', 'email'));
   end if;
   return i.group_id;
 end;
@@ -3774,7 +4528,7 @@ $$;
 -- ============================================================
 
 -- AdminUser：{ id, email, name, username, photo_url, creation_time, last_login_*, last_active_at, role_ids, top_position,
--- totp_count, vault_enabled }
+-- is_owner, totp_count, vault_enabled }
 -- last_login_ip 只給自己、管得到對方的人（或 service role）；totp_count 是預設群組的驗證碼數；
 -- last_active_at 是所有登入中 session 的最後活動取最新的（同 user_sessions_json），沒有 session 時 null
 create function public.admin_user_json(p_uid uuid)
@@ -3809,6 +4563,7 @@ as $$
       where ur.user_id = p.id and not r.is_default
     ), '[]'::jsonb),
     'top_position', site_top_position(p.id),
+    'is_owner', site_is_owner(p.id),
     'totp_count', (select count(*) from totp_accounts a where a.group_id = default_group_of(p.id)),
     'vault_enabled', p.vault is not null
   )
@@ -3817,7 +4572,7 @@ as $$
   where p.id = p_uid;
 $$;
 
--- 使用者列表（VIEW_USERS）：search 比對 email / name / username；依建立時間新到舊
+-- 使用者列表（VIEW_USERS）：{ total, users, site_owner_id }；search 比對 email / name / username；依建立時間新到舊
 create function public.admin_users(search text, page_offset int, page_size int)
 returns jsonb
 language plpgsql
@@ -3856,7 +4611,8 @@ begin
          ), '[]'::jsonb)
   into total, users;
 
-  return jsonb_build_object('total', total, 'users', users);
+  return jsonb_build_object('total', total, 'users', users,
+                            'site_owner_id', (select o.user_id from site_owner o limit 1));
 end;
 $$;
 
@@ -3887,7 +4643,7 @@ begin
 end;
 $$;
 
--- 修改使用者名稱與 @ID（MANAGE_USERS + 階層）：null 代表不改，空字串代表清除 @ID
+-- 修改使用者名稱與 @ID（MANAGE_USERS + 階層）：null 代表不改，空字串代表清除 @ID；名稱最多 64 字
 create function public.admin_update_user(user_id uuid, name text, username text)
 returns void
 language plpgsql
@@ -3897,7 +4653,7 @@ as $$
 declare
   uid uuid := require_uid();
   p_target uuid := admin_update_user.user_id;
-  p_name text := admin_update_user.name;
+  p_name text := trim(admin_update_user.name);
   p_username text := admin_update_user.username;
   v text;
   old profiles%rowtype;
@@ -3910,6 +4666,9 @@ begin
   if p_target <> uid and not site_can_manage_user(uid, p_target) then
     raise exception '只能管理比你目前最高身分組還低的身分組 / 成員';
   end if;
+  if char_length(p_name) > 64 then
+    raise exception '名稱最多 64 個字';
+  end if;
 
   if p_username is not null then
     v := username_normalize(p_username);
@@ -3920,7 +4679,7 @@ begin
 
   begin
     update profiles p
-    set name = case when p_name is null then p.name else trim(p_name) end,
+    set name = case when p_name is null then p.name else p_name end,
         username = case when p_username is null then p.username else v end,
         updated_at = now()
     where p.id = p_target;
@@ -3929,9 +4688,17 @@ begin
   end;
 
   perform audit(null, uid, 'site.user.update', 'user', p_target::text, jsonb_build_object(
-    'name', coalesce(nullif(case when p_name is null then old.name else trim(p_name) end, ''), display_name(p_target)),
+    'name', coalesce(nullif(case when p_name is null then old.name else p_name end, ''), display_name(p_target)),
     'old_name', old.name,
     'username', case when p_username is null then old.username else v end, 'old_username', old.username));
+  -- @ID 被改了：通知本人（後台可以整個關掉；改自己的不通知）
+  if p_username is not null and v is distinct from old.username and p_target <> uid
+     and notify_admin_change_enabled('username') then
+    perform notify(array[p_target], 'admin_changed_username', '@ID 已被修改',
+                   case when v is null then format('%s 清除了你的 @ID。', notify_name(uid))
+                        else format('%s 把你的 @ID 改成 @%s。', notify_name(uid), v) end,
+                   '/me/update_info', jsonb_build_object('actor_id', uid, 'username', v, 'old_username', old.username));
+  end if;
 end;
 $$;
 
@@ -4005,6 +4772,12 @@ begin
   perform audit(null, uid, 'site.user.totp.update', 'user', p_target::text, jsonb_build_object(
     'name', display_name(p_target), 'item_id', p_item,
     'item_name', (select name from totp_accounts where id = p_item), 'fields', fields));
+  -- 通知本人（後台可以整個關掉；改自己的不通知）
+  if p_target <> uid and notify_admin_change_enabled('codes') then
+    perform notify(array[p_target], 'admin_changed_codes', '驗證碼已被修改',
+                   format('%s 修改了你的驗證碼「%s」。', notify_name(uid), (select name from totp_accounts where id = p_item)),
+                   '/', jsonb_build_object('actor_id', uid, 'item_id', p_item, 'action', 'update'));
+  end if;
 end;
 $$;
 
@@ -4032,6 +4805,12 @@ begin
   delete from totp_accounts x where x.id = p_item;
   perform audit(null, uid, 'site.user.totp.delete', 'user', p_target::text,
                 jsonb_build_object('name', display_name(p_target), 'item_id', p_item, 'item_name', a.name));
+  -- 通知本人（後台可以整個關掉；改自己的不通知）
+  if p_target <> uid and notify_admin_change_enabled('codes') then
+    perform notify(array[p_target], 'admin_changed_codes', '驗證碼已被修改',
+                   format('%s 刪除了你的驗證碼「%s」。', notify_name(uid), a.name),
+                   '/', jsonb_build_object('actor_id', uid, 'item_id', p_item, 'action', 'delete'));
+  end if;
 end;
 $$;
 
@@ -4161,7 +4940,57 @@ as $$
   ) l;
 $$;
 
--- 群組操作紀錄（VIEW_AUDIT_LOG）：id 由大到小，before_id null 從最新開始
+-- 邀請碼只留前 4 碼：'AbCdEfGh…' → 'AbCd…'
+create function public.invite_code_mask(v text)
+returns text
+language sql
+immutable
+as $$
+  select case when v is null or char_length(v) <= 4 then v else left(v, 4) || '…' end;
+$$;
+
+-- 群組操作紀錄的一筆（audit_page 的格式）讀取時遮蔽：邀請連結的邀請碼（target_id、detail.name、detail.code）只留前 4 碼；
+-- p_with_email false 時 detail 裡看起來像 email 的 name / actor_name / email 改成 null。存的資料不變
+create function public.group_audit_redact(p_row jsonb, p_with_email boolean)
+returns jsonb
+language plpgsql
+immutable
+as $$
+declare
+  r jsonb := p_row;
+  d jsonb := case when jsonb_typeof(p_row -> 'detail') = 'object' then p_row -> 'detail' else '{}'::jsonb end;
+  k text;
+begin
+  if p_row is null then
+    return null;
+  end if;
+  -- 邀請連結的紀錄：target_id 與 detail.name 是邀請碼（Email 邀請的 target_id 是 uuid，不是邀請碼）
+  if coalesce(p_row ->> 'action', '') like 'group.invite.%'
+     and (p_row ->> 'target_type') = 'invite'
+     and coalesce(p_row ->> 'target_id', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    r := r || jsonb_build_object('target_id', invite_code_mask(p_row ->> 'target_id'));
+    if jsonb_typeof(d -> 'name') = 'string' then
+      d := d || jsonb_build_object('name', invite_code_mask(d ->> 'name'));
+    end if;
+  end if;
+  -- 用邀請連結加入（group.member.join）的 detail.code
+  if jsonb_typeof(d -> 'code') = 'string' then
+    d := d || jsonb_build_object('code', invite_code_mask(d ->> 'code'));
+  end if;
+  -- 看不到 email 的人：detail 裡看起來像 email 的值（Email 邀請、沒有名稱時用 email 當顯示名稱）改成 null
+  if not coalesce(p_with_email, false) then
+    foreach k in array array['name', 'actor_name', 'email'] loop
+      if jsonb_typeof(d -> k) = 'string' and (d ->> k) ~ '^[^@\s]+@[^@\s]+$' then
+        d := d || jsonb_build_object(k, null);
+      end if;
+    end loop;
+  end if;
+  return r || jsonb_build_object('detail', d);
+end;
+$$;
+
+-- 群組操作紀錄（VIEW_AUDIT_LOG）：id 由大到小，before_id null 從最新開始；
+-- email 只給看得到成員 email 的人（group_sees_emails），邀請碼一律遮蔽（group_audit_redact）
 create function public.group_audit_log(gid uuid, before_id bigint, page_size int)
 returns jsonb
 language plpgsql
@@ -4172,9 +5001,15 @@ as $$
 declare
   uid uuid := require_uid();
   p_gid uuid := group_audit_log.gid;
+  with_email boolean;
 begin
   perform group_require(p_gid, uid, 256);
-  return audit_page(p_gid, group_audit_log.before_id, group_audit_log.page_size, true);
+  with_email := group_sees_emails(p_gid, uid);
+  return coalesce((
+    select jsonb_agg(group_audit_redact(x.e, with_email) order by x.ord)
+    from jsonb_array_elements(audit_page(p_gid, group_audit_log.before_id, group_audit_log.page_size, with_email))
+         with ordinality as x(e, ord)
+  ), '[]'::jsonb);
 end;
 $$;
 
@@ -4278,6 +5113,21 @@ as $$
   ) l;
 $$;
 
+-- 保留期限（只給 service role，/api/record-login 寫入登入紀錄時呼叫）：
+-- 刪掉一年前的登入紀錄（所有人，包含已刪除的帳號）、帳號刪除超過一年的託管密文、一年前的通知
+create function public.prune_retention()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from login_history h where h.created_at < now() - interval '1 year';
+  delete from vault_escrow v where v.account_deleted_at < now() - interval '1 year';
+  delete from notifications n where n.created_at < now() - interval '1 year';
+end;
+$$;
+
 -- 使用者的登入紀錄分頁：[{ id, created_at, ip, device, user_agent, provider }]，新到舊；p_show_ip false 時 ip 是 null
 create function public.login_history_page(p_uid uuid, p_before bigint, p_size int, p_show_ip boolean)
 returns jsonb
@@ -4355,6 +5205,16 @@ begin
   end;
   if act is not null then
     perform user_audit(new.id, actor, act, '{}'::jsonb);
+    -- 通知本人（自己做的也通知）；推播不送到做這個變更的那台裝置
+    perform notify(array[new.id], 'vault_changed',
+      case act when 'user.vault.enable' then '已設定金鑰加密密碼' when 'user.vault.password' then '金鑰加密密碼已變更'
+               when 'user.vault.disable' then '已關閉金鑰加密' else '已重設金鑰加密' end,
+      case act when 'user.vault.enable' then '你已設定金鑰加密的密碼。'
+               when 'user.vault.password' then '你的金鑰加密密碼已變更。'
+               when 'user.vault.disable' then '你已關閉金鑰加密。'
+               else '你已重設金鑰加密，加密群組裡的驗證碼已刪除。' end
+        || '如果不是你本人操作，請立即檢查帳號安全。',
+      '/me/update_info', jsonb_build_object('action', replace(act, 'user.vault.', '')), current_session_id());
   end if;
 
   -- 預設群組（建立 profile 時第一次設定不算）
@@ -4977,7 +5837,1103 @@ $$;
 
 
 -- ============================================================
--- 15. 權限設定（GRANT / REVOKE）
+-- 15. 通知、公告、最低版本
+-- - notifications：每位使用者的通知（鈴鐺）。標題與內文由這裡的函式產生（固定的中文句型，帶入名稱），
+--   網站與 App 直接顯示。內容只寫誰、哪個群組、做了什麼，不放驗證碼、金鑰、封鎖原因、IP、email。
+-- - 事件：既有的 RPC／觸發器呼叫 notify()（或 notify_codes_changed()），notify 依 notification_prefs 決定
+--   push_state（關掉 → skipped，鈴鐺裡照樣有），寫入後送 sync_signals topic 'notifications'。
+--   自己做的動作不通知自己（new_login、vault_changed 除外）。
+-- - 公告：後台（SEND_NOTIFICATIONS）用 admin_broadcast_send 依條件發給一群人，記在 broadcasts（一律保留）。
+-- - 推播：notifications 有 pending 的 insert 之後（statement 層級觸發器）用 pg_net 呼叫 Edge Function push
+--   （<project_url>/functions/v1/push，header x-push-secret）；project_url 與 push_webhook_secret 存在 Supabase Vault。
+--   沒有 pg_net、Vault 或其中一個 secret 時安靜地跳過（push_state 留 pending）；呼叫失敗不會擋住原本的操作。
+--   有 pg_cron 時每分鐘 push_retry() 補送；Edge Function 用 push_claim / push_finish（只給 service role）領取與回報。
+-- - 全站設定 site_settings：notify_admin_changes（後台修改帳號時要不要通知本人）、min_app_version（App 最低版本，
+--   app_config() 不用登入就能讀）。
+-- - 保留：通知一年（prune_retention），刪帳號時跟著刪除。
+-- ============================================================
+
+-- ---------- 種類與共用 helper ----------
+
+-- 通知種類（順序 = 設定頁的顯示順序）：type、類別、預設開關、locked（不能關）
+create function public.notification_defaults()
+returns jsonb
+language sql
+immutable
+as $$
+  select '[
+    {"type": "announce_important",       "category": "system",  "default": true,  "locked": true},
+    {"type": "announce_update",          "category": "system",  "default": true,  "locked": false},
+    {"type": "announce_promo",           "category": "system",  "default": true,  "locked": false},
+    {"type": "announce_other",           "category": "system",  "default": true,  "locked": false},
+    {"type": "new_login",                "category": "account", "default": true,  "locked": false},
+    {"type": "vault_changed",            "category": "account", "default": true,  "locked": false},
+    {"type": "admin_changed_role",       "category": "account", "default": true,  "locked": false},
+    {"type": "admin_changed_username",   "category": "account", "default": true,  "locked": false},
+    {"type": "admin_changed_codes",      "category": "account", "default": true,  "locked": false},
+    {"type": "group_invite",             "category": "feature", "default": true,  "locked": false},
+    {"type": "invite_answered",          "category": "feature", "default": true,  "locked": false},
+    {"type": "member_added",             "category": "feature", "default": true,  "locked": false},
+    {"type": "member_removed",           "category": "feature", "default": true,  "locked": false},
+    {"type": "member_banned",            "category": "feature", "default": true,  "locked": false},
+    {"type": "group_roles_changed",      "category": "feature", "default": true,  "locked": false},
+    {"type": "ownership_received",       "category": "feature", "default": true,  "locked": false},
+    {"type": "group_deleted",            "category": "feature", "default": true,  "locked": false},
+    {"type": "group_encryption_changed", "category": "feature", "default": true,  "locked": false},
+    {"type": "codes_changed",            "category": "feature", "default": false, "locked": false}
+  ]'::jsonb;
+$$;
+
+-- 一種通知的設定（{ type, category, default, locked }）；未知的 type 回傳 null
+create function public.notification_type(p_type text)
+returns jsonb
+language sql
+immutable
+set search_path = public
+as $$
+  select e from jsonb_array_elements(notification_defaults()) e where e ->> 'type' = p_type;
+$$;
+
+-- 這位使用者有沒有開這一種通知（locked 的一律開）
+create function public.notify_enabled(p_uid uuid, p_type text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when coalesce((notification_type(p_type) ->> 'locked')::boolean, false) then true
+    else coalesce(
+      (select case when jsonb_typeof(np.overrides -> p_type) = 'boolean' then (np.overrides ->> p_type)::boolean end
+       from notification_prefs np where np.user_id = p_uid),
+      (notification_type(p_type) ->> 'default')::boolean,
+      true)
+  end;
+$$;
+
+-- 通知內文裡的名稱：名稱 → @ID → 「一位使用者」（不用 email）
+create function public.notify_name(p_uid uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select coalesce(nullif(btrim(p.name), ''), '@' || p.username) from profiles p where p.id = p_uid),
+    '一位使用者');
+$$;
+
+-- 公告的連結：空的 → null；只接受站內路徑（/ 開頭、不是 //、沒有空白與反斜線、最多 500 字），否則 raise
+create function public.notify_norm_link(p_link text)
+returns text
+language plpgsql
+immutable
+as $$
+declare
+  l text := btrim(coalesce(p_link, ''));
+begin
+  if l = '' then
+    return null;
+  end if;
+  if char_length(l) > 500 or l !~ '^/' or l ~ '^//' or l ~ '[\s\\]' or l ~ '[[:cntrl:]]' then
+    raise exception '連結只能是站內路徑（以 / 開頭）';
+  end if;
+  return l;
+end;
+$$;
+
+-- 寫通知給 p_uids（去重、略過不存在的 profile）；回傳寫了幾則。
+-- p_data.actor_id 是操作者：不通知操作者自己（new_login、vault_changed 除外）；
+-- 防灌：同一位操作者、同一種通知、同一位收件人一小時內最多 30 則，超過的不寫。
+-- push_state：收件人關掉這一種就是 skipped（鈴鐺裡照樣有）。寫完送 sync_signals 'notifications'
+create function public.notify(p_uids uuid[], p_type text, p_title text, p_body text, p_link text, p_data jsonb,
+                              p_exclude_session uuid default null)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  info jsonb := notification_type(p_type);
+  d jsonb := case when jsonb_typeof(p_data) = 'object' then p_data else '{}'::jsonb end;
+  actor uuid;
+  self_ok boolean := p_type in ('new_login', 'vault_changed');
+  uids uuid[];
+begin
+  if info is null then
+    raise exception '未知的通知種類：%', p_type;
+  end if;
+  if coalesce(d ->> 'actor_id', '') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    actor := (d ->> 'actor_id')::uuid;
+  end if;
+
+  with ins as (
+    insert into notifications (user_id, category, type, title, body, link, data, exclude_session, push_state)
+    select r.u, info ->> 'category', p_type, left(coalesce(p_title, ''), 100), left(coalesce(p_body, ''), 500),
+           case when char_length(p_link) <= 500 and p_link ~ '^/' and p_link !~ '^//' then p_link end,
+           d, p_exclude_session,
+           case when notify_enabled(r.u, p_type) then 'pending' else 'skipped' end
+    from (select distinct x as u from unnest(coalesce(p_uids, '{}'::uuid[])) x where x is not null) r
+    where exists (select 1 from profiles p where p.id = r.u)
+      and (self_ok or actor is null or r.u <> actor)
+      and (actor is null or (
+        select count(*) from notifications n
+        where n.user_id = r.u and n.type = p_type and n.data ->> 'actor_id' = actor::text
+          and n.created_at > now() - interval '1 hour') < 30)
+    returning user_id
+  )
+  select coalesce(array_agg(ins.user_id), '{}') into uids from ins;
+
+  if cardinality(uids) > 0 then
+    perform sync_signal(uids, array['notifications']);
+  end if;
+  return cardinality(uids);
+end;
+$$;
+
+-- codes_changed 的內文
+create function public.notify_codes_body(p_actor text, p_group text, p_added int, p_removed int)
+returns text
+language sql
+immutable
+as $$
+  select case
+    when coalesce(p_added, 0) > 0 and coalesce(p_removed, 0) > 0
+      then format('%s 在「%s」新增了 %s 筆、刪除了 %s 筆驗證碼。', p_actor, p_group, p_added, p_removed)
+    when coalesce(p_added, 0) > 0
+      then format('%s 在「%s」新增了 %s 筆驗證碼。', p_actor, p_group, p_added)
+    else format('%s 在「%s」刪除了 %s 筆驗證碼。', p_actor, p_group, coalesce(p_removed, 0))
+  end;
+$$;
+
+-- 群組驗證碼新增 / 刪除（codes_changed）：通知看得到 p_ids 其中至少一筆的成員（操作者除外）；刪除要在刪掉之前呼叫。
+-- 合併：同一位操作者、同一個群組、10 分鐘內、收件人還沒讀的那一則，數量累加、時間更新（推播只在第一次送）；
+-- 一次匯入多筆只產生一則
+create function public.notify_codes_changed(p_gid uuid, p_actor uuid, p_ids uuid[], p_added int, p_removed int)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  gname text;
+  aname text;
+  rcpt uuid[];
+  merged uuid[];
+begin
+  if p_gid is null or p_actor is null or coalesce(cardinality(p_ids), 0) = 0 then
+    return;
+  end if;
+  select g.name into gname from groups g where g.id = p_gid;
+  if gname is null then
+    return;
+  end if;
+  select coalesce(array_agg(m.user_id), '{}') into rcpt
+  from group_members m
+  where m.group_id = p_gid and m.user_id <> p_actor
+    and exists (select 1 from unnest(p_ids) a where account_permissions(a, m.user_id) & 2 <> 0);
+  if cardinality(rcpt) = 0 then
+    return;
+  end if;
+  aname := notify_name(p_actor);
+
+  with upd as (
+    update notifications n
+    set data = n.data || jsonb_build_object(
+          'added', coalesce((n.data ->> 'added')::int, 0) + coalesce(p_added, 0),
+          'removed', coalesce((n.data ->> 'removed')::int, 0) + coalesce(p_removed, 0)),
+        body = notify_codes_body(aname, gname,
+                                 coalesce((n.data ->> 'added')::int, 0) + coalesce(p_added, 0),
+                                 coalesce((n.data ->> 'removed')::int, 0) + coalesce(p_removed, 0)),
+        created_at = now()
+    where n.user_id = any (rcpt) and n.type = 'codes_changed' and n.read_at is null
+      and n.data ->> 'group_id' = p_gid::text and n.data ->> 'actor_id' = p_actor::text
+      and n.created_at > now() - interval '10 minutes'
+    returning n.user_id
+  )
+  select coalesce(array_agg(distinct upd.user_id), '{}') into merged from upd;
+
+  if cardinality(merged) > 0 then
+    perform sync_signal(merged, array['notifications']);
+  end if;
+  perform notify(
+    array(select x from unnest(rcpt) x where not (x = any (merged))),
+    'codes_changed', '群組驗證碼有變動', notify_codes_body(aname, gname, p_added, p_removed),
+    '/groups/' || p_gid::text,
+    jsonb_build_object('group_id', p_gid, 'actor_id', p_actor, 'added', coalesce(p_added, 0), 'removed', coalesce(p_removed, 0)));
+end;
+$$;
+
+-- 全站設定的值（沒有那一列時 null）
+create function public.site_setting(p_key text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select s.value from site_settings s where s.key = p_key;
+$$;
+
+-- 後台修改帳號時要不要通知本人（site_settings.notify_admin_changes 的 role / username / codes；沒設定時開）
+create function public.notify_admin_change_enabled(p_key text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce((
+    select case when jsonb_typeof(s.value -> p_key) = 'boolean' then (s.value ->> p_key)::boolean end
+    from site_settings s where s.key = 'notify_admin_changes'
+  ), true);
+$$;
+
+-- semver 比較：a < b → -1、相等 → 0、a > b → 1；任一個格式不對 → null。
+-- 格式 [v]主.次.修[-預先發行][+建置]；預先發行比正式版舊（1.5.0-beta.1 < 1.5.0），建置資訊忽略
+create function public.semver_cmp(a text, b text)
+returns int
+language plpgsql
+immutable
+as $$
+declare
+  re constant text := '^v?(\d{1,9})\.(\d{1,9})\.(\d{1,9})(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z.-]+)?$';
+  ra text[] := regexp_match(btrim(coalesce(a, '')), re);
+  rb text[] := regexp_match(btrim(coalesce(b, '')), re);
+  pa text[];
+  pb text[];
+  x text;
+  y text;
+  i int;
+begin
+  if ra is null or rb is null then
+    return null;
+  end if;
+  for i in 1..3 loop
+    if ra[i]::bigint <> rb[i]::bigint then
+      return case when ra[i]::bigint < rb[i]::bigint then -1 else 1 end;
+    end if;
+  end loop;
+  if ra[4] is null and rb[4] is null then
+    return 0;
+  elsif ra[4] is null then
+    return 1;
+  elsif rb[4] is null then
+    return -1;
+  end if;
+  pa := string_to_array(ra[4], '.');
+  pb := string_to_array(rb[4], '.');
+  for i in 1..greatest(cardinality(pa), cardinality(pb)) loop
+    if i > cardinality(pa) then
+      return -1;
+    elsif i > cardinality(pb) then
+      return 1;
+    end if;
+    x := pa[i];
+    y := pb[i];
+    if x ~ '^\d+$' and y ~ '^\d+$' then
+      if x::numeric <> y::numeric then
+        return case when x::numeric < y::numeric then -1 else 1 end;
+      end if;
+    elsif x ~ '^\d+$' then
+      return -1;
+    elsif y ~ '^\d+$' then
+      return 1;
+    elsif x <> y then
+      return case when x collate "C" < y collate "C" then -1 else 1 end;
+    end if;
+  end loop;
+  return 0;
+end;
+$$;
+
+-- ---------- 自己的通知 ----------
+
+-- 我的通知（新到舊）：[{ id, category, type, title, body, link, data, created_at, read_at, push_state }]。
+-- p_category：null = 全部、system / account / feature；p_before：上一頁最後一筆的 id；p_limit 1～100（預設 30）
+create function public.notifications_list(p_category text default null, p_before bigint default null, p_limit int default 30)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+  c text := nullif(btrim(coalesce(p_category, '')), '');
+  cur_at timestamptz;
+begin
+  if c is not null and c not in ('system', 'account', 'feature') then
+    raise exception '通知類別不正確';
+  end if;
+  if p_before is not null then
+    select n.created_at into cur_at from notifications n where n.id = p_before and n.user_id = uid;
+  end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'id', x.id, 'category', x.category, 'type', x.type, 'title', x.title, 'body', x.body, 'link', x.link,
+      'data', x.data, 'created_at', x.created_at, 'read_at', x.read_at, 'push_state', x.push_state
+    ) order by x.created_at desc, x.id desc)
+    from (
+      select * from notifications n
+      where n.user_id = uid
+        and (c is null or n.category = c)
+        and (p_before is null
+             or (cur_at is null and n.id < p_before)
+             or (n.created_at, n.id) < (cur_at, p_before))
+      order by n.created_at desc, n.id desc
+      limit greatest(1, least(coalesce(p_limit, 30), 100))
+    ) x
+  ), '[]'::jsonb);
+end;
+$$;
+
+-- 未讀數：{ total, system, account, feature }
+create function public.notifications_unread_counts()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+begin
+  return (
+    select jsonb_build_object(
+      'total', count(*),
+      'system', count(*) filter (where n.category = 'system'),
+      'account', count(*) filter (where n.category = 'account'),
+      'feature', count(*) filter (where n.category = 'feature'))
+    from notifications n
+    where n.user_id = uid and n.read_at is null
+  );
+end;
+$$;
+
+-- 標為已讀：p_ids（最多 1000 個）、p_category 都 null = 全部；兩個都給 = 交集。回傳這次標了幾則
+create function public.notifications_mark_read(p_ids bigint[] default null, p_category text default null)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+  c text := nullif(btrim(coalesce(p_category, '')), '');
+  k int;
+begin
+  if c is not null and c not in ('system', 'account', 'feature') then
+    raise exception '通知類別不正確';
+  end if;
+  if coalesce(cardinality(p_ids), 0) > 1000 then
+    raise exception '一次最多 1000 則';
+  end if;
+  update notifications n set read_at = now()
+  where n.user_id = uid and n.read_at is null
+    and (p_ids is null or n.id = any (p_ids))
+    and (c is null or n.category = c);
+  get diagnostics k = row_count;
+  if k > 0 then
+    perform sync_signal(array[uid], array['notifications']);
+  end if;
+  return k;
+end;
+$$;
+
+-- 我的通知開關：[{ type, category, default, locked, enabled }]（順序同 notification_defaults）
+create function public.notification_prefs_get()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+begin
+  return (
+    select jsonb_agg(t.e || jsonb_build_object('enabled', notify_enabled(uid, t.e ->> 'type')) order by t.ord)
+    from jsonb_array_elements(notification_defaults()) with ordinality as t(e, ord)
+  );
+end;
+$$;
+
+-- 修改通知開關：p_overrides { "<type>": true | false } 合併到現有設定；未知的 type、不是 boolean 的值、
+-- 關掉不能關的（announce_important）都忽略。只存和預設不同的。回傳同 notification_prefs_get
+create function public.notification_prefs_set(p_overrides jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+  o jsonb := case when jsonb_typeof(p_overrides) = 'object' then p_overrides else '{}'::jsonb end;
+  cur jsonb;
+  nxt jsonb;
+begin
+  select np.overrides into cur from notification_prefs np where np.user_id = uid for update;
+  cur := coalesce(cur, '{}'::jsonb);
+  select coalesce(jsonb_object_agg(t.k, t.val), '{}'::jsonb) into nxt
+  from (
+    select e ->> 'type' as k,
+           case when jsonb_typeof(o -> (e ->> 'type')) = 'boolean' then o -> (e ->> 'type')
+                when jsonb_typeof(cur -> (e ->> 'type')) = 'boolean' then cur -> (e ->> 'type') end as val,
+           e -> 'default' as def
+    from jsonb_array_elements(notification_defaults()) e
+    where not (e ->> 'locked')::boolean
+  ) t
+  where t.val is not null and t.val <> t.def;
+  insert into notification_prefs (user_id, overrides, updated_at) values (uid, nxt, now())
+  on conflict (user_id) do update set overrides = excluded.overrides, updated_at = excluded.updated_at;
+  return notification_prefs_get();
+end;
+$$;
+
+-- 推播 token：寫到目前這個 session（access token 的 session_id）的 session_devices，那列還沒有就建立；
+-- null / 空字串 = 取消（登出前呼叫）。同一個 token 在其他 session 的列會被清掉
+create function public.register_push_token(p_token text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+  sid uuid := current_session_id();
+  t text := nullif(btrim(coalesce(p_token, '')), '');
+begin
+  if sid is null then
+    raise exception '找不到目前的裝置';
+  end if;
+  if t is not null and (char_length(t) > 4096 or t !~ '^[!-~]+$') then
+    raise exception '推播 token 格式不正確';
+  end if;
+  if t is not null then
+    update session_devices d set push_token = null, push_updated_at = now()
+    where md5(d.push_token) = md5(t) and d.push_token = t and d.session_id <> sid;
+  end if;
+  insert into session_devices (session_id, user_id, push_token, push_updated_at)
+  values (sid, uid, t, now())
+  on conflict (session_id) do update
+    set push_token = excluded.push_token, push_updated_at = excluded.push_updated_at
+    where session_devices.user_id = uid;
+end;
+$$;
+
+-- 使用者直接寫 session_devices（PostgREST）時，推播 token 靜靜地維持原值（只能透過 register_push_token 改）。
+-- 不是 security definer：要看到呼叫者自己的 current_user
+create function public.session_devices_guard()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if current_user <> 'authenticated' then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    new.push_token := null;
+    new.push_updated_at := null;
+  else
+    new.push_token := old.push_token;
+    new.push_updated_at := old.push_updated_at;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger session_devices_guard
+  before insert or update on public.session_devices
+  for each row execute function public.session_devices_guard();
+
+-- App 設定（不用登入）：{ min_app_version: { version, message } | null }
+create function public.app_config()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object('min_app_version', (
+    select case when jsonb_typeof(s.value) = 'object' then s.value end
+    from site_settings s where s.key = 'min_app_version'));
+$$;
+
+-- ---------- 事件：新的登入 ----------
+
+-- login_history 新增一筆（/api/record-login，同一個 session 只記一次）→ 通知本人；推播不送到登入的那台裝置。
+-- 帳號的第一次登入不通知
+create function public.login_history_notify()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if exists (select 1 from login_history h where h.user_id = new.user_id and h.id <> new.id) then
+    perform notify(array[new.user_id], 'new_login', '新的登入',
+                   format('你的帳號剛剛在「%s」登入。如果不是你本人，請盡快檢查帳號安全並登出不認得的裝置。',
+                          coalesce(nullif(btrim(new.device), ''), '新的裝置')),
+                   '/me/activity', jsonb_build_object('login_id', new.id), new.session_id);
+  end if;
+  return null;
+end;
+$$;
+
+create trigger login_history_notify
+  after insert on public.login_history
+  for each row execute function public.login_history_notify();
+
+-- ---------- 公告（SEND_NOTIFICATIONS）----------
+
+-- filter 裡的 uuid 陣列：null / 空陣列 → null；不是 uuid 字串的陣列或超過 p_max 個 → raise
+create function public.broadcast_filter_uuids(p_value jsonb, p_max int)
+returns uuid[]
+language plpgsql
+immutable
+as $$
+declare
+  r uuid[];
+begin
+  if p_value is null or jsonb_typeof(p_value) = 'null' then
+    return null;
+  end if;
+  if jsonb_typeof(p_value) <> 'array' or jsonb_array_length(p_value) > p_max
+     or exists (select 1 from jsonb_array_elements(p_value) e
+                where jsonb_typeof(e) <> 'string'
+                   or (e #>> '{}') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') then
+    raise exception '通知對象條件格式不正確';
+  end if;
+  select array_agg(distinct (e #>> '{}')::uuid) into r from jsonb_array_elements(p_value) e;
+  return r;
+end;
+$$;
+
+-- 公告的收件人：每人一列 { user_id, push_sessions, devices, push_devices }。條件（全部可選、同時符合才算，至少要有一個）：
+--   使用者條件 all_users、user_ids、site_role_ids（含 @everyone = 所有人）、last_seen_days（最後活動在 N 天內）
+--   裝置條件 platforms（ios / android / macos / linux / windows / web）、session_ids、version_min、version_max（含，semver）
+-- 有裝置條件：給至少有一台符合的 App 裝置（登入中的 session_devices；last_seen_days 也套用在裝置上）的人，
+--   push_sessions = 符合的那幾台；web = 只用網站（沒有登入中的 App 裝置、有登入紀錄），
+--   session_ids 指到網站的 session 也算（沒有推播），前提是 platforms 沒給或含 web、沒有版本條件。
+-- 沒有裝置條件：給所有符合的人，push_sessions null（推播送他全部裝置）。
+-- devices / push_devices：會收到的 App 裝置數、其中有推播 token 的
+create function public.broadcast_targets(p_filter jsonb)
+returns table (user_id uuid, push_sessions uuid[], devices int, push_devices int)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  f jsonb := case when jsonb_typeof(p_filter) = 'object' then p_filter else '{}'::jsonb end;
+  v_all boolean := false;
+  v_users uuid[] := broadcast_filter_uuids(f -> 'user_ids', 10000);
+  v_roles uuid[] := broadcast_filter_uuids(f -> 'site_role_ids', 1000);
+  v_sessions uuid[] := broadcast_filter_uuids(f -> 'session_ids', 1000);
+  v_platforms text[];
+  v_min text;
+  v_max text;
+  v_days int;
+  everyone boolean;
+  dev_cond boolean;
+begin
+  if coalesce(jsonb_typeof(f -> 'all_users'), 'null') not in ('boolean', 'null') then
+    raise exception '通知對象條件格式不正確';
+  end if;
+  v_all := coalesce((f ->> 'all_users')::boolean, false);
+
+  if coalesce(jsonb_typeof(f -> 'platforms'), 'null') <> 'null' then
+    if jsonb_typeof(f -> 'platforms') <> 'array'
+       or exists (select 1 from jsonb_array_elements(f -> 'platforms') e
+                  where jsonb_typeof(e) <> 'string'
+                     or (e #>> '{}') not in ('ios', 'android', 'macos', 'linux', 'windows', 'web')) then
+      raise exception '通知對象條件格式不正確';
+    end if;
+    select array_agg(distinct e #>> '{}') into v_platforms from jsonb_array_elements(f -> 'platforms') e;
+  end if;
+
+  if coalesce(jsonb_typeof(f -> 'version_min'), 'null') <> 'null' then
+    v_min := nullif(btrim(f ->> 'version_min'), '');
+    if jsonb_typeof(f -> 'version_min') <> 'string' or (v_min is not null and semver_cmp(v_min, v_min) is null) then
+      raise exception '版本格式不正確';
+    end if;
+  end if;
+  if coalesce(jsonb_typeof(f -> 'version_max'), 'null') <> 'null' then
+    v_max := nullif(btrim(f ->> 'version_max'), '');
+    if jsonb_typeof(f -> 'version_max') <> 'string' or (v_max is not null and semver_cmp(v_max, v_max) is null) then
+      raise exception '版本格式不正確';
+    end if;
+  end if;
+
+  if coalesce(jsonb_typeof(f -> 'last_seen_days'), 'null') <> 'null' then
+    if jsonb_typeof(f -> 'last_seen_days') <> 'number' or (f ->> 'last_seen_days') !~ '^[0-9]{1,4}$'
+       or (f ->> 'last_seen_days')::int not between 1 and 3650 then
+      raise exception '通知對象條件格式不正確';
+    end if;
+    v_days := (f ->> 'last_seen_days')::int;
+  end if;
+
+  if not v_all and v_users is null and v_roles is null and v_platforms is null and v_sessions is null
+     and v_min is null and v_max is null and v_days is null then
+    raise exception '請選擇通知對象';
+  end if;
+
+  everyone := v_roles is not null and exists (select 1 from site_roles r where r.id = any (v_roles) and r.is_default);
+  dev_cond := v_platforms is not null or v_sessions is not null or v_min is not null or v_max is not null;
+
+  return query
+  with u as (
+    select p.id
+    from profiles p
+    where (v_users is null or p.id = any (v_users))
+      and (v_roles is null or everyone
+           or exists (select 1 from site_user_roles ur where ur.user_id = p.id and ur.role_id = any (v_roles)))
+      and (v_days is null or greatest(
+             p.last_login_at,
+             (select max(d.last_seen_at) from session_devices d where d.user_id = p.id),
+             (select max(h.created_at) from login_history h where h.user_id = p.id),
+             (select max(greatest(s.created_at, s.updated_at, s.refreshed_at at time zone 'UTC'))
+              from auth.sessions s where s.user_id = p.id)
+           ) >= now() - make_interval(days => v_days))
+  ),
+  dev as (
+    select d.user_id as uid, d.session_id as sid, d.push_token is not null as has_token,
+           (v_platforms is null or d.platform = any (v_platforms))
+           and (v_sessions is null or d.session_id = any (v_sessions))
+           and (v_min is null or coalesce(semver_cmp(d.app_version, v_min) >= 0, false))
+           and (v_max is null or coalesce(semver_cmp(d.app_version, v_max) <= 0, false))
+           and (v_days is null or d.last_seen_at >= now() - make_interval(days => v_days)) as hit
+    from session_devices d
+    join auth.sessions s on s.id = d.session_id and s.user_id = d.user_id
+    where (s.not_after is null or s.not_after > now())
+      and d.user_id in (select u.id from u)
+  ),
+  agg as (
+    select x.uid,
+           coalesce(array_agg(x.sid) filter (where x.hit), '{}') as hit_sessions,
+           (count(*) filter (where x.hit))::int as hit_devices,
+           (count(*) filter (where x.hit and x.has_token))::int as hit_push,
+           count(*)::int as all_devices,
+           (count(*) filter (where x.has_token))::int as all_push
+    from dev x
+    group by x.uid
+  ),
+  per as (
+    select u.id, a.hit_sessions, coalesce(a.hit_devices, 0) as hit_devices, coalesce(a.hit_push, 0) as hit_push,
+           coalesce(a.all_devices, 0) as all_devices, coalesce(a.all_push, 0) as all_push,
+           coalesce(
+             v_min is null and v_max is null and (v_platforms is null or 'web' = any (v_platforms)) and (
+               (v_sessions is not null and exists (
+                  select 1 from auth.sessions s
+                  where s.user_id = u.id and s.id = any (v_sessions) and (s.not_after is null or s.not_after > now())
+                    and not exists (select 1 from session_devices d where d.session_id = s.id and d.user_id = s.user_id)))
+               or (v_sessions is null and v_platforms is not null and a.uid is null
+                   and exists (select 1 from login_history h where h.user_id = u.id))),
+             false) as web_hit
+    from u
+    left join agg a on a.uid = u.id
+  )
+  select per.id,
+         case when dev_cond then coalesce(per.hit_sessions, '{}'::uuid[]) end,
+         case when dev_cond then per.hit_devices else per.all_devices end,
+         case when dev_cond then per.hit_push else per.all_push end
+  from per
+  where not dev_cond or per.hit_devices > 0 or per.web_hit;
+end;
+$$;
+
+-- 預覽公告對象（SEND_NOTIFICATIONS）：{ users, devices, push_devices, limit }
+create function public.admin_broadcast_preview(p_filter jsonb)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+  r jsonb;
+begin
+  perform site_require(uid, 1024);
+  select jsonb_build_object('users', count(*), 'devices', coalesce(sum(t.devices), 0),
+                            'push_devices', coalesce(sum(t.push_devices), 0), 'limit', 10000)
+  into r
+  from broadcast_targets(p_filter) t;
+  return r;
+end;
+$$;
+
+-- 發公告（SEND_NOTIFICATIONS，重要公告也一樣）：kind important / update / promo / other（type announce_<kind>）；
+-- 標題 1～100 字、內文最多 500 字、連結只能是站內路徑；一次最多 10,000 人；每人每小時最多 20 次。
+-- 寫 broadcasts 與 audit_logs（notification.broadcast）；回傳 { broadcast_id, users, devices, push_devices }
+create function public.admin_broadcast_send(p_kind text, p_title text, p_body text, p_link text, p_filter jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+  k text := lower(btrim(coalesce(p_kind, '')));
+  t text := btrim(coalesce(p_title, ''));
+  b text := btrim(coalesce(p_body, ''));
+  l text;
+  f jsonb := case when jsonb_typeof(p_filter) = 'object' then p_filter else '{}'::jsonb end;
+  tp text;
+  bid bigint;
+  n_users int;
+  n_dev int;
+  n_push int;
+begin
+  perform site_require(uid, 1024);
+  if k not in ('important', 'update', 'promo', 'other') then
+    raise exception '公告類別不正確';
+  end if;
+  if t = '' then
+    raise exception '請輸入標題';
+  end if;
+  if char_length(t) > 100 then
+    raise exception '標題最多 100 個字';
+  end if;
+  if char_length(b) > 500 then
+    raise exception '內文最多 500 個字';
+  end if;
+  l := notify_norm_link(p_link);
+  if (select count(*) from broadcasts x where x.created_by = uid and x.created_at > now() - interval '1 hour') >= 20 then
+    raise exception '發送太頻繁，請稍後再試';
+  end if;
+  tp := 'announce_' || k;
+
+  insert into broadcasts (kind, title, body, link, filter, created_by)
+  values (k, t, b, l, f, uid)
+  returning id into bid;
+
+  with tg as (
+    select * from broadcast_targets(f)
+  ), ins as (
+    insert into notifications (user_id, category, type, title, body, link, data, broadcast_id, push_sessions, push_state)
+    select tg.user_id, 'system', tp, t, b, l, jsonb_build_object('broadcast_id', bid, 'kind', k), bid, tg.push_sessions,
+           case when notify_enabled(tg.user_id, tp) then 'pending' else 'skipped' end
+    from tg
+    returning 1
+  )
+  select (select count(*) from ins), coalesce(sum(tg.devices), 0), coalesce(sum(tg.push_devices), 0)
+  into n_users, n_dev, n_push
+  from tg;
+
+  if n_users = 0 then
+    raise exception '沒有符合條件的使用者';
+  end if;
+  if n_users > 10000 then
+    raise exception '通知對象超過 10,000 人，請縮小範圍';
+  end if;
+
+  update broadcasts x set user_count = n_users, device_count = n_dev, push_count = n_push where x.id = bid;
+  perform sync_signal(array(select n.user_id from notifications n where n.broadcast_id = bid), array['notifications']);
+  perform audit(null, uid, 'notification.broadcast', 'broadcast', bid::text, jsonb_build_object(
+    'name', t, 'kind', k, 'title', t, 'user_count', n_users, 'device_count', n_dev, 'filter', f));
+  return jsonb_build_object('broadcast_id', bid, 'users', n_users, 'devices', n_dev, 'push_devices', n_push);
+end;
+$$;
+
+-- 發送紀錄（SEND_NOTIFICATIONS），新到舊：[{ id, kind, title, body, link, filter, created_by, created_at,
+--   user_count, device_count, push_count }]；created_by 的 email 只給有 VIEW_USERS 的人
+create function public.admin_broadcasts_list(p_before bigint default null, p_limit int default 50)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+  perms bigint;
+begin
+  perms := site_require(uid, 1024);
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'id', b.id, 'kind', b.kind, 'title', b.title, 'body', b.body, 'link', b.link, 'filter', b.filter,
+      'created_by', user_brief(b.created_by, perms & 4 <> 0), 'created_at', b.created_at,
+      'user_count', b.user_count, 'device_count', b.device_count, 'push_count', b.push_count
+    ) order by b.id desc)
+    from (
+      select * from broadcasts x
+      where admin_broadcasts_list.p_before is null or x.id < admin_broadcasts_list.p_before
+      order by x.id desc
+      limit greatest(1, least(coalesce(admin_broadcasts_list.p_limit, 50), 200))
+    ) b
+  ), '[]'::jsonb);
+end;
+$$;
+
+-- ---------- 全站設定（讀 VIEW_ADMIN、改 MANAGE_USERS）----------
+
+-- { notify_admin_changes: { role, username, codes }, min_app_version: { version, message } | null }
+create function public.admin_site_settings_get()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+begin
+  perform site_require(uid, 2);
+  return jsonb_build_object(
+    'notify_admin_changes', jsonb_build_object(
+      'role', notify_admin_change_enabled('role'),
+      'username', notify_admin_change_enabled('username'),
+      'codes', notify_admin_change_enabled('codes')),
+    'min_app_version', (select case when jsonb_typeof(s.value) = 'object' then s.value end
+                        from site_settings s where s.key = 'min_app_version'));
+end;
+$$;
+
+-- 修改全站設定（MANAGE_USERS）；回傳存進去的值，有變才記 site.settings.update。
+--   notify_admin_changes：{ role?, username?, codes? } boolean，合併到現有值
+--   min_app_version：null（清除）或 { version: semver, message: 最多 500 字 }
+create function public.admin_site_settings_set(p_key text, p_value jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := require_uid();
+  k text := btrim(coalesce(p_key, ''));
+  v jsonb;
+  old jsonb;
+  ver text;
+  msg text;
+begin
+  perform site_require(uid, 8);
+  if k = 'notify_admin_changes' then
+    if p_value is null or jsonb_typeof(p_value) <> 'object' then
+      raise exception '設定格式不正確';
+    end if;
+    old := site_setting(k);
+    v := jsonb_build_object(
+      'role', case when jsonb_typeof(p_value -> 'role') = 'boolean' then p_value -> 'role'
+                   else to_jsonb(notify_admin_change_enabled('role')) end,
+      'username', case when jsonb_typeof(p_value -> 'username') = 'boolean' then p_value -> 'username'
+                       else to_jsonb(notify_admin_change_enabled('username')) end,
+      'codes', case when jsonb_typeof(p_value -> 'codes') = 'boolean' then p_value -> 'codes'
+                    else to_jsonb(notify_admin_change_enabled('codes')) end);
+  elsif k = 'min_app_version' then
+    old := site_setting(k);
+    if p_value is null or jsonb_typeof(p_value) = 'null' then
+      v := 'null'::jsonb;
+    elsif jsonb_typeof(p_value) <> 'object' or jsonb_typeof(p_value -> 'version') is distinct from 'string' then
+      raise exception '設定格式不正確';
+    else
+      ver := btrim(p_value ->> 'version');
+      if char_length(ver) > 32 or semver_cmp(ver, ver) is null then
+        raise exception '版本格式不正確';
+      end if;
+      msg := btrim(coalesce(case when jsonb_typeof(p_value -> 'message') = 'string' then p_value ->> 'message' end, ''));
+      if char_length(msg) > 500 then
+        raise exception '說明文字最多 500 個字';
+      end if;
+      v := jsonb_build_object('version', ver, 'message', msg);
+    end if;
+  else
+    raise exception '未知的設定';
+  end if;
+
+  insert into site_settings (key, value, updated_by, updated_at)
+  values (k, v, uid, now())
+  on conflict (key) do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at;
+  if old is distinct from v then
+    perform audit(null, uid, 'site.settings.update', 'setting', k,
+                  jsonb_build_object('name', k, 'value', v, 'old_value', old));
+  end if;
+  return v;
+end;
+$$;
+
+-- ---------- 推播（Edge Function push）----------
+
+-- 呼叫 Edge Function：POST <vault project_url>/functions/v1/push，header x-push-secret = vault push_webhook_secret。
+-- 用 pg_net（非同步，交易 commit 之後才真的送出）；沒有 pg_net、Vault 或 secret 就跳過；任何錯誤都吞掉，不擋原本的操作
+create function public.push_kick()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  url text;
+  secret text;
+begin
+  if to_regclass('vault.decrypted_secrets') is null or to_regnamespace('net') is null then
+    return;
+  end if;
+  execute 'select decrypted_secret from vault.decrypted_secrets where name = $1 order by created_at desc limit 1'
+    into url using 'project_url';
+  execute 'select decrypted_secret from vault.decrypted_secrets where name = $1 order by created_at desc limit 1'
+    into secret using 'push_webhook_secret';
+  if coalesce(btrim(url), '') = '' or coalesce(secret, '') = '' then
+    return;
+  end if;
+  execute 'select net.http_post(url := $1, body := $2, headers := $3, timeout_milliseconds := 5000)'
+    using rtrim(btrim(url), '/') || '/functions/v1/push', '{}'::jsonb,
+          jsonb_build_object('Content-Type', 'application/json', 'x-push-secret', secret);
+exception when others then
+  return;
+end;
+$$;
+
+-- notifications 有 pending 的 insert 之後（每個 statement 一次）叫一次 Edge Function
+create function public.notifications_push_kick()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if exists (select 1 from new_rows r where r.push_state = 'pending') then
+    perform push_kick();
+  end if;
+  return null;
+end;
+$$;
+
+create trigger notifications_push_kick
+  after insert on public.notifications
+  referencing new table as new_rows
+  for each statement execute function public.notifications_push_kick();
+
+-- 補送（pg_cron 每分鐘）：有超過 1 分鐘還 pending、或領取超過 5 分鐘還沒回報的，再叫一次 Edge Function
+create function public.push_retry()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if exists (
+    select 1 from notifications n
+    where n.push_state in ('pending', 'sending')
+      and ((n.push_state = 'pending' and n.created_at < now() - interval '1 minute')
+           or (n.push_state = 'sending' and n.push_claimed_at < now() - interval '5 minutes'))
+  ) then
+    perform push_kick();
+  end if;
+end;
+$$;
+
+-- Edge Function 驗證 x-push-secret（只給 service role）
+create function public.push_check_secret(p_secret text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  s text;
+begin
+  if p_secret is null or p_secret = '' or to_regclass('vault.decrypted_secrets') is null then
+    return false;
+  end if;
+  execute 'select decrypted_secret from vault.decrypted_secrets where name = $1 order by created_at desc limit 1'
+    into s using 'push_webhook_secret';
+  return coalesce(s, '') <> '' and s = p_secret;
+end;
+$$;
+
+-- Edge Function 領取要推播的通知（只給 service role）：最多 p_limit（≤ 500）則 pending
+-- （或領取超過 5 分鐘還沒回報的），標成 sending；回傳 [{ id, category, type, title, body, link, tokens }]。
+-- tokens：收件人登入中的裝置的推播 token（排除 exclude_session；公告有裝置條件時只給符合的裝置）；
+-- 沒有任何 token 的直接標 sent，不回傳。超過 1 天還沒送出的標 skipped 不送；已經登出的 session 的 token 清掉
+create function public.push_claim(p_limit int default 500)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  ids bigint[];
+  result jsonb;
+begin
+  update notifications n set push_state = 'skipped'
+  where n.push_state in ('pending', 'sending') and n.created_at < now() - interval '1 day'
+    and (n.push_state = 'pending' or n.push_claimed_at < now() - interval '5 minutes');
+
+  select coalesce(array_agg(x.id), '{}') into ids
+  from (
+    select n.id from notifications n
+    where n.push_state = 'pending'
+       or (n.push_state = 'sending' and n.push_claimed_at < now() - interval '5 minutes')
+    order by n.id
+    limit greatest(1, least(coalesce(p_limit, 500), 500))
+    for update skip locked
+  ) x;
+  if cardinality(ids) = 0 then
+    return '[]'::jsonb;
+  end if;
+
+  update notifications n set push_state = 'sending', push_claimed_at = now() where n.id = any (ids);
+
+  update session_devices d set push_token = null, push_updated_at = now()
+  where d.push_token is not null
+    and not exists (select 1 from auth.sessions s
+                    where s.id = d.session_id and s.user_id = d.user_id and (s.not_after is null or s.not_after > now()));
+
+  with t as (
+    select n.id, n.category, n.type, n.title, n.body, n.link,
+           coalesce((
+             select array_agg(d.push_token order by d.push_updated_at desc nulls last)
+             from session_devices d
+             where d.user_id = n.user_id and d.push_token is not null
+               and d.session_id is distinct from n.exclude_session
+               and (n.push_sessions is null or d.session_id = any (n.push_sessions))
+           ), '{}') as tokens
+    from notifications n
+    where n.id = any (ids)
+  ), done as (
+    update notifications n set push_state = 'sent'
+    from t
+    where n.id = t.id and cardinality(t.tokens) = 0
+    returning n.id
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', t.id, 'category', t.category, 'type', t.type, 'title', t.title, 'body', t.body, 'link', t.link,
+           'tokens', to_jsonb(t.tokens)
+         ) order by t.id) filter (where cardinality(t.tokens) > 0), '[]'::jsonb)
+  into result
+  from t;
+  return result;
+end;
+$$;
+
+-- Edge Function 回報送完（只給 service role）：p_ids 標成 sent；p_bad_tokens（FCM 說無效的）從裝置清掉
+create function public.push_finish(p_ids bigint[], p_bad_tokens text[] default null)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update notifications n set push_state = 'sent'
+  where n.id = any (coalesce(p_ids, '{}')) and n.push_state = 'sending';
+  if coalesce(cardinality(p_bad_tokens), 0) > 0 then
+    update session_devices d set push_token = null, push_updated_at = now()
+    where d.push_token is not null
+      and md5(d.push_token) = any (array(select md5(x) from unnest(p_bad_tokens) x where x is not null))
+      and d.push_token = any (p_bad_tokens);
+  end if;
+end;
+$$;
+
+
+-- ============================================================
+-- 16. 權限設定（GRANT / REVOKE）
 -- Supabase 預設會把 public schema 新建的資料表、函式權限授予 anon / authenticated / service_role，
 -- 這裡把不該開放的收回。部分 Supabase 專案不會自動授權，所以 service_role 需要的權限也明確寫出來。
 -- ============================================================
@@ -4987,14 +6943,16 @@ grant usage on schema public to anon, authenticated, service_role;
 -- ---------- 資料表 ----------
 
 -- profiles：使用者只能直接改自己的顯示資料；email、email_verified、vault、username、last_login_*、migrated、totp、
--- default_group_id 一律走 RPC（security definer）或 service role。新增 / 刪除 profile 也只由觸發器、ensure_profile 與後端處理。
+-- default_group_id、photo_custom 一律走 RPC（security definer）或 service role。新增 / 刪除 profile 也只由觸發器、ensure_profile 與後端處理。
+-- creation_time、last_sign_in_time 留著欄位權限讓舊版前端送了不會失敗，值由 profiles_guard 觸發器維持原值。
 revoke all on table public.profiles from anon, authenticated;
 grant select on table public.profiles to authenticated;
 grant update (name, photo_url, bg_photo_url, phone_number, creation_time, last_sign_in_time, migration_notified, updated_at)
   on table public.profiles to authenticated;
 grant select, insert, update, delete on table public.profiles to service_role;
 
--- legacy_import：只有 service_role（匯入腳本）需要存取；一般使用者由 RLS（沒有 policy）擋下
+-- legacy_import：只有 service_role（匯入腳本）需要存取；一般使用者沒有權限，也由 RLS（沒有 policy）擋下
+revoke all on table public.legacy_import from anon, authenticated;
 grant select, insert, update, delete on table public.legacy_import to service_role;
 
 -- 只走 RPC 的資料表：一般使用者沒有任何權限；service_role（Next.js API route：產碼、刪除使用者、寫紀錄）可直接讀寫
@@ -5003,14 +6961,14 @@ revoke all on table
   public.site_roles, public.site_user_roles, public.site_pending_roles,
   public.groups, public.group_roles, public.group_members, public.group_member_roles,
   public.group_invites, public.group_email_invites, public.group_account_overwrites,
-  public.audit_logs
+  public.audit_logs, public.group_bans, public.site_owner
 from anon, authenticated;
 grant select, insert, update, delete on table
   public.totp_accounts, public.totp_secrets,
   public.site_roles, public.site_user_roles, public.site_pending_roles,
   public.groups, public.group_roles, public.group_members, public.group_member_roles,
   public.group_invites, public.group_email_invites, public.group_account_overwrites,
-  public.audit_logs
+  public.audit_logs, public.group_bans, public.site_owner
 to service_role;
 
 -- login_history：由 /api/record-login 用 service role 寫入，查詢走 RPC
@@ -5018,6 +6976,11 @@ revoke all on table public.login_history from anon, authenticated;
 revoke all on sequence public.login_history_id_seq from anon, authenticated;
 grant select, insert, delete on table public.login_history to service_role;
 grant usage, select on sequence public.login_history_id_seq to service_role;
+
+-- vault_escrow：只有 service role 讀（解密由團隊離線處理）與刪（/api/record-login 清掉帳號已刪除超過一年的）；寫入走 RPC
+revoke all on table public.vault_escrow from anon, authenticated;
+revoke all on sequence public.vault_escrow_id_seq from anon, authenticated;
+grant select, delete on table public.vault_escrow to service_role;
 
 -- sync_signals：authenticated 只能 select（policy 只看得到自己的列），寫入只由觸發器處理
 revoke all on table public.sync_signals from anon, authenticated;
@@ -5028,6 +6991,13 @@ grant select, insert, update, delete on table public.sync_signals to service_rol
 revoke all on table public.session_devices from anon, authenticated;
 grant select, insert, update on table public.session_devices to authenticated;
 grant select, insert, update, delete on table public.session_devices to service_role;
+
+-- 通知、公告、全站設定：一律走 RPC；service_role 可直接讀寫
+revoke all on table public.notifications, public.notification_prefs, public.broadcasts, public.site_settings
+from anon, authenticated;
+revoke all on sequence public.notifications_id_seq, public.broadcasts_id_seq from anon, authenticated;
+grant select, insert, update, delete on table public.notifications, public.notification_prefs, public.broadcasts, public.site_settings
+to service_role;
 
 -- ---------- 內部函式：一般使用者不能直接呼叫 ----------
 revoke execute on function public.require_uid() from public, anon, authenticated;
@@ -5040,6 +7010,7 @@ revoke execute on function public.norm_role_name(text) from public, anon, authen
 revoke execute on function public.site_perm_name(bigint) from public, anon, authenticated;
 revoke execute on function public.site_permissions(uuid) from public, anon, authenticated;
 revoke execute on function public.site_top_position(uuid) from public, anon, authenticated;
+revoke execute on function public.site_is_owner(uuid) from public, anon, authenticated;
 revoke execute on function public.site_is_root(uuid) from public, anon, authenticated;
 revoke execute on function public.site_require(uuid, bigint) from public, anon, authenticated;
 revoke execute on function public.site_can_manage_position(uuid, int) from public, anon, authenticated;
@@ -5053,6 +7024,7 @@ revoke execute on function public.username_reserved(text) from public, anon, aut
 revoke execute on function public.username_normalize(text) from public, anon, authenticated;
 revoke execute on function public.username_assert(text, uuid) from public, anon, authenticated;
 revoke execute on function public.profiles_username_guard() from public, anon, authenticated;
+revoke execute on function public.profiles_guard() from public, anon, authenticated;
 revoke execute on function public.claim_verified_email(uuid, text, timestamptz) from public, anon, authenticated;
 revoke execute on function public.legacy_target_group(uuid) from public, anon, authenticated;
 revoke execute on function public.profiles_totp_to_accounts() from public, anon, authenticated;
@@ -5067,6 +7039,8 @@ revoke execute on function public.group_can_manage_member(uuid, uuid, uuid) from
 revoke execute on function public.group_roles_renumber(uuid) from public, anon, authenticated;
 revoke execute on function public.group_brief(uuid) from public, anon, authenticated;
 revoke execute on function public.group_sees_emails(uuid, uuid) from public, anon, authenticated;
+revoke execute on function public.group_is_banned(uuid, uuid) from public, anon, authenticated;
+revoke execute on function public.group_find_user(text) from public, anon, authenticated;
 revoke execute on function public.group_insert(uuid, text, text) from public, anon, authenticated;
 revoke execute on function public.default_group_name(uuid) from public, anon, authenticated;
 revoke execute on function public.ensure_default_group(uuid) from public, anon, authenticated;
@@ -5082,6 +7056,7 @@ revoke execute on function public.totp_norm_algorithm(jsonb, text) from public, 
 revoke execute on function public.totp_norm_bool(jsonb, boolean) from public, anon, authenticated;
 revoke execute on function public.totp_norm_text(jsonb, text) from public, anon, authenticated;
 revoke execute on function public.totp_import_items(uuid, uuid, jsonb, uuid) from public, anon, authenticated;
+revoke execute on function public.totp_assert_caps(jsonb) from public, anon, authenticated;
 revoke execute on function public.totp_apply_patch(uuid, jsonb) from public, anon, authenticated;
 revoke execute on function public.totp_reorder_items(uuid, uuid, text[]) from public, anon, authenticated;
 revoke execute on function public.totp_items_json(uuid) from public, anon, authenticated;
@@ -5094,11 +7069,15 @@ revoke execute on function public.account_permissions(uuid, uuid) from public, a
 revoke execute on function public.account_group(uuid) from public, anon, authenticated;
 revoke execute on function public.account_require(uuid, uuid, bigint) from public, anon, authenticated;
 revoke execute on function public.totp_default_group() from public, anon, authenticated;
+revoke execute on function public.vault_info_valid(jsonb) from public, anon, authenticated;
+revoke execute on function public.vault_escrow_key_id(text) from public, anon, authenticated;
 revoke execute on function public.invite_invalid_reason(group_invites) from public, anon, authenticated;
 revoke execute on function public.new_invite_code() from public, anon, authenticated;
 revoke execute on function public.group_assert_not_encrypted(uuid) from public, anon, authenticated;
 revoke execute on function public.admin_user_json(uuid) from public, anon, authenticated;
 revoke execute on function public.audit_page(uuid, bigint, int, boolean) from public, anon, authenticated;
+revoke execute on function public.invite_code_mask(text) from public, anon, authenticated;
+revoke execute on function public.group_audit_redact(jsonb, boolean) from public, anon, authenticated;
 revoke execute on function public.activity_actor() from public, anon, authenticated;
 revoke execute on function public.user_audit(uuid, uuid, text, jsonb) from public, anon, authenticated;
 revoke execute on function public.activity_value(text) from public, anon, authenticated;
@@ -5121,10 +7100,51 @@ revoke execute on function public.sync_on_profiles_delete() from public, anon, a
 revoke execute on function public.current_session_id() from public, anon, authenticated;
 revoke execute on function public.user_sessions_json(uuid, uuid, boolean) from public, anon, authenticated;
 revoke execute on function public.session_devices_cleanup() from public, anon, authenticated;
+revoke execute on function public.prune_retention() from public, anon, authenticated;
+grant execute on function public.prune_retention() to service_role;
+revoke execute on function public.notification_defaults() from public, anon, authenticated;
+revoke execute on function public.notification_type(text) from public, anon, authenticated;
+revoke execute on function public.notify_enabled(uuid, text) from public, anon, authenticated;
+revoke execute on function public.notify_name(uuid) from public, anon, authenticated;
+revoke execute on function public.notify_norm_link(text) from public, anon, authenticated;
+revoke execute on function public.notify(uuid[], text, text, text, text, jsonb, uuid) from public, anon, authenticated;
+revoke execute on function public.notify_codes_body(text, text, int, int) from public, anon, authenticated;
+revoke execute on function public.notify_codes_changed(uuid, uuid, uuid[], int, int) from public, anon, authenticated;
+revoke execute on function public.site_setting(text) from public, anon, authenticated;
+revoke execute on function public.notify_admin_change_enabled(text) from public, anon, authenticated;
+revoke execute on function public.semver_cmp(text, text) from public, anon, authenticated;
+revoke execute on function public.session_devices_guard() from public, anon, authenticated;
+revoke execute on function public.login_history_notify() from public, anon, authenticated;
+revoke execute on function public.broadcast_filter_uuids(jsonb, int) from public, anon, authenticated;
+revoke execute on function public.broadcast_targets(jsonb) from public, anon, authenticated;
+revoke execute on function public.push_kick() from public, anon, authenticated;
+revoke execute on function public.notifications_push_kick() from public, anon, authenticated;
+revoke execute on function public.push_retry() from public, anon, authenticated;
+-- 通知 RPC：先收回 public / anon（下面再 grant 給 authenticated；app_config 例外開給 anon）
+revoke execute on function public.notifications_list(text, bigint, int) from public, anon;
+revoke execute on function public.notifications_unread_counts() from public, anon;
+revoke execute on function public.notifications_mark_read(bigint[], text) from public, anon;
+revoke execute on function public.notification_prefs_get() from public, anon;
+revoke execute on function public.notification_prefs_set(jsonb) from public, anon;
+revoke execute on function public.register_push_token(text) from public, anon;
+revoke execute on function public.admin_broadcast_preview(jsonb) from public, anon;
+revoke execute on function public.admin_broadcast_send(text, text, text, text, jsonb) from public, anon;
+revoke execute on function public.admin_broadcasts_list(bigint, int) from public, anon;
+revoke execute on function public.admin_site_settings_get() from public, anon;
+revoke execute on function public.admin_site_settings_set(text, jsonb) from public, anon;
+revoke execute on function public.app_config() from public;
+-- Edge Function push（service role）專用
+revoke execute on function public.push_check_secret(text) from public, anon, authenticated;
+revoke execute on function public.push_claim(int) from public, anon, authenticated;
+revoke execute on function public.push_finish(bigint[], text[]) from public, anon, authenticated;
+grant execute on function public.push_check_secret(text) to service_role;
+grant execute on function public.push_claim(int) to service_role;
+grant execute on function public.push_finish(bigint[], text[]) to service_role;
 
 -- ---------- RPC：只開給登入使用者 ----------
 revoke execute on function public.me_permissions() from public, anon;
 revoke execute on function public.site_roles_list() from public, anon;
+revoke execute on function public.site_owner() from public, anon;
 revoke execute on function public.site_role_create(text, text, bigint) from public, anon;
 revoke execute on function public.site_role_update(uuid, text, text, bigint) from public, anon;
 revoke execute on function public.site_role_delete(uuid) from public, anon;
@@ -5145,6 +7165,10 @@ revoke execute on function public.group_transfer(uuid, uuid) from public, anon;
 revoke execute on function public.group_set_default(uuid) from public, anon;
 revoke execute on function public.group_leave(uuid) from public, anon;
 revoke execute on function public.group_kick(uuid, uuid) from public, anon;
+revoke execute on function public.group_bans(uuid) from public, anon;
+revoke execute on function public.group_ban(uuid, text, text) from public, anon;
+revoke execute on function public.group_ban_update(uuid, uuid, text) from public, anon;
+revoke execute on function public.group_unban(uuid, uuid) from public, anon;
 revoke execute on function public.group_add_member(uuid, text) from public, anon;
 revoke execute on function public.group_set_member_roles(uuid, uuid, uuid[]) from public, anon;
 revoke execute on function public.group_role_create(uuid, text, text, bigint) from public, anon;
@@ -5169,7 +7193,9 @@ revoke execute on function public.totp_update(text, jsonb) from public, anon;
 revoke execute on function public.totp_delete(text) from public, anon;
 revoke execute on function public.totp_clear() from public, anon;
 revoke execute on function public.totp_reorder(text[]) from public, anon;
-revoke execute on function public.totp_set_vault(jsonb, jsonb, text) from public, anon;
+revoke execute on function public.totp_set_vault(jsonb, jsonb, text, text) from public, anon;
+revoke execute on function public.vault_escrow_put(text) from public, anon;
+revoke execute on function public.vault_escrow_needed() from public, anon;
 revoke execute on function public.vault_reset() from public, anon;
 revoke execute on function public.group_set_encrypted(uuid, boolean, jsonb, text) from public, anon;
 revoke execute on function public.group_invite_create(uuid, int, int) from public, anon;
@@ -5201,6 +7227,7 @@ revoke execute on function public.admin_user_sessions(uuid) from public, anon;
 
 grant execute on function public.me_permissions() to authenticated;
 grant execute on function public.site_roles_list() to authenticated;
+grant execute on function public.site_owner() to authenticated;
 grant execute on function public.site_role_create(text, text, bigint) to authenticated;
 grant execute on function public.site_role_update(uuid, text, text, bigint) to authenticated;
 grant execute on function public.site_role_delete(uuid) to authenticated;
@@ -5221,6 +7248,10 @@ grant execute on function public.group_transfer(uuid, uuid) to authenticated;
 grant execute on function public.group_set_default(uuid) to authenticated;
 grant execute on function public.group_leave(uuid) to authenticated;
 grant execute on function public.group_kick(uuid, uuid) to authenticated;
+grant execute on function public.group_bans(uuid) to authenticated;
+grant execute on function public.group_ban(uuid, text, text) to authenticated;
+grant execute on function public.group_ban_update(uuid, uuid, text) to authenticated;
+grant execute on function public.group_unban(uuid, uuid) to authenticated;
 grant execute on function public.group_add_member(uuid, text) to authenticated;
 grant execute on function public.group_set_member_roles(uuid, uuid, uuid[]) to authenticated;
 grant execute on function public.group_role_create(uuid, text, text, bigint) to authenticated;
@@ -5245,7 +7276,9 @@ grant execute on function public.totp_update(text, jsonb) to authenticated;
 grant execute on function public.totp_delete(text) to authenticated;
 grant execute on function public.totp_clear() to authenticated;
 grant execute on function public.totp_reorder(text[]) to authenticated;
-grant execute on function public.totp_set_vault(jsonb, jsonb, text) to authenticated;
+grant execute on function public.totp_set_vault(jsonb, jsonb, text, text) to authenticated;
+grant execute on function public.vault_escrow_put(text) to authenticated;
+grant execute on function public.vault_escrow_needed() to authenticated;
 grant execute on function public.vault_reset() to authenticated;
 grant execute on function public.group_set_encrypted(uuid, boolean, jsonb, text) to authenticated;
 grant execute on function public.group_invite_create(uuid, int, int) to authenticated;
@@ -5274,10 +7307,26 @@ grant execute on function public.admin_user_activity(uuid, bigint, int) to authe
 grant execute on function public.list_my_sessions() to authenticated;
 grant execute on function public.revoke_my_session(uuid) to authenticated;
 grant execute on function public.admin_user_sessions(uuid) to authenticated;
+grant execute on function public.notifications_list(text, bigint, int) to authenticated;
+grant execute on function public.notifications_unread_counts() to authenticated;
+grant execute on function public.notifications_mark_read(bigint[], text) to authenticated;
+grant execute on function public.notification_prefs_get() to authenticated;
+grant execute on function public.notification_prefs_set(jsonb) to authenticated;
+grant execute on function public.register_push_token(text) to authenticated;
+grant execute on function public.admin_broadcast_preview(jsonb) to authenticated;
+grant execute on function public.admin_broadcast_send(text, text, text, text, jsonb) to authenticated;
+grant execute on function public.admin_broadcasts_list(bigint, int) to authenticated;
+grant execute on function public.admin_site_settings_get() to authenticated;
+grant execute on function public.admin_site_settings_set(text, jsonb) to authenticated;
+
+-- ---------- RPC：不用登入也能呼叫 ----------
+
+-- App 開啟時讀最低版本（鎖定畫面、還沒登入時也要讀得到）
+grant execute on function public.app_config() to anon, authenticated;
 
 
 -- ============================================================
--- 16. 種子資料
+-- 17. 種子資料（含 Storage bucket、推播用的 Vault secret 與排程）
 -- ============================================================
 
 -- 全站身分組：@everyone（CREATE_GROUPS）與「管理員」（ADMINISTRATOR）；固定 id
@@ -5286,10 +7335,60 @@ values
   ('00000000-0000-0000-0000-000000000000', '@everyone', '', 0, 256, true),
   ('00000000-0000-0000-0000-000000000001', '管理員', '#e11d48', 100, 1, false);
 
+-- 全站擁有者：固定一列，一開始沒有人（設定方式見「18.」）
+insert into public.site_owner (id) values (true);
+
+-- ---------- Storage ----------
+-- 大頭照與背景圖：公開 bucket avatars（只有 service role 的 /api/profile/photo 寫入，不建使用者的 storage policy）。
+-- 圖片由網站的 /media/<path> 轉到 Storage 的公開網址，資料庫不寫死 Supabase 的網址。
+-- 沒有 storage schema 的環境（例如本機 PGlite 測試）略過
+do $$
+begin
+  if to_regclass('storage.buckets') is not null then
+    insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true) on conflict do nothing;
+  end if;
+end;
+$$;
+
+-- ---------- 通知 ----------
+-- 全站設定的預設值：後台修改帳號時三種通知都開、沒有最低 App 版本
+insert into public.site_settings (key, value) values
+  ('notify_admin_changes', '{"role": true, "username": true, "codes": true}'::jsonb),
+  ('min_app_version', 'null'::jsonb)
+on conflict (key) do nothing;
+
+-- 推播：資料庫呼叫 Edge Function 用的密語存進 Supabase Vault（已經有就不動）。
+-- project_url 不放在這裡（網址不進 repo），請自己在 SQL Editor 執行一次：
+--   select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+-- 沒有 Vault 的環境（例如本機 PGlite 測試）略過
+do $$
+begin
+  if to_regclass('vault.secrets') is not null then
+    if not exists (select 1 from vault.secrets where name = 'push_webhook_secret') then
+      perform vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'), 'push_webhook_secret',
+                                  'Securibit：資料庫呼叫 Edge Function push 時帶的 x-push-secret');
+    end if;
+  end if;
+exception when others then
+  raise notice '無法建立 push_webhook_secret：%', sqlerrm;
+end;
+$$;
+
+-- 推播補送：有 pg_cron 時每分鐘執行 push_retry()（同名的排程會被更新）；沒有 pg_cron 就略過
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    execute $q$select cron.schedule('securibit-push-retry', '* * * * *', 'select public.push_retry()')$q$;
+  end if;
+exception when others then
+  raise notice '無法排程推播補送：%', sqlerrm;
+end;
+$$;
+
 
 -- ============================================================
--- 17. （選用）指定第一位管理員
--- 新專案一開始沒有任何人擁有「管理員」身分組，請把下面的 email 換成你的，取消註解後執行一次。
+-- 18. （選用）指定第一位管理員與全站擁有者
+-- 新專案一開始沒有任何人擁有「管理員」身分組，也沒有全站擁有者，請把下面的 email 換成你的，取消註解後執行一次。
 -- - 還沒註冊：先記在 site_pending_roles，等這個 email 第一次登入、而且 email 已驗證
 --   （例如 Google 登入，或點過驗證信）時，由 ensure_profile → claim_verified_email → apply_pending_roles 自動套上。
 -- - 已經註冊過：直接寫進 site_user_roles（也可以照樣用 site_pending_roles，下次登入時套上）。
@@ -5306,3 +7405,11 @@ values
 -- join auth.users u on u.id = p.id
 -- where lower(u.email) = 'you@example.com'
 -- on conflict do nothing;
+
+-- 全站擁有者（只能有一位）：還沒註冊就記成 pending_email，等這個 email 第一次登入且已驗證時接上；已經註冊過就直接設定
+-- update public.site_owner set pending_email = 'you@example.com' where user_id is null;
+
+-- update public.site_owner
+-- set user_id = (select p.id from public.profiles p join auth.users u on u.id = p.id
+--                where lower(u.email) = 'you@example.com' limit 1),
+--     pending_email = null;

@@ -85,7 +85,14 @@ const VaultUnlock = (props: VaultUnlockProps) => {
         isOpen={confirmReset}
         danger
         title="忘記加密密碼"
-        description="密碼沒有辦法找回，也沒有人能幫你解開。只能清空所有加密群組裡的驗證碼並停用加密（沒加密的群組不受影響），之後要到各服務重新綁定兩步驟驗證。確定要清空嗎？"
+        description={
+          <>
+            <p>也可以用帳戶的電子郵件寫信到 service@bityo.tw，確認是本人後我們可以協助還原密碼</p>
+            <p>
+              不想等的話，可以清空所有加密群組裡的驗證碼並停用加密（沒加密的群組不受影響），之後要到各服務重新綁定兩步驟驗證。確定要清空嗎？
+            </p>
+          </>
+        }
         confirmLabel="清空並停用加密"
         onCancel={() => setConfirmReset(false)}
         onConfirm={async () => {

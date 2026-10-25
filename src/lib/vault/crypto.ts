@@ -64,8 +64,20 @@ export const verifyKey = async (info: VaultInfo, key: CryptoKey) => {
   }
 };
 
-// 用密碼解鎖，密碼錯誤回傳 null
+// 加密設定的次數範圍（同資料庫 totp_set_vault 的檢查）；超出範圍可能是資料被竄改，不能拿去算（太大會卡住瀏覽器）
+const MIN_ITERATIONS = 600_000;
+const MAX_ITERATIONS = 5_000_000;
+export const VAULT_INVALID_MESSAGE = '加密設定異常，請聯絡我們';
+
+export const isValidVault = (info: VaultInfo) =>
+  info.v === 1 &&
+  Number.isInteger(info.iterations) &&
+  info.iterations >= MIN_ITERATIONS &&
+  info.iterations <= MAX_ITERATIONS;
+
+// 用密碼解鎖，密碼錯誤回傳 null；加密設定不合法時丟出 VAULT_INVALID_MESSAGE
 export const unlockVault = async (info: VaultInfo, passphrase: string) => {
+  if (!isValidVault(info)) throw new Error(VAULT_INVALID_MESSAGE);
   const key = await deriveKey(passphrase, fromBase64(info.salt), info.iterations);
   return (await verifyKey(info, key)) ? key : null;
 };

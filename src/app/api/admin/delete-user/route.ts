@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticate, jsonError, rpcError, serverError } from '@/lib/server/supabaseAdmin';
+import {
+  authenticate,
+  jsonError,
+  removeUserMedia,
+  requireRecentLogin,
+  rpcError,
+  serverError,
+} from '@/lib/server/supabaseAdmin';
 
 // 後台刪除使用者：先以呼叫者身分檢查權限（admin_can_delete_user），通過才用 service role 刪除
 export async function POST(req: NextRequest) {
   const auth = await authenticate(req);
   if (auth instanceof NextResponse) return auth;
   const { user, admin, asUser } = auth;
+
+  // 操作的管理員要 10 分鐘內登入過
+  const reauth = requireRecentLogin(auth);
+  if (reauth) return reauth;
 
   const body = await req.json().catch(() => null);
   const userId = typeof body?.userId === 'string' ? body.userId : '';
@@ -45,6 +56,9 @@ export async function POST(req: NextRequest) {
     if (log?.id != null) await admin.from('audit_logs').delete().eq('id', log.id);
     return serverError('刪除使用者失敗', deleteError);
   }
+
+  // 對方上傳過的大頭照與背景圖一起刪掉
+  await removeUserMedia(admin, userId);
 
   return NextResponse.json({ success: true });
 }
